@@ -1,0 +1,356 @@
+import * as Crypto from "expo-crypto";
+import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useTranslation } from "react-i18next";
+
+import { BigButton } from "@/src/components/BigButton";
+import { CartLineRow } from "@/src/components/sell/CartLineRow";
+import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
+import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
+import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import { fetchProducts, type Product } from "@/src/lib/products/queries";
+import { enqueueSale } from "@/src/lib/sales/offlineQueue";
+import {
+  createCustomer,
+  fetchCustomers,
+  type Customer,
+  type PaymentMethod,
+} from "@/src/lib/sales/queries";
+import { cartSubtotal, saleTotal, type CartLine } from "@/src/lib/sales/totals";
+import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
+import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
+import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
+
+export default function SellScreen() {
+  const { profile } = useAuth();
+  const { t } = useTranslation();
+  const isOwner = profile?.role === "owner";
+  const sync = useSaleSync();
+
+  const [lines, setLines] = useState<CartLine[]>([]);
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Product[]>([]);
+  const [saleDiscount, setSaleDiscount] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const debounced = useDebouncedValue(search, 250);
+  const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
+  const total = useMemo(() => saleTotal(lines, discountCents), [lines, discountCents]);
+
+  useEffect(() => {
+    fetchCustomers()
+      .then(setCustomers)
+      .catch(() => setCustomers([]));
+  }, []);
+
+  useEffect(() => {
+    if (!debounced.trim()) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    fetchProducts(
+      { search: debounced, categoryId: null, lowStockOnly: false, status: "active" },
+      0,
+      isOwner
+    )
+      .then((rows) => !cancelled && setResults(rows.slice(0, 8)))
+      .catch(() => !cancelled && setResults([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced, isOwner]);
+
+  const addProduct = useCallback((product: Product) => {
+    setLines((current) => {
+      const existing = current.findIndex((line) => line.product_id === product.id);
+      if (existing >= 0) {
+        const next = [...current];
+        next[existing] = { ...next[existing], quantity: next[existing].quantity + 1 };
+        return next;
+      }
+      return [
+        ...current,
+        {
+          product_id: product.id,
+          name: product.name,
+          unit: product.unit,
+          quantity: product.unit === "kg" ? 1 : 1,
+          unit_price_cents: product.selling_price_cents,
+          discount_cents: 0,
+          unit_cost_cents: product.current_cost_cents,
+        },
+      ];
+    });
+    setSearch("");
+    setResults([]);
+  }, []);
+
+  const addByBarcode = useCallback(
+    async (barcode: string): Promise<string | null> => {
+      try {
+        const [match] = await fetchProducts(
+          { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
+          0,
+          isOwner
+        );
+        if (!match) {
+          setFlash(t('sell.notFound', { barcode }));
+          return t('sell.notFound', { barcode });
+        }
+        addProduct(match);
+        setFlash(t('sell.added', { name: match.name }));
+        return `${match.name} · ${centsToDisplay(match.selling_price_cents)} DH`;
+      } catch {
+        setFlash(t('sell.lookupFailed'));
+        return null;
+      }
+    },
+    [addProduct, isOwner]
+  );
+
+  // USB/Bluetooth scanners on web type the code and press Enter.
+  useKeyboardWedge((barcode) => {
+    setSearch("");
+    addByBarcode(barcode);
+  }, !paymentOpen);
+
+  const handleConfirm = async (method: PaymentMethod, customerId: string | null) => {
+    if (!profile || lines.length === 0) return;
+
+    setSaving(true);
+    setError(null);
+
+    const sale = pendingSaleFrom(
+      Crypto.randomUUID(),
+      {
+        customer_id: method === "credit" ? customerId : null,
+        payment_method: method,
+        discount_cents: discountCents,
+        total_cents: total,
+      },
+      lines
+    );
+
+    try {
+      // Queued first, then synced: if the request dies midway the sale is
+      // still on the device, and the id makes a retry safe to repeat.
+      await enqueueSale(sale);
+      await sync.sync();
+
+      setLines([]);
+      setSaleDiscount("");
+      setPaymentOpen(false);
+      setFlash(t('sell.recorded', { amount: formatMAD(total) }));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('sell.couldNotRecord'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <SyncBadge online={sync.online} pending={sync.pending} syncing={sync.syncing} />
+          <View style={styles.headerLinks}>
+            <Pressable onPress={() => router.push("/(app)/sell/credit")}>
+              <Text style={styles.link}>{t('sell.credit')}</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push("/(app)/sell/history")}>
+              <Text style={styles.link}>{t('sell.history')}</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.searchRow}>
+          <TextInput
+            style={[styles.search, styles.flex]}
+            placeholder={t('sell.searchPlaceholder')}
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {Platform.OS !== "web" && (
+            <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
+              <Text style={styles.scanButtonText}>{t('sell.scan')}</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {flash && <Text style={styles.flash}>{flash}</Text>}
+
+        {results.map((product) => (
+          <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
+            <Text style={styles.resultName}>{product.name}</Text>
+            <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <FlatList
+        data={lines}
+        keyExtractor={(line) => line.product_id}
+        renderItem={({ item, index }) => (
+          <CartLineRow
+            line={item}
+            onChange={(next) =>
+              setLines((current) => current.map((line, i) => (i === index ? next : line)))
+            }
+            onRemove={() => setLines((current) => current.filter((_, i) => i !== index))}
+          />
+        )}
+        ListEmptyComponent={<Text style={styles.empty}>{t('sell.empty')}</Text>}
+      />
+
+      {lines.length > 0 && (
+        <View style={styles.footer}>
+          <View style={styles.discountRow}>
+            <Text style={styles.footerLabel}>{t('sell.saleDiscount')}</Text>
+            <TextInput
+              style={styles.discountInput}
+              value={saleDiscount}
+              onChangeText={setSaleDiscount}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+            />
+          </View>
+
+          <View style={styles.totalRow}>
+            <Text style={styles.footerLabel}>
+              {t('sell.subtotal', { amount: formatMAD(cartSubtotal(lines)) })}
+            </Text>
+            <Text style={styles.totalValue}>{formatMAD(total)}</Text>
+          </View>
+
+          <BigButton label={t('sell.charge')} onPress={() => setPaymentOpen(true)} />
+        </View>
+      )}
+
+      <ContinuousScanner
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanned={addByBarcode}
+      />
+
+      <PaymentSheet
+        visible={paymentOpen}
+        totalCents={total}
+        customers={customers}
+        saving={saving}
+        error={error}
+        onClose={() => setPaymentOpen(false)}
+        onConfirm={handleConfirm}
+        onCreateCustomer={async (name) => {
+          try {
+            const created = await createCustomer(name, null);
+            setCustomers((current) => [...current, created]);
+            return created;
+          } catch {
+            return null;
+          }
+        }}
+      />
+    </View>
+  );
+}
+
+function SyncBadge({
+  online,
+  pending,
+  syncing,
+}: {
+  online: boolean;
+  pending: number;
+  syncing: boolean;
+}) {
+  const { t } = useTranslation();
+  const label = syncing
+    ? t('sell.syncSyncing')
+    : !online
+      ? pending > 0 ? t('sell.syncOfflineQueued', { count: pending }) : t('sell.syncOffline')
+      : pending > 0
+        ? t('sell.syncPending', { count: pending })
+        : t('sell.syncOnline');
+
+  return (
+    <View style={[styles.badge, !online && styles.badgeOffline, pending > 0 && styles.badgePending]}>
+      <Text style={[styles.badgeText, !online && styles.badgeTextOffline]}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff" },
+  header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerLinks: { flexDirection: "row", gap: 16 },
+  link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
+  searchRow: { flexDirection: "row", gap: 10 },
+  flex: { flex: 1 },
+  search: {
+    minHeight: 56,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    paddingHorizontal: 16,
+    fontSize: 17,
+  },
+  scanButton: {
+    minHeight: 56,
+    paddingHorizontal: 22,
+    borderRadius: 10,
+    backgroundColor: "#1d7a46",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  flash: { color: "#1d7a46", fontSize: 14 },
+  result: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: "#f4f4f4",
+  },
+  resultName: { fontSize: 15, fontWeight: "600", flex: 1 },
+  resultPrice: { fontSize: 15, fontWeight: "700" },
+  empty: { textAlign: "center", marginTop: 48, color: "#666", fontSize: 15 },
+  footer: { padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: "#eee" },
+  discountRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  footerLabel: { fontSize: 15, color: "#555" },
+  discountInput: {
+    minHeight: 48,
+    minWidth: 110,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    paddingHorizontal: 14,
+    fontSize: 16,
+    textAlign: "right",
+  },
+  totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  totalValue: { fontSize: 30, fontWeight: "800" },
+  badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, backgroundColor: "#e8f3ec" },
+  badgePending: { backgroundColor: "#fff3d6" },
+  badgeOffline: { backgroundColor: "#fdecea" },
+  badgeText: { fontSize: 13, fontWeight: "700", color: "#1d7a46" },
+  badgeTextOffline: { color: "#b3261e" },
+});

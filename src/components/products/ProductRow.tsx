@@ -1,0 +1,81 @@
+import { memo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
+import type { Product } from "@/src/lib/products/queries";
+
+export const PRODUCT_ROW_HEIGHT = 92;
+
+type Props = {
+  product: Product;
+  showCost: boolean;
+  onPress?: () => void;
+};
+
+function ProductRowComponent({ product, showCost, onPress }: Props) {
+  const cost = showCost ? product.current_cost_cents : null;
+  // Cost 0 means the product has never been received, not that it is free.
+  const hasCost = cost !== null && cost > 0;
+  const unitProfit = hasCost ? product.selling_price_cents - cost : null;
+  const margin = hasCost ? marginPercent(product.selling_price_cents, cost) : null;
+  const belowCost = unitProfit !== null && unitProfit < 0;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && onPress ? styles.pressed : null]}
+      onPress={onPress}
+    >
+      <View style={styles.main}>
+        <Text style={styles.name} numberOfLines={1}>
+          {product.name}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {product.barcode ?? "no barcode"} · {product.stock_quantity} {product.unit}
+          {product.is_low_stock ? " · LOW" : ""}
+          {product.active ? "" : " · inactive"}
+        </Text>
+      </View>
+
+      <View style={styles.right}>
+        <Text style={styles.price}>{formatMAD(product.selling_price_cents)}</Text>
+
+        {showCost &&
+          (hasCost ? (
+            <>
+              <Text style={styles.cost}>buy {formatMAD(cost)}</Text>
+              <Text style={[styles.profit, belowCost && styles.profitNegative]}>
+                {(unitProfit as number) >= 0 ? "+" : ""}
+                {formatMAD(unitProfit as number)} · {formatMargin(margin)}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.cost}>no cost yet</Text>
+          ))}
+      </View>
+    </Pressable>
+  );
+}
+
+export const ProductRow = memo(ProductRowComponent);
+
+const styles = StyleSheet.create({
+  row: {
+    height: PRODUCT_ROW_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    gap: 12,
+  },
+  pressed: { backgroundColor: "#f6f6f6" },
+  main: { flex: 1, gap: 4 },
+  name: { fontSize: 16, fontWeight: "600" },
+  meta: { fontSize: 13, color: "#666" },
+  right: { alignItems: "flex-end", gap: 2 },
+  price: { fontSize: 17, fontWeight: "700" },
+  cost: { fontSize: 13, color: "#666" },
+  profit: { fontSize: 14, color: "#1d7a46", fontWeight: "700" },
+  profitNegative: { color: "#b3261e" },
+});

@@ -1,0 +1,142 @@
+import { supabase } from "@/src/lib/supabase/client";
+
+export type Supplier = { id: string; name: string; phone: string | null };
+
+export type PurchaseSummary = {
+  id: string;
+  purchase_date: string;
+  notes: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  total_cents: number;
+  line_count: number;
+};
+
+export type MonthlyTotal = {
+  month: string;
+  total_cents: number;
+  purchase_count: number;
+};
+
+export type SupplierTotal = {
+  supplier_id: string | null;
+  supplier_name: string;
+  total_cents: number;
+  purchase_count: number;
+};
+
+export type PricePoint = {
+  id: string;
+  created_at: string;
+  quantity: number;
+  unit_cost_cents: number;
+};
+
+export type DraftLine = {
+  product_id: string;
+  quantity: number;
+  unit_cost_cents: number;
+  expiry_date?: string | null;
+};
+
+export async function fetchSuppliers(): Promise<Supplier[]> {
+  const { data, error } = await supabase
+    .from("suppliers")
+    .select("id, name, phone")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Supplier[];
+}
+
+export async function createSupplier(name: string, phone: string | null): Promise<Supplier> {
+  const { data, error } = await supabase
+    .from("suppliers")
+    .insert({ name, phone })
+    .select("id, name, phone")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Supplier;
+}
+
+export async function fetchLastPurchasePrice(productId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("purchase_items")
+    .select("unit_cost_cents")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? (data as { unit_cost_cents: number }).unit_cost_cents : null;
+}
+
+// Stock and weighted-average cost are never written here: inserting the
+// purchase lines fires apply_purchase_item, which owns both plus cost_history.
+export async function createPurchase(
+  supplierId: string | null,
+  lines: DraftLine[],
+  ownerId: string,
+  notes: string | null
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("purchases")
+    .insert({ supplier_id: supplierId, created_by: ownerId, notes })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  const purchaseId = (data as { id: string }).id;
+
+  const { error: itemsError } = await supabase
+    .from("purchase_items")
+    .insert(lines.map((line) => ({ ...line, purchase_id: purchaseId })));
+
+  if (itemsError) throw new Error(itemsError.message);
+  return purchaseId;
+}
+
+export async function fetchPurchases(page: number, pageSize = 25): Promise<PurchaseSummary[]> {
+  const from = page * pageSize;
+  const { data, error } = await supabase
+    .from("purchase_summaries")
+    .select("id, purchase_date, notes, supplier_id, supplier_name, total_cents, line_count")
+    .order("purchase_date", { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PurchaseSummary[];
+}
+
+export async function fetchMonthlyTotals(): Promise<MonthlyTotal[]> {
+  const { data, error } = await supabase
+    .from("purchase_monthly_totals")
+    .select("month, total_cents, purchase_count")
+    .order("month", { ascending: false })
+    .limit(12);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as MonthlyTotal[];
+}
+
+export async function fetchSupplierTotals(): Promise<SupplierTotal[]> {
+  const { data, error } = await supabase
+    .from("purchase_supplier_totals")
+    .select("supplier_id, supplier_name, total_cents, purchase_count")
+    .order("total_cents", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SupplierTotal[];
+}
+
+export async function fetchPriceHistory(productId: string): Promise<PricePoint[]> {
+  const { data, error } = await supabase
+    .from("purchase_items")
+    .select("id, created_at, quantity, unit_cost_cents")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PricePoint[];
+}

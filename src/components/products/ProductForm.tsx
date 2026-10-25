@@ -1,0 +1,305 @@
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+
+import { BigButton } from "@/src/components/BigButton";
+import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
+import {
+  centsToDisplay,
+  formatMAD,
+  formatMargin,
+  marginPercent,
+  parseMoneyToCents,
+  parseQuantity,
+} from "@/src/lib/money";
+import {
+  findByBarcode,
+  type Category,
+  type Product,
+  type ProductInput,
+  type ProductUnit,
+} from "@/src/lib/products/queries";
+
+const UNITS: ProductUnit[] = ["piece", "kg", "pack"];
+
+type Props = {
+  categories: Category[];
+  initial?: Product | null;
+  submitLabel: string;
+  onSubmit: (input: ProductInput) => Promise<void>;
+};
+
+export function ProductForm({ categories, initial, submitLabel, onSubmit }: Props) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [barcode, setBarcode] = useState(initial?.barcode ?? "");
+  const [categoryId, setCategoryId] = useState<string | null>(initial?.category_id ?? null);
+  const [unit, setUnit] = useState<ProductUnit>(initial?.unit ?? "piece");
+  const [price, setPrice] = useState(
+    initial ? centsToDisplay(initial.selling_price_cents) : ""
+  );
+  const [threshold, setThreshold] = useState(String(initial?.low_stock_threshold ?? 0));
+  const [active, setActive] = useState(initial?.active ?? true);
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [duplicate, setDuplicate] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const trimmed = barcode.trim();
+    if (!trimmed || trimmed === initial?.barcode) {
+      setDuplicate(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const existing = await findByBarcode(trimmed, true);
+        if (!cancelled) setDuplicate(existing && existing.id !== initial?.id ? existing.name : null);
+      } catch {
+        if (!cancelled) setDuplicate(null);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [barcode, initial?.barcode, initial?.id]);
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    const priceCents = parseMoneyToCents(price);
+    if (!name.trim()) return setError("Name is required.");
+    if (priceCents === null) return setError("Selling price is not a valid amount.");
+
+    const thresholdValue = parseQuantity(threshold) ?? 0;
+
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        name: name.trim(),
+        barcode: barcode.trim() || null,
+        category_id: categoryId,
+        unit,
+        selling_price_cents: priceCents,
+        low_stock_threshold: thresholdValue,
+        active,
+      });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Could not save the product.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Field label="Name">
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Product name" />
+      </Field>
+
+      <Field label="Barcode">
+        <View style={styles.row}>
+          <TextInput
+            style={[styles.input, styles.flex]}
+            value={barcode}
+            onChangeText={setBarcode}
+            placeholder="Barcode"
+            keyboardType="number-pad"
+          />
+          {Platform.OS !== "web" && (
+            <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
+              <Text style={styles.scanButtonText}>Scan</Text>
+            </Pressable>
+          )}
+        </View>
+        {duplicate && (
+          <Text style={styles.warning}>
+            This barcode is already used by &quot;{duplicate}&quot;.
+          </Text>
+        )}
+      </Field>
+
+      <Field label="Category">
+        <View style={styles.chips}>
+          <Chip label="None" selected={categoryId === null} onPress={() => setCategoryId(null)} />
+          {categories.map((category) => (
+            <Chip
+              key={category.id}
+              label={category.name}
+              selected={categoryId === category.id}
+              onPress={() => setCategoryId(category.id)}
+            />
+          ))}
+        </View>
+      </Field>
+
+      <Field label="Unit">
+        <View style={styles.chips}>
+          {UNITS.map((value) => (
+            <Chip
+              key={value}
+              label={value}
+              selected={unit === value}
+              onPress={() => setUnit(value)}
+            />
+          ))}
+        </View>
+      </Field>
+
+      <Field label="Selling price (DH)">
+        <TextInput
+          style={styles.input}
+          value={price}
+          onChangeText={setPrice}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+        />
+      </Field>
+
+      <Field label="Low stock threshold">
+        <TextInput
+          style={styles.input}
+          value={threshold}
+          onChangeText={setThreshold}
+          placeholder="0"
+          keyboardType="decimal-pad"
+        />
+      </Field>
+
+      <View style={styles.switchRow}>
+        <Text style={styles.label}>Active</Text>
+        <Switch value={active} onValueChange={setActive} />
+      </View>
+
+      {initial && <CostSummary product={initial} price={price} />}
+
+      {error && <Text style={styles.error}>{error}</Text>}
+
+      <BigButton
+        label={submitting ? "Saving..." : submitLabel}
+        onPress={handleSubmit}
+        disabled={submitting}
+      />
+
+      <BarcodeScannerModal
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanned={(value) => {
+          setBarcode(value);
+          setScannerOpen(false);
+        }}
+      />
+    </ScrollView>
+  );
+}
+
+// Shows what the price being typed would actually earn, using the product's
+// current weighted-average cost. Owners only: cashiers get no cost column.
+function CostSummary({ product, price }: { product: Product; price: string }) {
+  const cost = product.current_cost_cents;
+  const typedPrice = parseMoneyToCents(price);
+
+  if (cost === null || cost <= 0) {
+    return (
+      <Text style={styles.note}>
+        Stock {product.stock_quantity} · no buying price yet. Receive it in Stock In to track
+        profit.
+      </Text>
+    );
+  }
+
+  const profit = typedPrice === null ? null : typedPrice - cost;
+  const margin = typedPrice === null ? null : marginPercent(typedPrice, cost);
+
+  return (
+    <View style={styles.summary}>
+      <Text style={styles.summaryLine}>
+        Stock {product.stock_quantity} · buying price {formatMAD(cost)}
+      </Text>
+      {profit !== null && (
+        <Text style={[styles.summaryProfit, profit < 0 && styles.summaryLoss]}>
+          {profit >= 0 ? "Profit" : "Loss"} {formatMAD(Math.abs(profit))} per {product.unit} ·{" "}
+          {formatMargin(margin)}
+        </Text>
+      )}
+      <Text style={styles.note}>Stock and buying price change through Stock In, not here.</Text>
+      <Pressable onPress={() => router.push(`/(app)/products/history/${product.id}`)}>
+        <Text style={styles.historyLink}>See buying price history →</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Chip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { padding: 20, gap: 18, paddingBottom: 48 },
+  field: { gap: 8 },
+  label: { fontSize: 14, fontWeight: "600", color: "#444" },
+  input: {
+    minHeight: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  row: { flexDirection: "row", gap: 10 },
+  flex: { flex: 1 },
+  scanButton: {
+    minHeight: 52,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: "#1d7a46",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#eee",
+  },
+  chipSelected: { backgroundColor: "#1d7a46" },
+  chipText: { fontSize: 15, color: "#333" },
+  chipTextSelected: { color: "#fff", fontWeight: "600" },
+  switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  note: { fontSize: 13, color: "#666", fontStyle: "italic" },
+  summary: { backgroundColor: "#f3f7f4", borderRadius: 10, padding: 14, gap: 6 },
+  summaryLine: { fontSize: 15, color: "#333" },
+  summaryProfit: { fontSize: 17, fontWeight: "700", color: "#1d7a46" },
+  summaryLoss: { color: "#b3261e" },
+  historyLink: { color: "#1d7a46", fontWeight: "600", fontSize: 14, marginTop: 2 },
+  warning: { color: "#b36b00", fontSize: 14 },
+  error: { color: "#b3261e", fontSize: 14 },
+});
