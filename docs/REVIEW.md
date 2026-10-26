@@ -334,8 +334,9 @@ Each step is independent and safe to do alone. Steps within a group can be done 
 **A1** · `app/(app)/stock-in/index.tsx:116-119`  
 Replace the sequential selling-price `for` loop with `Promise.all`, catch partial failures separately from the delivery save, and surface a per-product warning message.
 
-**A2** · `app/(app)/stock-in/index.tsx:102-105`  
-Replace the inline `Math.round(unit_cost_cents * quantity)` total with `lineTotalCents` imported from `src/lib/money.ts`. Add a test pinning the output to the expected centimes for a known fractional-kg delivery.
+**A2** ✅ · `app/(app)/stock-in/index.tsx:102-105`  
+Replace the inline `Math.round(unit_cost_cents * quantity)` total with `lineTotalCents` imported from `src/lib/money.ts`. Add a test pinning the output to the expected centimes for a known fractional-kg delivery.  
+_Done — branch `refactor/a2-delivery-total`. Test already present in `tests/stock/stockFlow.test.ts`._
 
 ### Group B — Fix the remaining high-risk issues (H3, H4)
 
