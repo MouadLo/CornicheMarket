@@ -2,9 +2,13 @@ import NetInfo from "@react-native-community/netinfo";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  MAX_RETRY_ATTEMPTS,
   countPendingSales,
+  countStuckSales,
+  isTemporaryError,
   listPendingSales,
   markAttempt,
+  quarantineSale,
   removePendingSale,
   type PendingSale,
 } from "@/src/lib/sales/offlineQueue";
@@ -13,6 +17,7 @@ import { submitSale } from "@/src/lib/sales/queries";
 export type SyncState = {
   online: boolean;
   pending: number;
+  stuck: number;
   syncing: boolean;
   lastError: string | null;
 };
@@ -21,6 +26,7 @@ export function useSaleSync() {
   const [state, setState] = useState<SyncState>({
     online: true,
     pending: 0,
+    stuck: 0,
     syncing: false,
     lastError: null,
   });
@@ -30,8 +36,8 @@ export function useSaleSync() {
   const syncing = useRef(false);
 
   const refreshPending = useCallback(async () => {
-    const pending = await countPendingSales();
-    setState((current) => ({ ...current, pending }));
+    const [pending, stuck] = await Promise.all([countPendingSales(), countStuckSales()]);
+    setState((current) => ({ ...current, pending, stuck }));
   }, []);
 
   const sync = useCallback(async () => {
@@ -53,16 +59,28 @@ export function useSaleSync() {
         await submitSale(sale);
         await removePendingSale(sale.id);
       } catch (error) {
-        lastError = error instanceof Error ? error.message : "Sync failed";
-        await markAttempt(sale.id, lastError);
-        // Stop at the first failure so sales keep their original order.
-        break;
+        const message = error instanceof Error ? error.message : "Sync failed";
+        lastError = message;
+
+        const temporary = isTemporaryError(message);
+        const exhausted = sale.attempts + 1 >= MAX_RETRY_ATTEMPTS;
+
+        if (!temporary || exhausted) {
+          // Permanent failure or retry budget spent → quarantine so the rest
+          // of the queue is not blocked. Data is never deleted.
+          await quarantineSale(sale, message);
+        } else {
+          // Transient network error → record the attempt and stop this run
+          // to preserve the sale's position in the ordering.
+          await markAttempt(sale.id, message);
+          break;
+        }
       }
     }
 
     syncing.current = false;
-    const pending = await countPendingSales();
-    setState((current) => ({ ...current, syncing: false, pending, lastError }));
+    const [pending, stuck] = await Promise.all([countPendingSales(), countStuckSales()]);
+    setState((current) => ({ ...current, syncing: false, pending, stuck, lastError }));
   }, []);
 
   useEffect(() => {

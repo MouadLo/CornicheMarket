@@ -10,9 +10,14 @@
  */
 import {
   countPendingSales,
+  countStuckSales,
   enqueueSale,
+  isTemporaryError,
   listPendingSales,
+  listStuckSales,
+  quarantineSale,
   removePendingSale,
+  retryStuckSale,
   type PendingSale,
 } from "../../src/lib/sales/offlineQueue";
 import { pendingSaleFrom } from "../../src/lib/sales/useSaleSync";
@@ -121,5 +126,81 @@ describe("sync cycle: no duplicate submissions", () => {
 
     const remaining = (await listPendingSales()).map((s) => s.id);
     expect(remaining).toEqual(["sale-2", "sale-3"]);
+  });
+});
+
+describe("isTemporaryError", () => {
+  it.each([
+    "Network request failed",
+    "Failed to fetch",
+    "fetch failed",
+    "Socket timeout",
+    "connection timeout",
+    "503 Service Unavailable",
+    "502 Bad Gateway",
+    "504 Gateway Timeout",
+  ])("classifies '%s' as temporary", (msg) => {
+    expect(isTemporaryError(msg)).toBe(true);
+  });
+
+  it.each([
+    "invalid input syntax",
+    "foreign key violation",
+    "duplicate key value",
+    "400 Bad Request",
+    "401 Unauthorized",
+    "403 Forbidden",
+    "404 Not Found",
+    "22P02",
+  ])("classifies '%s' as permanent", (msg) => {
+    expect(isTemporaryError(msg)).toBe(false);
+  });
+});
+
+describe("quarantine: stuck queue", () => {
+  function makeSale(id: string): PendingSale {
+    return pendingSaleFrom(
+      id,
+      { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 700 },
+      []
+    );
+  }
+
+  it("moves a sale from the retry queue to the stuck list", async () => {
+    const sale = makeSale("stuck-1");
+    await enqueueSale(sale);
+    expect(await countPendingSales()).toBe(1);
+
+    await quarantineSale(sale, "foreign key violation");
+
+    expect(await countPendingSales()).toBe(0);
+    expect(await countStuckSales()).toBe(1);
+    const [entry] = await listStuckSales();
+    expect(entry.sale.id).toBe("stuck-1");
+    expect(entry.error).toBe("foreign key violation");
+  });
+
+  it("quarantine is idempotent — calling twice does not duplicate", async () => {
+    const sale = makeSale("stuck-2");
+    await enqueueSale(sale);
+    await quarantineSale(sale, "error A");
+    await quarantineSale(sale, "error B"); // second call: already absent from queue
+    expect(await countStuckSales()).toBe(1);
+    // First error wins
+    const [entry] = await listStuckSales();
+    expect(entry.error).toBe("error A");
+  });
+
+  it("retryStuckSale moves the sale back to the queue with attempts reset", async () => {
+    const sale = { ...makeSale("stuck-3"), attempts: 5 };
+    await quarantineSale(sale, "some error");
+    expect(await countStuckSales()).toBe(1);
+
+    await retryStuckSale("stuck-3");
+
+    expect(await countStuckSales()).toBe(0);
+    expect(await countPendingSales()).toBe(1);
+    const [queued] = await listPendingSales();
+    expect(queued.attempts).toBe(0);
   });
 });
