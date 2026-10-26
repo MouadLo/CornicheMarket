@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { fetchExpiringBatches, type ExpiringBatch } from "@/src/lib/inventory/queries";
 
 const RANGES = [7, 30, 90];
 
 export default function ExpiringScreen() {
+  const { t } = useTranslation();
   const [withinDays, setWithinDays] = useState(30);
   const [batches, setBatches] = useState<ExpiringBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,10 +18,10 @@ export default function ExpiringScreen() {
     fetchExpiringBatches(withinDays)
       .then(setBatches)
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Could not load batches.")
+        setError(loadError instanceof Error ? loadError.message : t('stockIn.expiringLoadError'))
       )
       .finally(() => setLoading(false));
-  }, [withinDays]);
+  }, [withinDays, t]);
 
   useEffect(load, [load]);
 
@@ -33,7 +35,7 @@ export default function ExpiringScreen() {
             onPress={() => setWithinDays(range)}
           >
             <Text style={[styles.chipText, withinDays === range && styles.chipTextActive]}>
-              Next {range} days
+              {t('stockIn.expiringNext', { days: range })}
             </Text>
           </Pressable>
         ))}
@@ -44,8 +46,7 @@ export default function ExpiringScreen() {
         <ActivityIndicator style={{ marginTop: 24 }} />
       ) : batches.length === 0 ? (
         <Text style={styles.empty}>
-          Nothing expiring in the next {withinDays} days. Expiry dates are set per delivery in
-          Stock In.
+          {t('stockIn.expiringNone', { days: withinDays })}
         </Text>
       ) : (
         batches.map((batch) => {
@@ -57,16 +58,15 @@ export default function ExpiringScreen() {
               <View style={styles.rowMain}>
                 <Text style={styles.name}>{batch.product_name}</Text>
                 <Text style={styles.meta}>
-                  delivered {batch.delivered_quantity} {batch.unit} · {batch.stock_quantity} in
-                  stock now
+                  {t('stockIn.expiringDelivered')} {batch.delivered_quantity} {batch.unit} · {batch.stock_quantity} {t('stockIn.expiringInStock')}
                 </Text>
               </View>
               <View style={styles.right}>
                 <Text style={[styles.days, expired && styles.expired, urgent && styles.urgent]}>
                   {expired
-                    ? `${Math.abs(batch.days_left)}d ago`
+                    ? t('stockIn.expiringDaysAgo', { days: Math.abs(batch.days_left) })
                     : batch.days_left === 0
-                      ? "today"
+                      ? t('stockIn.expiringToday')
                       : `${batch.days_left}d`}
                 </Text>
                 <Text style={styles.date}>{batch.expiry_date}</Text>
@@ -76,11 +76,7 @@ export default function ExpiringScreen() {
         })
       )}
 
-      <Text style={styles.note}>
-        Costing uses a weighted average rather than tracking each batch separately, so this lists
-        the batches that were delivered with an expiry date and the product&apos;s stock today —
-        it cannot tell you how much of one particular batch is left on the shelf.
-      </Text>
+      <Text style={styles.note}>{t('stockIn.expiringNote')}</Text>
     </ScrollView>
   );
 }

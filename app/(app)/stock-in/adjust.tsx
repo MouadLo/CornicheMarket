@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -17,6 +18,7 @@ import type { Product } from "@/src/lib/products/queries";
 
 export default function AdjustScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -35,8 +37,6 @@ export default function AdjustScreen() {
 
   useEffect(load, [load]);
 
-  // Every reason here except a correction removes stock, so the number the
-  // user types is treated as a quantity lost unless they are correcting.
   const isLoss = reason !== "count_correction";
   const parsed = parseQuantity(quantity);
   const delta = parsed === null ? null : isLoss ? -Math.abs(parsed) : parsed;
@@ -53,7 +53,7 @@ export default function AdjustScreen() {
       setNote("");
       load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save the adjustment.");
+      setError(saveError instanceof Error ? saveError.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -61,18 +61,18 @@ export default function AdjustScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.sectionLabel}>Adjust stock</Text>
+      <Text style={styles.sectionLabel}>{t('stockIn.adjustTitle')}</Text>
 
       {product ? (
         <View style={styles.selected}>
           <View style={styles.selectedMain}>
             <Text style={styles.name}>{product.name}</Text>
             <Text style={styles.meta}>
-              {product.stock_quantity} {product.unit} on record
+              {product.stock_quantity} {product.unit} {t('stockIn.adjustOnRecord')}
             </Text>
           </View>
           <Pressable onPress={() => setProduct(null)} hitSlop={8}>
-            <Text style={styles.change}>Change</Text>
+            <Text style={styles.change}>{t('stockIn.adjustChange')}</Text>
           </Pressable>
         </View>
       ) : (
@@ -81,7 +81,7 @@ export default function AdjustScreen() {
 
       {product && (
         <>
-          <Text style={styles.label}>Reason</Text>
+          <Text style={styles.label}>{t('stockIn.adjustReason')}</Text>
           <View style={styles.chips}>
             {ADJUSTMENT_REASONS.map((option) => (
               <Pressable
@@ -99,7 +99,7 @@ export default function AdjustScreen() {
           </View>
 
           <Text style={styles.label}>
-            {isLoss ? "Quantity lost" : "Difference (use - to reduce)"}
+            {isLoss ? t('stockIn.adjustQuantityLost') : t('stockIn.adjustDifference')}
           </Text>
           <TextInput
             style={styles.input}
@@ -113,7 +113,7 @@ export default function AdjustScreen() {
             style={styles.input}
             value={note}
             onChangeText={setNote}
-            placeholder="Note (optional)"
+            placeholder={t('stockIn.adjustNote')}
           />
 
           {delta !== null && delta !== 0 && (
@@ -121,7 +121,7 @@ export default function AdjustScreen() {
               Stock {product.stock_quantity} → {Number((product.stock_quantity + delta).toFixed(3))}{" "}
               {product.unit}
               {isOwner && product.current_cost_cents
-                ? ` · loss ${formatMAD(lossValueCents(delta, product.current_cost_cents) ?? 0)}`
+                ? ` · ${formatMAD(lossValueCents(delta, product.current_cost_cents) ?? 0)}`
                 : ""}
             </Text>
           )}
@@ -129,16 +129,16 @@ export default function AdjustScreen() {
           {error && <Text style={styles.error}>{error}</Text>}
 
           <BigButton
-            label={saving ? "Saving..." : "Record adjustment"}
+            label={saving ? t('stockIn.adjustSaving') : t('stockIn.adjustRecord')}
             onPress={handleSave}
             disabled={saving || delta === null || delta === 0}
           />
         </>
       )}
 
-      <Text style={styles.sectionLabel}>Recent adjustments</Text>
+      <Text style={styles.sectionLabel}>{t('stockIn.adjustRecent')}</Text>
       {history.length === 0 ? (
-        <Text style={styles.empty}>No adjustments recorded yet.</Text>
+        <Text style={styles.empty}>{t('stockIn.adjustNone')}</Text>
       ) : (
         history.map((record) => (
           <View key={record.id} style={styles.historyRow}>

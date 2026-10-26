@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { applyPercent, formatMAD } from "@/src/lib/money";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function BulkPriceModal({ visible, categories, onClose, onApplied }: Props) {
+  const { t } = useTranslation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [percent, setPercent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -30,7 +32,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
       setResult(`Updated ${count} product${count === 1 ? "" : "s"}.`);
       onApplied();
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : "Could not update prices.");
+      setError(applyError instanceof Error ? applyError.message : t('products.bulkUpdateError'));
     } finally {
       setSubmitting(false);
     }
@@ -52,7 +54,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
           <Text style={styles.label}>Category</Text>
           <View style={styles.chips}>
             <Chip
-              label="All active products"
+              label={t('products.bulkAll')}
               selected={categoryId === null}
               onPress={() => setCategoryId(null)}
             />
@@ -85,11 +87,11 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
           {result && <Text style={styles.success}>{result}</Text>}
 
           <BigButton
-            label={submitting ? "Applying..." : "Apply"}
+            label={submitting ? t('common.applying') : t('common.apply')}
             onPress={handleApply}
             disabled={!valid || submitting}
           />
-          <BigButton label="Close" variant="secondary" onPress={close} />
+          <BigButton label={t('common.close')} variant="secondary" onPress={close} />
         </View>
       </View>
     </Modal>

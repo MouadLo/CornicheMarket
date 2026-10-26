@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
@@ -17,6 +18,7 @@ type CountLine = {
 
 export default function StockCountScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const [lines, setLines] = useState<CountLine[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -37,9 +39,9 @@ export default function StockCountScreen() {
       true
     ).catch(() => []);
 
-    if (!match) return `Unknown barcode ${barcode}`;
+    if (!match) return t('stockIn.countUnknown', { barcode });
     addProduct(match);
-    return `${match.name} added to the count`;
+    return t('stockIn.countAdded', { name: match.name });
   };
 
   const apply = async () => {
@@ -62,7 +64,7 @@ export default function StockCountScreen() {
         } catch (error) {
           return {
             ...line,
-            applied: { error: error instanceof Error ? error.message : "Failed" },
+            applied: { error: error instanceof Error ? error.message : t('common.error') },
           };
         }
       })
@@ -73,21 +75,17 @@ export default function StockCountScreen() {
     const changed = results.filter(
       (line) => line.applied && "delta" in line.applied && line.applied.delta !== 0
     ).length;
-    setDone(`Applied. ${changed} product${changed === 1 ? "" : "s"} corrected.`);
+    setDone(t('stockIn.countDone', { count: changed }));
   };
 
   const countable = lines.filter((line) => parseQuantity(line.counted) !== null && !line.applied);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.intro}>
-        Scan or search each item on the shelf and type what you actually counted. Differences are
-        worked out against the live stock when you apply, so a sale during the count is not
-        overwritten.
-      </Text>
+      <Text style={styles.intro}>{t('stockIn.countIntro')}</Text>
 
       {Platform.OS !== "web" && (
-        <BigButton label="Scan items" onPress={() => setScannerOpen(true)} />
+        <BigButton label={t('stockIn.countScanItems')} onPress={() => setScannerOpen(true)} />
       )}
 
       <ProductSearchPicker onPick={addProduct} excludeIds={lines.map((line) => line.product.id)} />
@@ -106,13 +104,13 @@ export default function StockCountScreen() {
                 onPress={() => setLines((current) => current.filter((_, i) => i !== index))}
                 hitSlop={8}
               >
-                <Text style={styles.remove}>Remove</Text>
+                <Text style={styles.remove}>{t('stockIn.countRemove')}</Text>
               </Pressable>
             </View>
 
             <View style={styles.countRow}>
               <Text style={styles.systemQty}>
-                system {line.product.stock_quantity} {line.product.unit}
+                {t('stockIn.countSystem')} {line.product.stock_quantity} {line.product.unit}
               </Text>
               <TextInput
                 style={styles.input}
@@ -123,7 +121,7 @@ export default function StockCountScreen() {
                   )
                 }
                 keyboardType="decimal-pad"
-                placeholder="counted"
+                placeholder={t('stockIn.countCounted')}
               />
             </View>
 
@@ -131,8 +129,8 @@ export default function StockCountScreen() {
               "delta" in line.applied ? (
                 <Text style={styles.appliedOk}>
                   {line.applied.delta === 0
-                    ? "Matched — no change"
-                    : `Corrected by ${line.applied.delta > 0 ? "+" : ""}${line.applied.delta}`}
+                    ? t('stockIn.countMatched')
+                    : t('stockIn.countCorrected', { delta: line.applied.delta > 0 ? `+${line.applied.delta}` : String(line.applied.delta) })}
                 </Text>
               ) : (
                 <Text style={styles.error}>{line.applied.error}</Text>
@@ -147,8 +145,8 @@ export default function StockCountScreen() {
                   ]}
                 >
                   {difference === 0
-                    ? "Matches the system"
-                    : `${difference > 0 ? "+" : ""}${Number(difference.toFixed(3))} vs system`}
+                    ? t('stockIn.countMatched')
+                    : `${difference > 0 ? "+" : ""}${Number(difference.toFixed(3))}`}
                 </Text>
               )
             )}
@@ -158,7 +156,7 @@ export default function StockCountScreen() {
 
       {countable.length > 0 && (
         <BigButton
-          label={applying ? "Applying..." : `Apply ${countable.length} counted item${countable.length === 1 ? "" : "s"}`}
+          label={applying ? t('stockIn.countApplying') : t('stockIn.countApply', { count: countable.length })}
           onPress={apply}
           disabled={applying}
         />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import { fetchProducts, findByBarcode, type Product } from "@/src/lib/products/queries";
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function ProductSearchPicker({ onPick, excludeIds }: Props) {
+  const { t } = useTranslation();
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -63,7 +65,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
       );
       if (full) pick(full);
     } catch {
-      setNotice("Could not look up that barcode.");
+      setNotice(t('stockIn.barcodeError'));
     }
   };
 
@@ -72,7 +74,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
       <View style={styles.row}>
         <TextInput
           style={[styles.input, styles.flex]}
-          placeholder="Search a product to add"
+          placeholder={t('stockIn.searchProduct')}
           value={term}
           onChangeText={setTerm}
           autoCapitalize="none"

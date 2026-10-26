@@ -1,5 +1,5 @@
 // https://docs.expo.dev/guides/using-eslint/
 module.exports = {
   extends: 'expo',
-  ignorePatterns: ['supabase/functions/**'],
+  ignorePatterns: ['supabase/functions/**', 'dist/**'],
 };

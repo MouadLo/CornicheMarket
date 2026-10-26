@@ -1,6 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -15,6 +16,7 @@ import {
 export default function EditProduct() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -31,10 +33,10 @@ export default function EditProduct() {
         setProduct(loadedProduct);
       })
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Could not load the product.")
+        setError(loadError instanceof Error ? loadError.message : t('products.formLoadError'))
       )
       .finally(() => setLoading(false));
-  }, [id, isOwner]);
+  }, [id, isOwner, t]);
 
   if (profile && !isOwner) {
     return <Redirect href="/(app)/products" />;
@@ -42,13 +44,13 @@ export default function EditProduct() {
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
   if (error) return <Text style={{ padding: 20, color: "#b3261e" }}>{error}</Text>;
-  if (!product) return <Text style={{ padding: 20 }}>Product not found.</Text>;
+  if (!product) return <Text style={{ padding: 20 }}>{t('products.formProductNotFound')}</Text>;
 
   return (
     <ProductForm
       categories={categories}
       initial={product}
-      submitLabel="Save changes"
+      submitLabel={t('products.formSave')}
       onSubmit={async (input) => {
         await updateProduct(product.id, input);
         router.back();

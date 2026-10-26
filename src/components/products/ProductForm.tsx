@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function ProductForm({ categories, initial, submitLabel, onSubmit }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
   const [barcode, setBarcode] = useState(initial?.barcode ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.category_id ?? null);
@@ -72,8 +74,8 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
     setError(null);
 
     const priceCents = parseMoneyToCents(price);
-    if (!name.trim()) return setError("Name is required.");
-    if (priceCents === null) return setError("Selling price is not a valid amount.");
+    if (!name.trim()) return setError(t('products.formNameRequired'));
+    if (priceCents === null) return setError(t('products.formPriceInvalid'));
 
     const thresholdValue = parseQuantity(threshold) ?? 0;
 
@@ -89,7 +91,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
         active,
       });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Could not save the product.");
+      setError(submitError instanceof Error ? submitError.message : t('products.formSaveError'));
     } finally {
       setSubmitting(false);
     }
@@ -97,35 +99,35 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Field label="Name">
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Product name" />
+      <Field label={t('products.formName')}>
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('products.formNamePlaceholder')} />
       </Field>
 
-      <Field label="Barcode">
+      <Field label={t('products.formBarcode')}>
         <View style={styles.row}>
           <TextInput
             style={[styles.input, styles.flex]}
             value={barcode}
             onChangeText={setBarcode}
-            placeholder="Barcode"
+            placeholder={t('products.formBarcodePlaceholder')}
             keyboardType="number-pad"
           />
           {Platform.OS !== "web" && (
             <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
-              <Text style={styles.scanButtonText}>Scan</Text>
+              <Text style={styles.scanButtonText}>{t('products.formScan')}</Text>
             </Pressable>
           )}
         </View>
         {duplicate && (
           <Text style={styles.warning}>
-            This barcode is already used by &quot;{duplicate}&quot;.
+            {t('products.formDuplicateBarcode', { name: duplicate })}
           </Text>
         )}
       </Field>
 
-      <Field label="Category">
+      <Field label={t('products.formCategory')}>
         <View style={styles.chips}>
-          <Chip label="None" selected={categoryId === null} onPress={() => setCategoryId(null)} />
+          <Chip label={t('products.formCategoryNone')} selected={categoryId === null} onPress={() => setCategoryId(null)} />
           {categories.map((category) => (
             <Chip
               key={category.id}
@@ -137,7 +139,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
         </View>
       </Field>
 
-      <Field label="Unit">
+      <Field label={t('products.formUnit')}>
         <View style={styles.chips}>
           {UNITS.map((value) => (
             <Chip
@@ -150,7 +152,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
         </View>
       </Field>
 
-      <Field label="Selling price (DH)">
+      <Field label={t('products.formSellingPrice')}>
         <TextInput
           style={styles.input}
           value={price}
@@ -160,7 +162,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
         />
       </Field>
 
-      <Field label="Low stock threshold">
+      <Field label={t('products.formLowStockThreshold')}>
         <TextInput
           style={styles.input}
           value={threshold}
@@ -171,7 +173,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
       </Field>
 
       <View style={styles.switchRow}>
-        <Text style={styles.label}>Active</Text>
+        <Text style={styles.label}>{t('products.formActive')}</Text>
         <Switch value={active} onValueChange={setActive} />
       </View>
 
@@ -180,7 +182,7 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
       {error && <Text style={styles.error}>{error}</Text>}
 
       <BigButton
-        label={submitting ? "Saving..." : submitLabel}
+        label={submitting ? t('products.formSaving') : submitLabel}
         onPress={handleSubmit}
         disabled={submitting}
       />
@@ -200,14 +202,14 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
 // Shows what the price being typed would actually earn, using the product's
 // current weighted-average cost. Owners only: cashiers get no cost column.
 function CostSummary({ product, price }: { product: Product; price: string }) {
+  const { t } = useTranslation();
   const cost = product.current_cost_cents;
   const typedPrice = parseMoneyToCents(price);
 
   if (cost === null || cost <= 0) {
     return (
       <Text style={styles.note}>
-        Stock {product.stock_quantity} · no buying price yet. Receive it in Stock In to track
-        profit.
+        {t('products.formCostNoBuyingPrice', { qty: product.stock_quantity })}
       </Text>
     );
   }
@@ -218,17 +220,18 @@ function CostSummary({ product, price }: { product: Product; price: string }) {
   return (
     <View style={styles.summary}>
       <Text style={styles.summaryLine}>
-        Stock {product.stock_quantity} · buying price {formatMAD(cost)}
+        {t('products.formCostBuyingPrice', { qty: product.stock_quantity, price: formatMAD(cost) })}
       </Text>
       {profit !== null && (
         <Text style={[styles.summaryProfit, profit < 0 && styles.summaryLoss]}>
-          {profit >= 0 ? "Profit" : "Loss"} {formatMAD(Math.abs(profit))} per {product.unit} ·{" "}
-          {formatMargin(margin)}
+          {profit >= 0
+            ? t('products.formCostProfit', { amount: formatMAD(Math.abs(profit)), unit: product.unit, margin: formatMargin(margin) })
+            : t('products.formCostLoss', { amount: formatMAD(Math.abs(profit)), unit: product.unit, margin: formatMargin(margin) })}
         </Text>
       )}
-      <Text style={styles.note}>Stock and buying price change through Stock In, not here.</Text>
+      <Text style={styles.note}>{t('products.formStockNote')}</Text>
       <Pressable onPress={() => router.push(`/(app)/products/history/${product.id}`)}>
-        <Text style={styles.historyLink}>See buying price history →</Text>
+        <Text style={styles.historyLink}>{t('products.formPriceHistory')}</Text>
       </Pressable>
     </View>
   );

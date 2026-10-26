@@ -121,7 +121,7 @@ export default function SellScreen() {
         return null;
       }
     },
-    [addProduct, isOwner]
+    [addProduct, isOwner, t]
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { saveTextFile } from "@/src/lib/files";
@@ -17,6 +18,7 @@ type Row = {
 
 export default function LowStockScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -47,11 +49,11 @@ export default function LowStockScreen() {
         })
       );
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load low stock.");
+      setError(loadError instanceof Error ? loadError.message : t('stockIn.lowStockLoadError'));
     } finally {
       setLoading(false);
     }
-  }, [isOwner]);
+  }, [isOwner, t]);
 
   useEffect(() => {
     load();
@@ -80,13 +82,10 @@ export default function LowStockScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Text style={styles.intro}>
-        Suggested quantities cover {COVER_DAYS} days of the last 30 days&apos; sales, plus each
-        product&apos;s low-stock threshold, minus what is on the shelf.
-      </Text>
+      <Text style={styles.intro}>{t('stockIn.lowStockIntro', { days: COVER_DAYS })}</Text>
 
       {rows.length === 0 ? (
-        <Text style={styles.empty}>Nothing is low on stock.</Text>
+        <Text style={styles.empty}>{t('stockIn.lowStockEmpty')}</Text>
       ) : (
         <>
           {rows.map((row) => (
@@ -94,19 +93,22 @@ export default function LowStockScreen() {
               <View style={styles.rowMain}>
                 <Text style={styles.name}>{row.product.name}</Text>
                 <Text style={styles.meta}>
-                  {row.product.stock_quantity} {row.product.unit} left · sold {row.sold30d} in 30
-                  days
-                  {row.daysLeft !== null ? ` · ~${row.daysLeft.toFixed(1)} days cover` : ""}
+                  {t('stockIn.lowStockLeft', { stock: row.product.stock_quantity, unit: row.product.unit })}
+                  {' · '}
+                  {t('stockIn.lowStockSold30d', { count: row.sold30d })}
+                  {row.daysLeft !== null
+                    ? ` · ${t('stockIn.lowStockDaysCover', { days: row.daysLeft.toFixed(1) })}`
+                    : ""}
                 </Text>
               </View>
               <View style={styles.suggestBox}>
-                <Text style={styles.suggestLabel}>order</Text>
+                <Text style={styles.suggestLabel}>{t('stockIn.lowStockOrder')}</Text>
                 <Text style={styles.suggestValue}>{row.suggested}</Text>
               </View>
             </View>
           ))}
 
-          <BigButton label="Export reorder list" onPress={exportList} />
+          <BigButton label={t('stockIn.lowStockExport')} onPress={exportList} />
         </>
       )}
     </ScrollView>

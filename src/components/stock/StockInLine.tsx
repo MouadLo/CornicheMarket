@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { centsToDisplay, formatMAD, formatMargin, marginPercent, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function StockInLine({ line, onChange, onRemove }: Props) {
+  const { t } = useTranslation();
   const { product, lastCostCents } = line;
   const costCents = parseMoneyToCents(line.unitCost);
   const quantity = parseQuantity(line.quantity);
@@ -98,7 +100,7 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
 
       <Text style={styles.lastPrice}>
         {lastCostCents === null
-          ? "First time buying this product"
+          ? t('stockIn.firstTimeBuying')
           : `Last paid ${formatMAD(lastCostCents)}`}
         {lineTotal !== null ? ` · line total ${formatMAD(lineTotal)}` : ""}
       </Text>

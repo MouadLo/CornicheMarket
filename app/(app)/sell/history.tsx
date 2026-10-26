@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -8,6 +9,7 @@ import { fetchRecentSales, voidSale, type SaleSummary } from "@/src/lib/sales/qu
 
 export default function SalesHistory() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [sales, setSales] = useState<SaleSummary[]>([]);
@@ -22,10 +24,10 @@ export default function SalesHistory() {
     fetchRecentSales()
       .then(setSales)
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Could not load sales.")
+        setError(loadError instanceof Error ? loadError.message : t('sell.historyLoadError'))
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   useEffect(load, [load]);
 
@@ -33,12 +35,12 @@ export default function SalesHistory() {
     setSaving(true);
     setError(null);
     try {
-      await voidSale(saleId, reason.trim() || "No reason given");
+      await voidSale(saleId, reason.trim() || t('sell.voidReason'));
       setVoidingId(null);
       setReason("");
       load();
     } catch (voidError) {
-      setError(voidError instanceof Error ? voidError.message : "Could not void the sale.");
+      setError(voidError instanceof Error ? voidError.message : t('sell.historyVoidError'));
     } finally {
       setSaving(false);
     }
@@ -49,7 +51,7 @@ export default function SalesHistory() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
-      {sales.length === 0 && <Text style={styles.empty}>No sales recorded yet.</Text>}
+      {sales.length === 0 && <Text style={styles.empty}>{t('sell.historyEmpty')}</Text>}
 
       {sales.map((sale) => (
         <View key={sale.id} style={[styles.row, sale.voided_at ? styles.rowVoided : null]}>
@@ -57,9 +59,9 @@ export default function SalesHistory() {
             <View style={styles.rowMain}>
               <Text style={styles.time}>{new Date(sale.created_at).toLocaleString()}</Text>
               <Text style={styles.meta}>
-                {sale.payment_method === "credit" ? "pay later" : sale.payment_method}
-                {sale.discount_cents > 0 ? ` · discount ${formatMAD(sale.discount_cents)}` : ""}
-                {sale.voided_at ? ` · VOIDED (${sale.void_reason})` : ""}
+                {sale.payment_method === "credit" ? t('sell.historyPayLater') : sale.payment_method}
+                {sale.discount_cents > 0 ? ` ${t('sell.historyDiscount', { amount: formatMAD(sale.discount_cents) })}` : ""}
+                {sale.voided_at ? ` ${t('sell.historyVoided', { reason: sale.void_reason })}` : ""}
               </Text>
             </View>
             <Text style={[styles.total, sale.voided_at ? styles.totalVoided : null]}>
@@ -74,17 +76,17 @@ export default function SalesHistory() {
                   style={styles.input}
                   value={reason}
                   onChangeText={setReason}
-                  placeholder="Reason (e.g. customer returned it)"
+                  placeholder={t('sell.voidReason')}
                   autoFocus
                 />
                 <BigButton
-                  label={saving ? "Voiding..." : "Void and restore stock"}
+                  label={saving ? t('sell.voiding') : t('sell.voidAndRestore')}
                   variant="danger"
                   onPress={() => handleVoid(sale.id)}
                   disabled={saving}
                 />
                 <BigButton
-                  label="Cancel"
+                  label={t('common.cancel')}
                   variant="secondary"
                   onPress={() => {
                     setVoidingId(null);
@@ -94,7 +96,7 @@ export default function SalesHistory() {
               </View>
             ) : (
               <Pressable style={styles.voidButton} onPress={() => setVoidingId(sale.id)}>
-                <Text style={styles.voidButtonText}>Void / refund</Text>
+                <Text style={styles.voidButtonText}>{t('sell.voidRefund')}</Text>
               </Pressable>
             )
           )}
@@ -102,7 +104,7 @@ export default function SalesHistory() {
       ))}
 
       {!isOwner && sales.length > 0 && (
-        <Text style={styles.note}>Only the owner can void a sale.</Text>
+        <Text style={styles.note}>{t('sell.ownerOnlyVoid')}</Text>
       )}
     </ScrollView>
   );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
@@ -29,6 +30,7 @@ export function PaymentSheet({
   onConfirm,
   onCreateCustomer,
 }: Props) {
+  const { t } = useTranslation();
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [tendered, setTendered] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function PaymentSheet({
                 onPress={() => setMethod(value)}
               >
                 <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
-                  {value === "credit" ? "Pay later" : value}
+                  {value === "credit" ? t('sell.payLater') : value}
                 </Text>
               </Pressable>
             ))}
@@ -142,11 +144,11 @@ export function PaymentSheet({
           {error && <Text style={styles.error}>{error}</Text>}
 
           <BigButton
-            label={saving ? "Saving..." : "Complete sale"}
+            label={saving ? t('common.saving') : t('sell.completeSale')}
             onPress={() => onConfirm(method, customerId)}
             disabled={saving || needsCustomer || short}
           />
-          <BigButton label="Back to cart" variant="secondary" onPress={onClose} />
+          <BigButton label={t('common.back')} variant="secondary" onPress={onClose} />
         </ScrollView>
       </View>
     </Modal>

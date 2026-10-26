@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -19,6 +20,7 @@ import {
 
 export default function StockInScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -42,9 +44,7 @@ export default function StockInScreen() {
   if (profile && !isOwner) {
     return (
       <View style={styles.blocked}>
-        <Text style={styles.blockedText}>
-          Recording a delivery means entering buying prices, which only the owner can see.
-        </Text>
+        <Text style={styles.blockedText}>{t('stockIn.blockedText')}</Text>
       </View>
     );
   }
@@ -56,8 +56,6 @@ export default function StockInScreen() {
       {
         product,
         quantity: "",
-        // Pre-filled with the last price paid, falling back to the running
-        // average cost so the field is rarely empty.
         unitCost: centsToDisplay(lastCost ?? product.current_cost_cents ?? 0),
         lastCostCents: lastCost,
         newSellingPriceCents: null,
@@ -80,7 +78,7 @@ export default function StockInScreen() {
       setNewSupplierPhone("");
     } catch (supplierError) {
       setError(
-        supplierError instanceof Error ? supplierError.message : "Could not create the supplier."
+        supplierError instanceof Error ? supplierError.message : t('common.error')
       );
     }
   };
@@ -115,19 +113,17 @@ export default function StockInScreen() {
     try {
       await createPurchase(supplierId, validLines, profile.id, notes.trim() || null);
 
-      // Accepted price suggestions are applied after the delivery lands, so a
-      // failure here cannot leave stock unrecorded.
       for (const line of lines) {
         if (line.newSellingPriceCents !== null) {
           await updateSellingPrice(line.product.id, line.newSellingPriceCents);
         }
       }
 
-      setDone(`Recorded ${validLines.length} line${validLines.length === 1 ? "" : "s"} · ${formatMAD(total)}`);
+      setDone(t('stockIn.recordDelivery', { count: validLines.length }) + ` · ${formatMAD(total)}`);
       setLines([]);
       setNotes("");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save the delivery.");
+      setError(saveError instanceof Error ? saveError.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -135,21 +131,21 @@ export default function StockInScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Stock In</Text>
+      <Text style={styles.title}>{t('stockIn.title')}</Text>
 
       <View style={styles.toolRow}>
-        <ToolLink label="Low stock" href="/(app)/stock-in/low-stock" />
-        <ToolLink label="Count" href="/(app)/stock-in/count" />
-        <ToolLink label="Adjust" href="/(app)/stock-in/adjust" />
-        <ToolLink label="Expiring" href="/(app)/stock-in/expiring" />
-        <ToolLink label="History" href="/(app)/stock-in/history" />
+        <ToolLink label={t('stockIn.toolLowStock')} href="/(app)/stock-in/low-stock" />
+        <ToolLink label={t('stockIn.toolCount')} href="/(app)/stock-in/count" />
+        <ToolLink label={t('stockIn.toolAdjust')} href="/(app)/stock-in/adjust" />
+        <ToolLink label={t('stockIn.toolExpiring')} href="/(app)/stock-in/expiring" />
+        <ToolLink label={t('stockIn.toolHistory')} href="/(app)/stock-in/history" />
       </View>
 
       {done && <Text style={styles.success}>{done}</Text>}
 
-      <Text style={styles.sectionLabel}>Supplier</Text>
+      <Text style={styles.sectionLabel}>{t('stockIn.supplier')}</Text>
       <View style={styles.chips}>
-        <Chip label="No supplier" selected={supplierId === null} onPress={() => setSupplierId(null)} />
+        <Chip label={t('stockIn.noSupplier')} selected={supplierId === null} onPress={() => setSupplierId(null)} />
         {suppliers.map((supplier) => (
           <Chip
             key={supplier.id}
@@ -158,28 +154,28 @@ export default function StockInScreen() {
             onPress={() => setSupplierId(supplier.id)}
           />
         ))}
-        <Chip label="+ New supplier" selected={false} onPress={() => setAddingSupplier(true)} />
+        <Chip label={t('stockIn.addSupplier')} selected={false} onPress={() => setAddingSupplier(true)} />
       </View>
 
       {addingSupplier && (
         <View style={styles.supplierForm}>
           <TextInput
             style={styles.input}
-            placeholder="Supplier name"
+            placeholder={t('stockIn.supplierName')}
             value={newSupplierName}
             onChangeText={setNewSupplierName}
           />
           <TextInput
             style={styles.input}
-            placeholder="Phone (optional)"
+            placeholder={t('stockIn.supplierPhone')}
             value={newSupplierPhone}
             onChangeText={setNewSupplierPhone}
             keyboardType="phone-pad"
           />
           <View style={styles.supplierButtons}>
-            <BigButton label="Save supplier" onPress={handleAddSupplier} />
+            <BigButton label={t('stockIn.saveSupplier')} onPress={handleAddSupplier} />
             <BigButton
-              label="Cancel"
+              label={t('common.cancel')}
               variant="secondary"
               onPress={() => setAddingSupplier(false)}
             />
@@ -187,7 +183,7 @@ export default function StockInScreen() {
         </View>
       )}
 
-      <Text style={styles.sectionLabel}>Products received</Text>
+      <Text style={styles.sectionLabel}>{t('stockIn.productsReceived')}</Text>
       <ProductSearchPicker onPick={addProduct} excludeIds={lines.map((line) => line.product.id)} />
 
       {lines.map((line, index) => (
@@ -205,32 +201,28 @@ export default function StockInScreen() {
         <>
           <TextInput
             style={styles.input}
-            placeholder="Notes (optional)"
+            placeholder={t('stockIn.notesPlaceholder')}
             value={notes}
             onChangeText={setNotes}
           />
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Delivery total</Text>
+            <Text style={styles.totalLabel}>{t('stockIn.deliveryTotal')}</Text>
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
           </View>
 
           {incomplete && (
-            <Text style={styles.warning}>
-              Lines without a quantity and buying price will not be saved.
-            </Text>
+            <Text style={styles.warning}>{t('stockIn.incomplete')}</Text>
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
           <BigButton
-            label={saving ? "Saving..." : `Record delivery (${validLines.length})`}
+            label={saving ? t('stockIn.saving') : t('stockIn.recordDelivery', { count: validLines.length })}
             onPress={handleSave}
             disabled={saving || validLines.length === 0}
           />
-          <Text style={styles.note}>
-            Stock and average cost update automatically when this is saved.
-          </Text>
+          <Text style={styles.note}>{t('stockIn.stockNote')}</Text>
         </>
       )}
     </ScrollView>

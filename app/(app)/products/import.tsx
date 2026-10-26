@@ -1,6 +1,7 @@
 import { Redirect, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -21,6 +22,7 @@ type Step = "pick" | "map" | "preview" | "done";
 
 export default function ImportProducts() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [step, setStep] = useState<Step>("pick");
@@ -52,7 +54,7 @@ export default function ImportProducts() {
 
       const { headers: parsedHeaders, rows } = parseCsv(file.text);
       if (parsedHeaders.length === 0 || rows.length === 0) {
-        setError("That file has no readable rows.");
+        setError(t('products.importNoRows'));
         return;
       }
 
@@ -62,7 +64,7 @@ export default function ImportProducts() {
       setMapping(guessMapping(parsedHeaders));
       setStep("map");
     } catch (pickError) {
-      setError(pickError instanceof Error ? pickError.message : "Could not read that file.");
+      setError(pickError instanceof Error ? pickError.message : t('products.importReadError'));
     }
   };
 
@@ -74,7 +76,7 @@ export default function ImportProducts() {
       setValidation(validateRows(rawRows, mapping, { categories, existingBarcodes }));
       setStep("preview");
     } catch (validateError) {
-      setError(validateError instanceof Error ? validateError.message : "Validation failed.");
+      setError(validateError instanceof Error ? validateError.message : t('products.importValidationFailed'));
     } finally {
       setBusy(false);
     }
@@ -89,7 +91,7 @@ export default function ImportProducts() {
       setResult(await importProducts(validation.rows, profile.id));
       setStep("done");
     } catch (importError) {
-      setError(importError instanceof Error ? importError.message : "Import failed.");
+      setError(importError instanceof Error ? importError.message : t('products.importFailed'));
     } finally {
       setBusy(false);
     }
@@ -105,18 +107,15 @@ export default function ImportProducts() {
 
       {step === "pick" && (
         <>
-          <Text style={styles.title}>Import products from CSV</Text>
-          <Text style={styles.body}>
-            Pick a .csv file. The next step lets you match its columns to product fields, and
-            nothing is written until you have seen a preview.
-          </Text>
-          <BigButton label="Choose a CSV file" onPress={handlePick} />
+          <Text style={styles.title}>{t('products.importTitle')}</Text>
+          <Text style={styles.body}>{t('products.importPickBody')}</Text>
+          <BigButton label={t('products.importChooseFile')} onPress={handlePick} />
         </>
       )}
 
       {step === "map" && (
         <>
-          <Text style={styles.title}>Match the columns</Text>
+          <Text style={styles.title}>{t('products.importMapTitle')}</Text>
           <Text style={styles.body}>
             {fileName} · {rawRows.length} rows
           </Text>
@@ -130,7 +129,7 @@ export default function ImportProducts() {
               {field.hint && <Text style={styles.hint}>{field.hint}</Text>}
               <View style={styles.chips}>
                 <Chip
-                  label="Ignore"
+                  label={t('products.importIgnore')}
                   selected={!mapping[field.key]}
                   onPress={() =>
                     setMapping((current) => ({ ...current, [field.key]: undefined }))
@@ -151,22 +150,24 @@ export default function ImportProducts() {
           ))}
 
           <BigButton
-            label={busy ? "Checking..." : "Preview"}
+            label={busy ? t('products.importChecking') : t('products.importPreview')}
             onPress={handleValidate}
             disabled={!requiredMapped || busy}
           />
           {!requiredMapped && (
-            <Text style={styles.hint}>Name and selling price must be matched to continue.</Text>
+            <Text style={styles.hint}>{t('products.importRequiredHint')}</Text>
           )}
         </>
       )}
 
       {step === "preview" && validation && (
         <>
-          <Text style={styles.title}>Preview</Text>
+          <Text style={styles.title}>{t('products.importPreviewTitle')}</Text>
           <Text style={styles.summary}>
-            {validation.rows.length} row{validation.rows.length === 1 ? "" : "s"} ready ·{" "}
-            {validation.errors.length} with problems
+            {t('products.importPreviewSummary', {
+              ready: validation.rows.length,
+              problems: validation.errors.length,
+            })}
           </Text>
 
           {validation.rows.slice(0, 10).map((row) => (
@@ -174,7 +175,7 @@ export default function ImportProducts() {
               <Text style={styles.previewName}>{row.product.name}</Text>
               <Text style={styles.previewMeta}>
                 {centsToDisplay(row.product.selling_price_cents)} DH ·{" "}
-                {row.product.barcode ?? "no barcode"} · {row.product.unit}
+                {row.product.barcode ?? t('products.importNoBarcode')} · {row.product.unit}
                 {row.opening
                   ? ` · opening ${row.opening.quantity} @ ${centsToDisplay(row.opening.unit_cost_cents)} DH`
                   : ""}
@@ -182,58 +183,57 @@ export default function ImportProducts() {
             </View>
           ))}
           {validation.rows.length > 10 && (
-            <Text style={styles.hint}>...and {validation.rows.length - 10} more.</Text>
+            <Text style={styles.hint}>{t('products.importAndMore', { count: validation.rows.length - 10 })}</Text>
           )}
 
           {validation.errors.length > 0 && (
             <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>Rows that will be skipped</Text>
+              <Text style={styles.errorTitle}>{t('products.importSkippedTitle')}</Text>
               {validation.errors.slice(0, 20).map((rowError) => (
                 <Text key={rowError.rowNumber} style={styles.errorLine}>
-                  Row {rowError.rowNumber}: {rowError.messages.join("; ")}
+                  {t('products.importRowError', { row: rowError.rowNumber, messages: rowError.messages.join("; ") })}
                 </Text>
               ))}
               {validation.errors.length > 20 && (
                 <Text style={styles.errorLine}>
-                  ...and {validation.errors.length - 20} more rows.
+                  {t('products.importAndMoreRows', { count: validation.errors.length - 20 })}
                 </Text>
               )}
             </View>
           )}
 
           <BigButton
-            label={busy ? "Importing..." : `Import ${validation.rows.length} products`}
+            label={busy ? t('products.importImporting') : t('products.importStart', { count: validation.rows.length })}
             onPress={handleImport}
             disabled={busy || validation.rows.length === 0}
           />
-          <BigButton label="Back to mapping" variant="secondary" onPress={() => setStep("map")} />
+          <BigButton label={t('products.importBackToMapping')} variant="secondary" onPress={() => setStep("map")} />
         </>
       )}
 
       {step === "done" && result && (
         <>
-          <Text style={styles.title}>Import finished</Text>
+          <Text style={styles.title}>{t('products.importFinishedTitle')}</Text>
           <Text style={styles.summary}>
-            {result.inserted} product{result.inserted === 1 ? "" : "s"} created
             {result.openingLines > 0
-              ? `, opening stock recorded for ${result.openingLines}`
-              : ""}
-            .
+              ? t('products.importFinishedOpening', { count: result.inserted, opening: result.openingLines })
+              : t('products.importFinishedSummary', { count: result.inserted })}
           </Text>
 
           {result.errors.length > 0 && (
             <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>Problems</Text>
+              <Text style={styles.errorTitle}>{t('products.importProblemsTitle')}</Text>
               {result.errors.slice(0, 20).map((rowError, index) => (
                 <Text key={`${rowError.rowNumber}-${index}`} style={styles.errorLine}>
-                  {rowError.rowNumber > 0 ? `Row ${rowError.rowNumber}: ` : ""}
-                  {rowError.messages.join("; ")}
+                  {rowError.rowNumber > 0
+                    ? t('products.importRowError', { row: rowError.rowNumber, messages: rowError.messages.join("; ") })
+                    : rowError.messages.join("; ")}
                 </Text>
               ))}
             </View>
           )}
 
-          <BigButton label="Back to products" onPress={() => router.replace("/(app)/products")} />
+          <BigButton label={t('products.importBackToProducts')} onPress={() => router.replace("/(app)/products")} />
         </>
       )}
     </ScrollView>

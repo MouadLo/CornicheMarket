@@ -1,6 +1,7 @@
 import { Redirect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -24,17 +25,18 @@ import {
 } from "@/src/lib/reports/queries";
 import { isValidDateInput, resolveRange, type RangeKey } from "@/src/lib/reports/ranges";
 
-const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "yesterday", label: "Yesterday" },
-  { key: "7d", label: "7 days" },
-  { key: "month", label: "This month" },
-  { key: "30d", label: "30 days" },
-  { key: "custom", label: "Custom" },
+const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
+  { key: "today", tKey: "reports.today" },
+  { key: "yesterday", tKey: "reports.yesterday" },
+  { key: "7d", tKey: "reports.last7days" },
+  { key: "month", tKey: "reports.thisMonth" },
+  { key: "30d", tKey: "reports.last30days" },
+  { key: "custom", tKey: "reports.custom" },
 ];
 
 export default function ReportsScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [rangeKey, setRangeKey] = useState<RangeKey>("today");
@@ -96,11 +98,11 @@ export default function ReportsScreen() {
       setDeadStock(dead);
       setInventory(inventoryValue);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load reports.");
+      setError(loadError instanceof Error ? loadError.message : t('reports.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [range.from, range.to]);
+  }, [range.from, range.to, t]);
 
   useEffect(() => {
     if (isOwner) load();
@@ -198,29 +200,29 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Reports</Text>
+      <Text style={styles.title}>{t('reports.title')}</Text>
 
       {today && (
         <View style={styles.todayCard}>
-          <Text style={styles.todayLabel}>Today</Text>
+          <Text style={styles.todayLabel}>{t('reports.today')}</Text>
           <View style={styles.todayGrid}>
-            <Metric label="Sales" value={formatMAD(today.revenue_cents)} large />
-            <Metric label="Profit" value={formatMAD(today.gross_profit_cents)} large accent />
-            <Metric label="Transactions" value={String(today.transaction_count)} />
-            <Metric label="Average basket" value={formatMAD(today.average_basket_cents)} />
+            <Metric label={t('reports.metricRevenue')} value={formatMAD(today.revenue_cents)} large />
+            <Metric label={t('reports.profit')} value={formatMAD(today.gross_profit_cents)} large accent />
+            <Metric label={t('reports.metricTransactions')} value={String(today.transaction_count)} />
+            <Metric label={t('reports.metricAvgBasket')} value={formatMAD(today.average_basket_cents)} />
           </View>
         </View>
       )}
 
       <View style={styles.chips}>
-        {RANGE_OPTIONS.map((option) => (
+        {RANGE_KEYS.map((option) => (
           <Pressable
             key={option.key}
             style={[styles.chip, rangeKey === option.key && styles.chipActive]}
             onPress={() => setRangeKey(option.key)}
           >
             <Text style={[styles.chipText, rangeKey === option.key && styles.chipTextActive]}>
-              {option.label}
+              {t(option.tKey)}
             </Text>
           </Pressable>
         ))}
@@ -232,14 +234,14 @@ export default function ReportsScreen() {
             style={styles.dateInput}
             value={customFrom}
             onChangeText={setCustomFrom}
-            placeholder="From YYYY-MM-DD"
+            placeholder={t('reports.fromDate')}
             autoCapitalize="none"
           />
           <TextInput
             style={styles.dateInput}
             value={customTo}
             onChangeText={setCustomTo}
-            placeholder="To YYYY-MM-DD"
+            placeholder={t('reports.toDate')}
             autoCapitalize="none"
           />
         </View>
@@ -250,28 +252,28 @@ export default function ReportsScreen() {
 
       {!loading && summary && (
         <>
-          <Section title={`${range.label}: money`}>
+          <Section title={t('reports.money', { label: range.label })}>
             <View style={styles.metricGrid}>
-              <Metric label="Revenue" value={formatMAD(summary.revenue_cents)} large />
-              <Metric label="Cost of goods" value={formatMAD(summary.cogs_cents)} />
+              <Metric label={t('reports.metricRevenue')} value={formatMAD(summary.revenue_cents)} large />
+              <Metric label={t('reports.metricCogs')} value={formatMAD(summary.cogs_cents)} />
               <Metric
-                label="Gross profit"
+                label={t('reports.metricGrossProfit')}
                 value={formatMAD(summary.gross_profit_cents)}
                 large
                 accent
               />
-              <Metric label="Margin" value={formatMargin(summary.margin_percent)} />
-              <Metric label="Transactions" value={String(summary.transaction_count)} />
-              <Metric label="Average basket" value={formatMAD(summary.average_basket_cents)} />
+              <Metric label={t('reports.metricMargin')} value={formatMargin(summary.margin_percent)} />
+              <Metric label={t('reports.metricTransactions')} value={String(summary.transaction_count)} />
+              <Metric label={t('reports.metricAvgBasket')} value={formatMAD(summary.average_basket_cents)} />
               <Metric
-                label="Losses written off"
+                label={t('reports.metricLosses')}
                 value={formatMAD(summary.loss_cents)}
                 negative={summary.loss_cents > 0}
               />
             </View>
           </Section>
 
-          <Section title="Daily sales and profit">
+          <Section title={t('reports.dailySales')}>
             <MiniBarChart
               points={daily.map<ChartPoint>((point) => ({
                 key: point.day,
@@ -279,11 +281,11 @@ export default function ReportsScreen() {
                 value: point.revenue_cents,
                 secondary: point.profit_cents,
               }))}
-              secondaryLabel="Profit"
+              secondaryLabel={t('reports.profit')}
             />
           </Section>
 
-          <Section title="Sales by category">
+          <Section title={t('reports.byCategory')}>
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
@@ -291,11 +293,11 @@ export default function ReportsScreen() {
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}
-              secondaryLabel="Profit"
+              secondaryLabel={t('reports.profit')}
             />
           </Section>
 
-          <Section title="Sales by hour">
+          <Section title={t('reports.byHour')}>
             <MiniBarChart
               points={hours.map<ChartPoint>((row) => ({
                 key: String(row.hour),
@@ -306,33 +308,33 @@ export default function ReportsScreen() {
           </Section>
 
           {inventory && (
-            <Section title="Inventory value">
+            <Section title={t('reports.inventoryValue')}>
               <View style={styles.metricGrid}>
-                <Metric label="At cost" value={formatMAD(inventory.cost_value_cents)} large />
+                <Metric label={t('reports.metricAtCost')} value={formatMAD(inventory.cost_value_cents)} large />
                 <Metric
-                  label="At selling price"
+                  label={t('reports.metricAtSellingPrice')}
                   value={formatMAD(inventory.retail_value_cents)}
                   large
                 />
                 <Metric
-                  label="Profit if all sold"
+                  label={t('reports.metricPotentialProfit')}
                   value={formatMAD(inventory.potential_profit_cents)}
                   accent
                 />
-                <Metric label="Products in stock" value={String(inventory.product_count)} />
+                <Metric label={t('reports.metricProductsInStock')} value={String(inventory.product_count)} />
               </View>
             </Section>
           )}
 
-          <Section title="Top 20 by profit">
+          <Section title={t('reports.top20ByProfit')}>
             <ProductTable rows={topByProfit} renderValue={(row) => formatMAD(row.profit_cents)} />
           </Section>
 
-          <Section title="Top 20 by quantity">
+          <Section title={t('reports.top20ByQuantity')}>
             <ProductTable rows={topByQuantity} renderValue={(row) => `${row.quantity}`} />
           </Section>
 
-          <Section title="Lowest margin">
+          <Section title={t('reports.lowestMargin')}>
             <ProductTable
               rows={lowestMargin}
               renderValue={(row) => formatMargin(row.margin_percent)}
@@ -340,9 +342,9 @@ export default function ReportsScreen() {
             />
           </Section>
 
-          <Section title="Not sold in 30 days">
+          <Section title={t('reports.deadStock')}>
             {deadStock.length === 0 ? (
-              <Text style={styles.empty}>Everything in stock has sold recently.</Text>
+              <Text style={styles.empty}>{t('reports.allSoldRecently')}</Text>
             ) : (
               deadStock.slice(0, 20).map((row) => (
                 <View key={row.product_id} style={styles.tableRow}>
@@ -351,8 +353,8 @@ export default function ReportsScreen() {
                     <Text style={styles.rowMeta}>
                       {row.stock_quantity} {row.unit} ·{" "}
                       {row.last_sold_at
-                        ? `last sold ${new Date(row.last_sold_at).toLocaleDateString()}`
-                        : "never sold"}
+                        ? t('reports.deadStockLastSold', { date: new Date(row.last_sold_at).toLocaleDateString() })
+                        : t('reports.deadStockNeverSold')}
                     </Text>
                   </View>
                   <Text style={styles.rowValue}>{formatMAD(row.stock_value_cents)}</Text>
@@ -366,7 +368,7 @@ export default function ReportsScreen() {
               style={styles.exportButton}
               onPress={() => exportTablesAsCsv(`report-${fileStamp}.csv`, buildTables())}
             >
-              <Text style={styles.exportText}>Export CSV</Text>
+              <Text style={styles.exportText}>{t('reports.exportCsv')}</Text>
             </Pressable>
             <Pressable
               style={styles.exportButton}
@@ -378,7 +380,7 @@ export default function ReportsScreen() {
                 )
               }
             >
-              <Text style={styles.exportText}>Export PDF</Text>
+              <Text style={styles.exportText}>{t('reports.exportPdf')}</Text>
             </Pressable>
           </View>
         </>
@@ -435,8 +437,9 @@ function ProductTable({
   renderValue: (row: ProductPerformance) => string;
   warnBelowZero?: boolean;
 }) {
+  const { t } = useTranslation();
   if (rows.length === 0) {
-    return <Text style={styles.empty}>No sales in this range.</Text>;
+    return <Text style={styles.empty}>{t('reports.noSales')}</Text>;
   }
 
   return (

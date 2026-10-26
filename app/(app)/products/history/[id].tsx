@@ -1,6 +1,7 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PriceHistoryChart } from "@/src/components/stock/PriceHistoryChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -12,6 +13,7 @@ import { priceChangePercent } from "@/src/lib/stock/pricing";
 export default function ProductPriceHistory() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -28,15 +30,15 @@ export default function ProductPriceHistory() {
         setPoints(loadedPoints);
       })
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Could not load history.")
+        setError(loadError instanceof Error ? loadError.message : t('products.priceHistoryLoadError'))
       )
       .finally(() => setLoading(false));
-  }, [id, isOwner]);
+  }, [id, isOwner, t]);
 
   if (profile && !isOwner) return <Redirect href="/(app)/products" />;
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
   if (error) return <Text style={styles.error}>{error}</Text>;
-  if (!product) return <Text style={styles.error}>Product not found.</Text>;
+  if (!product) return <Text style={styles.error}>{t('products.formProductNotFound')}</Text>;
 
   const first = points[0]?.unit_cost_cents ?? null;
   const latest = points[points.length - 1]?.unit_cost_cents ?? null;
@@ -46,14 +48,14 @@ export default function ProductPriceHistory() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{product.name}</Text>
-      <Text style={styles.subtitle}>Buying price per delivery</Text>
+      <Text style={styles.subtitle}>{t('products.priceHistorySubtitle')}</Text>
 
       <PriceHistoryChart points={points} averageCostCents={product.current_cost_cents} />
 
       <View style={styles.stats}>
-        <Stat label="Sells at" value={formatMAD(product.selling_price_cents)} />
+        <Stat label={t('products.priceHistorySellsAt')} value={formatMAD(product.selling_price_cents)} />
         <Stat
-          label="Average cost"
+          label={t('products.priceHistoryAvgCost')}
           value={
             product.current_cost_cents && product.current_cost_cents > 0
               ? formatMAD(product.current_cost_cents)
@@ -61,14 +63,14 @@ export default function ProductPriceHistory() {
           }
         />
         <Stat
-          label="Margin now"
+          label={t('products.priceHistoryMarginNow')}
           value={formatMargin(
             marginPercent(product.selling_price_cents, product.current_cost_cents ?? 0)
           )}
         />
         {overallChange !== null && points.length > 1 && (
           <Stat
-            label="Since first delivery"
+            label={t('products.priceHistorySinceFirst')}
             value={`${overallChange >= 0 ? "+" : ""}${overallChange.toFixed(1)}%`}
             negative={overallChange > 0}
           />
@@ -77,7 +79,7 @@ export default function ProductPriceHistory() {
 
       {points.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>Deliveries</Text>
+          <Text style={styles.sectionLabel}>{t('products.priceHistoryDeliveries')}</Text>
           {[...points].reverse().map((point) => (
             <View key={point.id} style={styles.row}>
               <Text style={styles.rowDate}>
@@ -92,10 +94,7 @@ export default function ProductPriceHistory() {
         </>
       )}
 
-      <Text style={styles.note}>
-        The average cost blends every delivery still counted in stock, which is what profit on a
-        sale is measured against.
-      </Text>
+      <Text style={styles.note}>{t('products.priceHistoryNote')}</Text>
     </ScrollView>
   );
 }

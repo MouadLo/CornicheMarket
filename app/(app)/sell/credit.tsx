@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -12,6 +13,7 @@ import {
 
 export default function CreditScreen() {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const [balances, setBalances] = useState<CustomerBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +26,10 @@ export default function CreditScreen() {
     fetchCustomerBalances()
       .then(setBalances)
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Could not load balances.")
+        setError(loadError instanceof Error ? loadError.message : t('credit.loadError'))
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   useEffect(load, [load]);
 
@@ -43,7 +45,7 @@ export default function CreditScreen() {
       setAmount("");
       load();
     } catch (payError) {
-      setError(payError instanceof Error ? payError.message : "Could not record the payment.");
+      setError(payError instanceof Error ? payError.message : t('credit.payError'));
     } finally {
       setSaving(false);
     }
@@ -60,11 +62,11 @@ export default function CreditScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
 
       <View style={styles.summary}>
-        <Text style={styles.summaryLabel}>Total owed to the shop</Text>
+        <Text style={styles.summaryLabel}>{t('credit.totalOwed')}</Text>
         <Text style={styles.summaryValue}>{formatMAD(totalOwed)}</Text>
       </View>
 
-      {owing.length === 0 && <Text style={styles.empty}>Nobody owes anything right now.</Text>}
+      {owing.length === 0 && <Text style={styles.empty}>{t('credit.nobody')}</Text>}
 
       {owing.map((balance) => (
         <View key={balance.id} style={styles.row}>
@@ -73,7 +75,7 @@ export default function CreditScreen() {
               <Text style={styles.name}>{balance.name}</Text>
               <Text style={styles.meta}>
                 {balance.phone ? `${balance.phone} · ` : ""}
-                took {formatMAD(balance.credit_total_cents)} · paid{" "}
+                {t('credit.took')} {formatMAD(balance.credit_total_cents)} · {t('credit.paid')}{" "}
                 {formatMAD(balance.paid_total_cents)}
               </Text>
             </View>
@@ -87,16 +89,16 @@ export default function CreditScreen() {
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
-                placeholder="Amount received"
+                placeholder={t('credit.amountReceived')}
                 autoFocus
               />
               <BigButton
-                label={saving ? "Saving..." : "Record payment"}
+                label={saving ? t('credit.recordingPayment') : t('credit.recordPayment')}
                 onPress={() => handlePayment(balance.id)}
                 disabled={saving}
               />
               <BigButton
-                label="Cancel"
+                label={t('credit.cancelPayment')}
                 variant="secondary"
                 onPress={() => {
                   setPayingId(null);
@@ -112,7 +114,7 @@ export default function CreditScreen() {
                 setAmount("");
               }}
             >
-              <Text style={styles.payButtonText}>Record a payment</Text>
+              <Text style={styles.payButtonText}>{t('credit.recordPaymentButton')}</Text>
             </Pressable>
           )}
         </View>
@@ -120,14 +122,14 @@ export default function CreditScreen() {
 
       {settled.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>Settled</Text>
+          <Text style={styles.sectionLabel}>{t('credit.settled')}</Text>
           {settled.map((balance) => (
             <View key={balance.id} style={styles.settledRow}>
               <Text style={styles.settledName}>{balance.name}</Text>
               <Text style={styles.settledValue}>
                 {balance.balance_cents < 0
-                  ? `${formatMAD(-balance.balance_cents)} in credit`
-                  : "Clear"}
+                  ? t('credit.inCredit', { amount: formatMAD(-balance.balance_cents) })
+                  : t('credit.clear')}
               </Text>
             </View>
           ))}
