@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel any in-flight run for the same branch/PR so fast-pushers don't queue up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Type-check · lint · test · bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      EXPO_NO_DOTENV: "1"
+      # Placeholder values so the Supabase client initialises without real credentials.
+      # Tests mock the module; the bundle step just needs non-empty vars.
+      EXPO_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      # Skip husky in CI (no interactive terminal, hooks not needed).
+      # lint-staged is also not needed here; linting runs on the full tree below.
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Verify Expo SDK dependency versions
+        run: npx expo install --check
+
+      - name: Bundle (Android + iOS + web) — catches build-time errors
+        run: npm run export:ci

@@ -1,0 +1,81 @@
+name: Deploy web
+
+# Only runs after the CI workflow passes on main — never deploys broken code.
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Apply database migrations to the staging project ──────────────────
+  migrate-staging:
+    name: Staging DB migrations
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the exact commit that passed CI, not just HEAD of main.
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link staging project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase link --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+
+      - name: Apply pending migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase db push --password "${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}"
+
+  # ── 2. Build Expo web and deploy to Vercel ───────────────────────────────
+  deploy:
+    name: Build web → Vercel
+    needs: migrate-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      CI: "1"
+      EXPO_NO_DOTENV: "1"
+      # Use the staging Supabase project's URL and anon key so the web app
+      # talks to staging, not production.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build Expo web
+        run: npx expo export --platform web
+
+      # The vercel CLI reads VERCEL_ORG_ID and VERCEL_PROJECT_ID from the
+      # environment. --prod creates a production deployment (not a preview).
+      # --yes skips interactive prompts.
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel dist --prod --yes --token="$VERCEL_TOKEN"
