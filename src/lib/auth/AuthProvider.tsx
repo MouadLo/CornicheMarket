@@ -1,5 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { supabase } from "@/src/lib/supabase/client";
 
@@ -15,8 +15,10 @@ type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  profileError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  retryProfile: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -26,6 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileRetry, setProfileRetry] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -51,21 +55,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!session) {
       setProfile(null);
+      setProfileError(null);
       setProfileLoaded(true);
       return;
     }
 
     let mounted = true;
     setProfileLoaded(false);
+    setProfileError(null);
 
     supabase
       .from("profiles")
       .select("id, full_name, role")
       .eq("id", session.user.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (mounted) {
-          setProfile(data as Profile | null);
+          if (error || !data) {
+            setProfileError(error?.message ?? "Profile not found");
+            setProfile(null);
+          } else {
+            setProfile(data as Profile);
+          }
           setProfileLoaded(true);
         }
       });
@@ -73,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [session]);
+  }, [session, profileRetry]);
 
   const loading = !sessionLoaded || !profileLoaded;
 
@@ -86,8 +97,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const retryProfile = useCallback(() => setProfileRetry((n) => n + 1), []);
+
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ session, profile, loading, profileError, signIn, signOut, retryProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );
