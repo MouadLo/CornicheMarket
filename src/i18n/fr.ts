@@ -91,6 +91,7 @@ const fr = {
     completeSale: "Encaisser la vente",
     payLater: "Crédit",
     stuckBanner: "{{count}} vente(s) bloquée(s) · voir",
+    offlineBanner: "Hors ligne · prix au {{time}}",
     stuck: {
       title: "Ventes bloquées",
       empty: "Aucune vente bloquée.",

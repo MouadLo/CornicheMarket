@@ -10,6 +10,13 @@ import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import {
+  findCachedByBarcode,
+  getProductCacheMeta,
+  refreshProductCache,
+  searchCachedProducts,
+  type CachedProduct,
+} from "@/src/lib/products/offlineCache";
 import { fetchProducts, type Product } from "@/src/lib/products/queries";
 import { enqueueSale } from "@/src/lib/sales/offlineQueue";
 import {
@@ -39,6 +46,7 @@ export default function SellScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [offlineMeta, setOfflineMeta] = useState<{ refreshedAt: string } | null>(null);
 
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
@@ -50,12 +58,32 @@ export default function SellScreen() {
       .catch(() => setCustomers([]));
   }, []);
 
+  // Refresh the local product cache whenever the device comes online.
+  useEffect(() => {
+    if (sync.online) {
+      refreshProductCache(isOwner)
+        .then(() => getProductCacheMeta())
+        .then(setOfflineMeta)
+        .catch(() => {});
+    }
+  }, [sync.online, isOwner]);
+
   useEffect(() => {
     if (!debounced.trim()) {
       setResults([]);
       return;
     }
     let cancelled = false;
+
+    if (!sync.online) {
+      searchCachedProducts(debounced).then((rows) => {
+        if (!cancelled) setResults(rows as unknown as Product[]);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     fetchProducts(
       { search: debounced, categoryId: null, lowStockOnly: false, status: "active" },
       0,
@@ -66,7 +94,7 @@ export default function SellScreen() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, isOwner]);
+  }, [debounced, isOwner, sync.online]);
 
   const addProduct = useCallback((product: Product) => {
     setLines((current) => {
@@ -96,16 +124,23 @@ export default function SellScreen() {
   const addByBarcode = useCallback(
     async (barcode: string): Promise<string | null> => {
       try {
-        const [match] = await fetchProducts(
-          { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
-          0,
-          isOwner
-        );
+        let match: Product | CachedProduct | undefined;
+
+        if (!sync.online) {
+          match = (await findCachedByBarcode(barcode)) ?? undefined;
+        } else {
+          [match] = await fetchProducts(
+            { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
+            0,
+            isOwner
+          );
+        }
+
         if (!match) {
           setFlash(t("sell.notFound", { barcode }));
           return t("sell.notFound", { barcode });
         }
-        addProduct(match);
+        addProduct(match as Product);
         setFlash(t("sell.added", { name: match.name }));
         return `${match.name} · ${centsToDisplay(match.selling_price_cents)} DH`;
       } catch {
@@ -113,7 +148,7 @@ export default function SellScreen() {
         return null;
       }
     },
-    [addProduct, isOwner, t]
+    [addProduct, isOwner, sync.online, t]
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.
@@ -163,7 +198,7 @@ export default function SellScreen() {
           <SyncBadge online={sync.online} pending={sync.pending} syncing={sync.syncing} />
           <View style={styles.headerLinks}>
             {isOwner && sync.stuck > 0 && (
-              <Pressable onPress={() => router.push("/(app)/sell/stuck")}>
+              <Pressable onPress={() => router.push("/(app)/sell/stuck" as never)}>
                 <Text style={styles.stuckLink}>{t("sell.stuckBanner", { count: sync.stuck })}</Text>
               </Pressable>
             )}
@@ -191,6 +226,14 @@ export default function SellScreen() {
             </Pressable>
           )}
         </View>
+
+        {!sync.online && offlineMeta && (
+          <Text style={styles.offlineBanner}>
+            {t("sell.offlineBanner", {
+              time: new Date(offlineMeta.refreshedAt).toLocaleTimeString(),
+            })}
+          </Text>
+        )}
 
         {flash && <Text style={styles.flash}>{flash}</Text>}
 
@@ -325,6 +368,7 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   flash: { color: "#1d7a46", fontSize: 14 },
+  offlineBanner: { color: "#b36b00", fontSize: 13, fontStyle: "italic" },
   result: {
     flexDirection: "row",
     justifyContent: "space-between",

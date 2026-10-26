@@ -93,6 +93,7 @@ const ar: Translations = {
     completeSale: "إتمام البيع",
     payLater: "الدفع لاحقاً",
     stuckBanner: "{{count}} بيع/بيوع عالقة · عرض",
+    offlineBanner: "غير متصل · الأسعار من {{time}}",
     stuck: {
       title: "المبيعات العالقة",
       empty: "لا توجد مبيعات عالقة.",

@@ -93,6 +93,7 @@ const en: Translations = {
     completeSale: "Complete sale",
     payLater: "Pay later",
     stuckBanner: "{{count}} stuck sale(s) · view",
+    offlineBanner: "Offline · prices from {{time}}",
     stuck: {
       title: "Stuck sales",
       empty: "No stuck sales.",
