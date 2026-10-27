@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import { fetchProducts, findByBarcode, type Product } from "@/src/lib/products/queries";
+import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
 type Props = {
@@ -12,7 +13,11 @@ type Props = {
 };
 
 export function ProductSearchPicker({ onPick, excludeIds }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // A product name must not flip its own row based on its script -- see
+  // src/lib/text/bidi.ts.
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -65,7 +70,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
       );
       if (full) pick(full);
     } catch {
-      setNotice(t('stockIn.barcodeError'));
+      setNotice(t("stockIn.barcodeError"));
     }
   };
 
@@ -74,7 +79,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
       <View style={styles.row}>
         <TextInput
           style={[styles.input, styles.flex]}
-          placeholder={t('stockIn.searchProduct')}
+          placeholder={t("stockIn.searchProduct")}
           value={term}
           onChangeText={setTerm}
           autoCapitalize="none"
@@ -94,12 +99,14 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
         return (
           <Pressable
             key={product.id}
-            style={[styles.result, alreadyAdded && styles.resultDisabled]}
+            style={[styles.result, { direction: dir }, alreadyAdded && styles.resultDisabled]}
             disabled={alreadyAdded}
             onPress={() => pick(product)}
           >
-            <Text style={styles.resultName}>{product.name}</Text>
-            <Text style={styles.resultMeta}>
+            <Text style={[styles.resultName, { textAlign }]} numberOfLines={1}>
+              {isolateBidi(product.name)}
+            </Text>
+            <Text style={[styles.resultMeta, { textAlign }]}>
               {product.barcode ?? "no barcode"} · stock {product.stock_quantity}
               {alreadyAdded ? " · already added" : ""}
             </Text>
