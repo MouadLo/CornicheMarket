@@ -1,8 +1,10 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
+import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 
 export const PRODUCT_ROW_HEIGHT = 92;
 
@@ -13,6 +15,11 @@ type Props = {
 };
 
 function ProductRowComponent({ product, showCost, onPress }: Props) {
+  const { i18n } = useTranslation();
+  // A product name must not flip its own row based on its script -- see
+  // src/lib/text/bidi.ts.
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
   const cost = showCost ? product.current_cost_cents : null;
   // Cost 0 means the product has never been received, not that it is free.
   const hasCost = cost !== null && cost > 0;
@@ -22,14 +29,18 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && onPress ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.row,
+        { direction: dir },
+        pressed && onPress ? styles.pressed : null,
+      ]}
       onPress={onPress}
     >
       <View style={styles.main}>
-        <Text style={styles.name} numberOfLines={1}>
-          {product.name}
+        <Text style={[styles.name, { textAlign }]} numberOfLines={1}>
+          {isolateBidi(product.name)}
         </Text>
-        <Text style={styles.meta} numberOfLines={1}>
+        <Text style={[styles.meta, { textAlign }]} numberOfLines={1}>
           {product.barcode ?? "no barcode"} · {product.stock_quantity} {product.unit}
           {product.is_low_stock ? " · LOW" : ""}
           {product.active ? "" : " · inactive"}
