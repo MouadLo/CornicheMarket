@@ -92,6 +92,10 @@ const fr = {
     payLater: "Crédit",
     stuckBanner: "{{count}} vente(s) bloquée(s) · voir",
     offlineBanner: "Hors ligne · prix au {{time}}",
+    discount: "Remise",
+    lineDiscountTooHigh: "La remise dépasse le prix de cet article.",
+    saleDiscountTooHigh: "La remise dépasse le total du panier.",
+    remove: "Retirer",
     stuck: {
       title: "Ventes bloquées",
       empty: "Aucune vente bloquée.",

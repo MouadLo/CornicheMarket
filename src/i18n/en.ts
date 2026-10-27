@@ -94,6 +94,10 @@ const en: Translations = {
     payLater: "Pay later",
     stuckBanner: "{{count}} stuck sale(s) · view",
     offlineBanner: "Offline · prices from {{time}}",
+    discount: "Discount",
+    lineDiscountTooHigh: "Discount exceeds this item's price.",
+    saleDiscountTooHigh: "Discount exceeds the basket total.",
+    remove: "Remove",
     stuck: {
       title: "Stuck sales",
       empty: "No stuck sales.",

@@ -55,3 +55,41 @@ export function saleProfit(lines: CartLine[], saleDiscountCents: number): number
 export function totalItemCount(lines: CartLine[]): number {
   return lines.reduce((sum, line) => sum + line.quantity, 0);
 }
+
+// A discount bigger than what it discounts is a data-entry error, not a
+// legitimate markdown. Catching it here means it never reaches the point of
+// being silently clamped to a misleading 0.00 on screen, and never reaches
+// the DB CHECK on line_total_cents that would otherwise roll back (and, via
+// the offline queue's error classifier, quarantine) the whole sale.
+export function isLineDiscountValid(
+  quantity: number,
+  unitPriceCents: number,
+  discountCents: number
+): boolean {
+  return discountCents >= 0 && discountCents <= lineSubtotal(quantity, unitPriceCents);
+}
+
+// Mirrors the same rule at the basket level: a sale-wide discount cannot
+// exceed what the basket (after any line discounts) actually comes to.
+export function isSaleDiscountValid(lines: CartLine[], saleDiscountCents: number): boolean {
+  return saleDiscountCents >= 0 && saleDiscountCents <= cartSubtotal(lines);
+}
+
+export type DiscountValidationError = "line" | "sale" | null;
+
+// The single gate a sale must pass before it is ever handed to
+// enqueueSale. Called from handleConfirm so an invalid discount is
+// rejected with a readable error right there -- it never becomes a
+// PendingSale, so it can never end up in the offline queue's retry/
+// quarantine pipeline at all.
+export function validateSaleDiscounts(
+  lines: CartLine[],
+  saleDiscountCents: number
+): DiscountValidationError {
+  const hasInvalidLine = lines.some(
+    (line) => !isLineDiscountValid(line.quantity, line.unit_price_cents, line.discount_cents)
+  );
+  if (hasInvalidLine) return "line";
+  if (!isSaleDiscountValid(lines, saleDiscountCents)) return "sale";
+  return null;
+}

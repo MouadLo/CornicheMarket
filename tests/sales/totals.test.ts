@@ -2,12 +2,15 @@ import {
   cartSubtotal,
   changeDue,
   costOfGoods,
+  isLineDiscountValid,
+  isSaleDiscountValid,
   isShortPayment,
   lineSubtotal,
   lineTotal,
   saleProfit,
   saleTotal,
   totalItemCount,
+  validateSaleDiscounts,
   type CartLine,
 } from "../../src/lib/sales/totals";
 
@@ -49,9 +52,9 @@ describe("lineTotal", () => {
 
 describe("cartSubtotal", () => {
   it("adds up the lines", () => {
-    expect(cartSubtotal([line({ quantity: 2 }), line({ product_id: "p2", unit_price_cents: 150 })])).toBe(
-      1550
-    );
+    expect(
+      cartSubtotal([line({ quantity: 2 }), line({ product_id: "p2", unit_price_cents: 150 })])
+    ).toBe(1550);
   });
 
   it("is zero for an empty cart", () => {
@@ -176,6 +179,63 @@ describe("totals match what record_sale computes in the database", () => {
 
 describe("totalItemCount", () => {
   it("adds quantities including fractional ones", () => {
-    expect(totalItemCount([line({ quantity: 2 }), line({ product_id: "p2", quantity: 1.5 })])).toBe(3.5);
+    expect(totalItemCount([line({ quantity: 2 }), line({ product_id: "p2", quantity: 1.5 })])).toBe(
+      3.5
+    );
+  });
+});
+
+describe("isLineDiscountValid", () => {
+  it("accepts a discount up to and including the full line price", () => {
+    // 2 @ 7.00 = 14.00
+    expect(isLineDiscountValid(2, 700, 1400)).toBe(true);
+    expect(isLineDiscountValid(2, 700, 1000)).toBe(true);
+    expect(isLineDiscountValid(2, 700, 0)).toBe(true);
+  });
+
+  it("rejects a discount exceeding the line price by even one centime", () => {
+    expect(isLineDiscountValid(2, 700, 1401)).toBe(false);
+  });
+
+  it("rejects a negative discount", () => {
+    expect(isLineDiscountValid(1, 700, -1)).toBe(false);
+  });
+});
+
+describe("isSaleDiscountValid", () => {
+  it("accepts a discount up to the basket subtotal", () => {
+    const lines = [line({ quantity: 2, unit_price_cents: 700 })]; // 14.00
+    expect(isSaleDiscountValid(lines, 1400)).toBe(true);
+    expect(isSaleDiscountValid(lines, 500)).toBe(true);
+  });
+
+  it("rejects a discount exceeding the basket subtotal", () => {
+    const lines = [line({ quantity: 2, unit_price_cents: 700 })]; // 14.00
+    expect(isSaleDiscountValid(lines, 1401)).toBe(false);
+  });
+
+  it("rejects a negative discount", () => {
+    expect(isSaleDiscountValid([line()], -1)).toBe(false);
+  });
+});
+
+describe("validateSaleDiscounts: the gate before enqueueSale", () => {
+  it("flags an over-large line discount as 'line', before the sale discount is even considered", () => {
+    const lines = [line({ quantity: 1, unit_price_cents: 700, discount_cents: 701 })];
+    expect(validateSaleDiscounts(lines, 0)).toBe("line");
+  });
+
+  it("flags an over-large sale discount as 'sale' when every line is itself valid", () => {
+    const lines = [line({ quantity: 1, unit_price_cents: 700, discount_cents: 0 })];
+    expect(validateSaleDiscounts(lines, 701)).toBe("sale");
+  });
+
+  it("passes a normal sale with no discount at all", () => {
+    expect(validateSaleDiscounts([line({ quantity: 1, unit_price_cents: 700 })], 0)).toBeNull();
+  });
+
+  it("passes a sale whose line and basket discounts are both within bounds", () => {
+    const lines = [line({ quantity: 2, unit_price_cents: 700, discount_cents: 100 })]; // 14.00 - 1.00 = 13.00
+    expect(validateSaleDiscounts(lines, 500)).toBeNull();
   });
 });

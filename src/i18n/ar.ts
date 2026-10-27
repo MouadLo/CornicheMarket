@@ -94,6 +94,10 @@ const ar: Translations = {
     payLater: "الدفع لاحقاً",
     stuckBanner: "{{count}} بيع/بيوع عالقة · عرض",
     offlineBanner: "غير متصل · الأسعار من {{time}}",
+    discount: "خصم",
+    lineDiscountTooHigh: "الخصم يتجاوز سعر هذا المنتج.",
+    saleDiscountTooHigh: "الخصم يتجاوز إجمالي السلة.",
+    remove: "إزالة",
     stuck: {
       title: "المبيعات العالقة",
       empty: "لا توجد مبيعات عالقة.",
