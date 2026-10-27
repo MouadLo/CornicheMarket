@@ -19,6 +19,10 @@
 -- always sums to the sale's discount_cents exactly, which in turn
 -- guarantees net_revenue_cents sums to the sale's total, and line profit
 -- (net_revenue_cents - cost_cents) sums to the sale's own gross profit.
+--
+-- The column list below keeps occurred_at as the LAST column, matching
+-- 20260101000017_sale_occurred_at.sql: create or replace view only allows
+-- appending columns at the end, never reordering or inserting them.
 -- ============================================================
 
 create or replace view sale_line_economics as
@@ -67,7 +71,6 @@ select
   sale_id,
   product_id,
   created_at,
-  occurred_at,
   quantity,
   line_total_cents,
   (floor_discount + case when remainder_rank <= leftover then 1 else 0 end)::bigint
@@ -75,7 +78,8 @@ select
   (line_total_cents
     - (floor_discount + case when remainder_rank <= leftover then 1 else 0 end)
   )::bigint as net_revenue_cents,
-  round(unit_cost_cents * quantity)::bigint as cost_cents
+  round(unit_cost_cents * quantity)::bigint as cost_cents,
+  occurred_at
 from ranked
 where public.is_owner();
 

@@ -84,7 +84,15 @@ grant select on negative_stock_products to authenticated;
 -- so one oversold item can't offset the value of real stock elsewhere.
 -- oversold_value_cents surfaces what was excluded (always <= 0) instead of
 -- letting it vanish silently.
-create or replace function public.report_inventory_value()
+--
+-- This ADDS a return column (oversold_value_cents), and `create or replace
+-- function` cannot change a function's return type -- only its body --
+-- unlike `create or replace view`, which can at least append columns.
+-- Changing the return type requires dropping the function first. The drop
+-- also removes its grant, so the grant below re-adds it.
+drop function if exists public.report_inventory_value();
+
+create function public.report_inventory_value()
 returns table (
   product_count bigint,
   unit_count numeric,
@@ -119,3 +127,5 @@ begin
   where p.active and p.stock_quantity <> 0;
 end;
 $$;
+
+grant execute on function public.report_inventory_value() to authenticated;
