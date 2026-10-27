@@ -17,14 +17,22 @@
 -- BACKWARDS COMPATIBLE / ADDITIVE:
 -- record_sale(p_sale_id, p_customer_id, p_payment_method, p_discount_cents,
 -- p_lines) -- the 5-argument signature already in production -- is left
--- untouched below; it is not dropped or replaced. A new, separate 6-argument
--- overload adds p_occurred_at, defaulting to now(). Postgres distinguishes
--- functions by argument list, and PostgREST resolves an RPC call by the set
--- of parameter names in the request body, so the app version already in the
--- store (which POSTs the 5 old parameter names) keeps calling the old
--- function with the old behaviour -- occurred_at defaults to now(), exactly
--- like created_at did before this migration. Only an app built after this
--- ships sends p_occurred_at and reaches the new overload.
+-- untouched below; it is not dropped or replaced, and its INSERT never
+-- mentions occurred_at or needs_clock_review, so both columns take their
+-- NOT NULL DEFAULT (now() and false) automatically for every row it
+-- writes -- exactly the old created_at-at-sync-time behaviour, now applied
+-- to occurred_at instead. No sale written by an old client can end up with
+-- a null occurred_at.
+--
+-- A new, separate 6-argument overload adds p_occurred_at as a REQUIRED
+-- parameter (no default -- see below). Neither overload has any default
+-- parameter, so the two signatures have disjoint arities (exactly 5 vs
+-- exactly 6) with no overlap for Postgres or PostgREST to resolve: a call
+-- with 5 arguments can only match the old function, a call with 6 can only
+-- match the new one. The app version already in the store (which POSTs the
+-- 5 old parameter names) keeps calling the old function unaffected by this
+-- migration; only an app built after this ships sends all 6 and reaches
+-- the new overload.
 --
 -- NOT BACKFILLABLE: existing sales rows carry no record of when they truly
 -- occurred versus when they synced -- that information was never captured
@@ -49,7 +57,7 @@ create function public.record_sale(
   p_payment_method payment_method,
   p_discount_cents bigint,
   p_lines jsonb,
-  p_occurred_at timestamptz default now()
+  p_occurred_at timestamptz
 )
 returns uuid
 language plpgsql
