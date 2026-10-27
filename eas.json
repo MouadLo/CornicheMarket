@@ -3,9 +3,15 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
     "preview": {
       "node": "22.23.3",
-      "environment": "preview",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -13,7 +19,6 @@
     },
     "production": {
       "node": "22.23.3",
-      "environment": "production",
       "distribution": "store",
       "autoIncrement": true,
       "android": {
