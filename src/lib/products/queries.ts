@@ -137,6 +137,15 @@ export async function updateSellingPrice(id: string, sellingPriceCents: number):
   if (error) throw new Error(error.message);
 }
 
+export async function batchUpdateSellingPrices(
+  updates: { product_id: string; selling_price_cents: number }[]
+): Promise<void> {
+  const { error } = await supabase.rpc("batch_update_selling_prices", {
+    p_updates: updates,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function bulkAdjustSellingPrice(
   categoryId: string | null,
   percent: number

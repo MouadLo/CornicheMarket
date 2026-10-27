@@ -38,16 +38,17 @@ export async function submitSale(sale: PendingSale): Promise<void> {
       unit_price_cents: line.unit_price_cents,
       discount_cents: line.discount_cents,
     })),
+    // The real sale time, captured on the device when the cashier completed
+    // the sale (see pendingSaleFrom) -- not when this request happens to
+    // reach the server, which may be hours later for an offline sale.
+    p_occurred_at: sale.created_at,
   });
 
   if (error) throw new Error(error.message);
 }
 
 export async function fetchCustomers(): Promise<Customer[]> {
-  const { data, error } = await supabase
-    .from("customers")
-    .select("id, name, phone")
-    .order("name");
+  const { data, error } = await supabase.from("customers").select("id, name, phone").order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Customer[];
 }
@@ -89,7 +90,9 @@ export async function recordCustomerPayment(
 export async function fetchRecentSales(limit = 50): Promise<SaleSummary[]> {
   const { data, error } = await supabase
     .from("sales")
-    .select("id, created_at, payment_method, total_cents, discount_cents, customer_id, voided_at, void_reason")
+    .select(
+      "id, created_at, payment_method, total_cents, discount_cents, customer_id, voided_at, void_reason"
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);

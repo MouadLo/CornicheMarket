@@ -1,15 +1,7 @@
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  FlatList,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -18,6 +10,13 @@ import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import {
+  findCachedByBarcode,
+  getProductCacheMeta,
+  refreshProductCache,
+  searchCachedProducts,
+  type CachedProduct,
+} from "@/src/lib/products/offlineCache";
 import { fetchProducts, type Product } from "@/src/lib/products/queries";
 import { enqueueSale } from "@/src/lib/sales/offlineQueue";
 import {
@@ -47,6 +46,7 @@ export default function SellScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [offlineMeta, setOfflineMeta] = useState<{ refreshedAt: string } | null>(null);
 
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
@@ -58,12 +58,32 @@ export default function SellScreen() {
       .catch(() => setCustomers([]));
   }, []);
 
+  // Refresh the local product cache whenever the device comes online.
+  useEffect(() => {
+    if (sync.online) {
+      refreshProductCache(isOwner)
+        .then(() => getProductCacheMeta())
+        .then(setOfflineMeta)
+        .catch(() => {});
+    }
+  }, [sync.online, isOwner]);
+
   useEffect(() => {
     if (!debounced.trim()) {
       setResults([]);
       return;
     }
     let cancelled = false;
+
+    if (!sync.online) {
+      searchCachedProducts(debounced).then((rows) => {
+        if (!cancelled) setResults(rows as unknown as Product[]);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     fetchProducts(
       { search: debounced, categoryId: null, lowStockOnly: false, status: "active" },
       0,
@@ -74,7 +94,7 @@ export default function SellScreen() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, isOwner]);
+  }, [debounced, isOwner, sync.online]);
 
   const addProduct = useCallback((product: Product) => {
     setLines((current) => {
@@ -104,24 +124,31 @@ export default function SellScreen() {
   const addByBarcode = useCallback(
     async (barcode: string): Promise<string | null> => {
       try {
-        const [match] = await fetchProducts(
-          { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
-          0,
-          isOwner
-        );
-        if (!match) {
-          setFlash(t('sell.notFound', { barcode }));
-          return t('sell.notFound', { barcode });
+        let match: Product | CachedProduct | undefined;
+
+        if (!sync.online) {
+          match = (await findCachedByBarcode(barcode)) ?? undefined;
+        } else {
+          [match] = await fetchProducts(
+            { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
+            0,
+            isOwner
+          );
         }
-        addProduct(match);
-        setFlash(t('sell.added', { name: match.name }));
+
+        if (!match) {
+          setFlash(t("sell.notFound", { barcode }));
+          return t("sell.notFound", { barcode });
+        }
+        addProduct(match as Product);
+        setFlash(t("sell.added", { name: match.name }));
         return `${match.name} · ${centsToDisplay(match.selling_price_cents)} DH`;
       } catch {
-        setFlash(t('sell.lookupFailed'));
+        setFlash(t("sell.lookupFailed"));
         return null;
       }
     },
-    [addProduct, isOwner, t]
+    [addProduct, isOwner, sync.online, t]
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.
@@ -156,9 +183,9 @@ export default function SellScreen() {
       setLines([]);
       setSaleDiscount("");
       setPaymentOpen(false);
-      setFlash(t('sell.recorded', { amount: formatMAD(total) }));
+      setFlash(t("sell.recorded", { amount: formatMAD(total) }));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t('sell.couldNotRecord'));
+      setError(saveError instanceof Error ? saveError.message : t("sell.couldNotRecord"));
     } finally {
       setSaving(false);
     }
@@ -170,11 +197,16 @@ export default function SellScreen() {
         <View style={styles.headerTop}>
           <SyncBadge online={sync.online} pending={sync.pending} syncing={sync.syncing} />
           <View style={styles.headerLinks}>
+            {isOwner && sync.stuck > 0 && (
+              <Pressable onPress={() => router.push("/(app)/sell/stuck" as never)}>
+                <Text style={styles.stuckLink}>{t("sell.stuckBanner", { count: sync.stuck })}</Text>
+              </Pressable>
+            )}
             <Pressable onPress={() => router.push("/(app)/sell/credit")}>
-              <Text style={styles.link}>{t('sell.credit')}</Text>
+              <Text style={styles.link}>{t("sell.credit")}</Text>
             </Pressable>
             <Pressable onPress={() => router.push("/(app)/sell/history")}>
-              <Text style={styles.link}>{t('sell.history')}</Text>
+              <Text style={styles.link}>{t("sell.history")}</Text>
             </Pressable>
           </View>
         </View>
@@ -182,7 +214,7 @@ export default function SellScreen() {
         <View style={styles.searchRow}>
           <TextInput
             style={[styles.search, styles.flex]}
-            placeholder={t('sell.searchPlaceholder')}
+            placeholder={t("sell.searchPlaceholder")}
             value={search}
             onChangeText={setSearch}
             autoCapitalize="none"
@@ -190,10 +222,18 @@ export default function SellScreen() {
           />
           {Platform.OS !== "web" && (
             <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
-              <Text style={styles.scanButtonText}>{t('sell.scan')}</Text>
+              <Text style={styles.scanButtonText}>{t("sell.scan")}</Text>
             </Pressable>
           )}
         </View>
+
+        {!sync.online && offlineMeta && (
+          <Text style={styles.offlineBanner}>
+            {t("sell.offlineBanner", {
+              time: new Date(offlineMeta.refreshedAt).toLocaleTimeString(),
+            })}
+          </Text>
+        )}
 
         {flash && <Text style={styles.flash}>{flash}</Text>}
 
@@ -217,13 +257,13 @@ export default function SellScreen() {
             onRemove={() => setLines((current) => current.filter((_, i) => i !== index))}
           />
         )}
-        ListEmptyComponent={<Text style={styles.empty}>{t('sell.empty')}</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t("sell.empty")}</Text>}
       />
 
       {lines.length > 0 && (
         <View style={styles.footer}>
           <View style={styles.discountRow}>
-            <Text style={styles.footerLabel}>{t('sell.saleDiscount')}</Text>
+            <Text style={styles.footerLabel}>{t("sell.saleDiscount")}</Text>
             <TextInput
               style={styles.discountInput}
               value={saleDiscount}
@@ -235,12 +275,12 @@ export default function SellScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.footerLabel}>
-              {t('sell.subtotal', { amount: formatMAD(cartSubtotal(lines)) })}
+              {t("sell.subtotal", { amount: formatMAD(cartSubtotal(lines)) })}
             </Text>
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
           </View>
 
-          <BigButton label={t('sell.charge')} onPress={() => setPaymentOpen(true)} />
+          <BigButton label={t("sell.charge")} onPress={() => setPaymentOpen(true)} />
         </View>
       )}
 
@@ -283,15 +323,19 @@ function SyncBadge({
 }) {
   const { t } = useTranslation();
   const label = syncing
-    ? t('sell.syncSyncing')
+    ? t("sell.syncSyncing")
     : !online
-      ? pending > 0 ? t('sell.syncOfflineQueued', { count: pending }) : t('sell.syncOffline')
+      ? pending > 0
+        ? t("sell.syncOfflineQueued", { count: pending })
+        : t("sell.syncOffline")
       : pending > 0
-        ? t('sell.syncPending', { count: pending })
-        : t('sell.syncOnline');
+        ? t("sell.syncPending", { count: pending })
+        : t("sell.syncOnline");
 
   return (
-    <View style={[styles.badge, !online && styles.badgeOffline, pending > 0 && styles.badgePending]}>
+    <View
+      style={[styles.badge, !online && styles.badgeOffline, pending > 0 && styles.badgePending]}
+    >
       <Text style={[styles.badgeText, !online && styles.badgeTextOffline]}>{label}</Text>
     </View>
   );
@@ -303,6 +347,7 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 16 },
   link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
+  stuckLink: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   searchRow: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
   search: {
@@ -323,6 +368,7 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   flash: { color: "#1d7a46", fontSize: 14 },
+  offlineBanner: { color: "#b36b00", fontSize: 13, fontStyle: "italic" },
   result: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -348,7 +394,12 @@ const styles = StyleSheet.create({
   },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   totalValue: { fontSize: 30, fontWeight: "800" },
-  badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, backgroundColor: "#e8f3ec" },
+  badge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: "#e8f3ec",
+  },
   badgePending: { backgroundColor: "#fff3d6" },
   badgeOffline: { backgroundColor: "#fdecea" },
   badgeText: { fontSize: 13, fontWeight: "700", color: "#1d7a46" },

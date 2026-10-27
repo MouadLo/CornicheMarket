@@ -14,7 +14,7 @@ import {
   parseMoneyToCents,
   parseQuantity,
 } from "@/src/lib/money";
-import { updateSellingPrice, type Product } from "@/src/lib/products/queries";
+import { batchUpdateSellingPrices, type Product } from "@/src/lib/products/queries";
 import {
   createPurchase,
   createSupplier,
@@ -117,10 +117,12 @@ export default function StockInScreen() {
     try {
       await createPurchase(supplierId, validLines, profile.id, notes.trim() || null);
 
-      for (const line of lines) {
-        if (line.newSellingPriceCents !== null) {
-          await updateSellingPrice(line.product.id, line.newSellingPriceCents);
-        }
+      const priceUpdates = lines
+        .filter((l) => l.newSellingPriceCents !== null)
+        .map((l) => ({ product_id: l.product.id, selling_price_cents: l.newSellingPriceCents! }));
+
+      if (priceUpdates.length > 0) {
+        await batchUpdateSellingPrices(priceUpdates);
       }
 
       setDone(t("stockIn.recordDelivery", { count: validLines.length }) + ` · ${formatMAD(total)}`);

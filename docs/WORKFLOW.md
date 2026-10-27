@@ -129,6 +129,22 @@ Supabase does **not** support automatic migration rollback. To undo a migration:
 
 For emergencies, you can use the Supabase dashboard → **SQL editor** to run a one-off fix while you write the proper migration.
 
+### Dropping a legacy RPC overload
+
+Migration `20260101000017_sale_occurred_at.sql` adds a second, 6-argument overload of `record_sale` and deliberately leaves the original 5-argument version in place untouched, so that an already-installed app (which only ever sends the 5 old parameter names) keeps working exactly as before. The two signatures have no default parameters and no overlapping arity, so Postgres and PostgREST resolve a call to the right one without any risk of choosing wrong.
+
+**Do not drop the 5-argument `record_sale` until every installed copy of the app has updated past the version that added `p_occurred_at`.** Dropping it earlier would break checkout for anyone still on the old build — the RPC call they send would no longer match anything.
+
+How to know it is safe to drop:
+
+1. **Check version adoption**, not database activity — the database cannot tell you which overload a given row came from (both write into the same `sales` table, and a same-day online sale looks identical either way). Use:
+   - **EAS Update dashboard** (expo.dev → your project → Updates) for the OTA-updated JS bundle's adoption, if sales run through an app using EAS Update channels.
+   - **Google Play Console → Release → Statistics** (and Apple App Store Connect → App Analytics, if/when iOS ships) for native build version adoption, since a user who hasn't opened the app since before this release never receives an OTA update either.
+2. Wait until 100% (or your accepted risk threshold) of active devices are on a build that sends `p_occurred_at`.
+3. Only then write a new migration that drops the 5-argument overload: `drop function public.record_sale(uuid, uuid, payment_method, bigint, jsonb);`. Never edit the existing migration file to remove it — migrations are append-only (see the rule above).
+
+For a one-shop, one-phone deployment this is quick to verify by hand (check the one device); the dashboards above matter once there is more than one cashier device in the field.
+
 ---
 
 ## GitHub Secrets reference
