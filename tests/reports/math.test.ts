@@ -71,6 +71,73 @@ describe("allocateSaleDiscount", () => {
   it("splits evenly between equal lines", () => {
     expect(allocateSaleDiscount([1000, 1000], 200)).toEqual([100, 100]);
   });
+
+  // These two cases round to 9 and 6 respectively (not 10 and 5) under
+  // independent per-line rounding -- the drift documented in
+  // docs/PRE-LAUNCH-GAPS.md#i1. Largest-remainder allocation must not drop
+  // or invent centimes.
+  it("sums to the discount exactly: [333, 333, 334] with a 10-cent discount", () => {
+    const allocated = allocateSaleDiscount([333, 333, 334], 10);
+    expect(allocated.reduce((sum, value) => sum + value, 0)).toBe(10);
+    expect(allocated).toEqual([3, 3, 4]);
+  });
+
+  it("sums to the discount exactly: six 1-cent lines with a 5-cent discount", () => {
+    const allocated = allocateSaleDiscount([1, 1, 1, 1, 1, 1], 5);
+    expect(allocated.reduce((sum, value) => sum + value, 0)).toBe(5);
+    expect(allocated).toEqual([1, 1, 1, 1, 1, 0]);
+  });
+
+  // A small deterministic PRNG (mulberry32) rather than Math.random, so a
+  // failure is reproducible from the printed seed without needing a new
+  // dependency.
+  function mulberry32(seed: number) {
+    let state = seed;
+    return () => {
+      state |= 0;
+      state = (state + 0x6d2b79f5) | 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  it("sums to the discount exactly across randomized baskets", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rand = mulberry32(seed);
+      const lineCount = 1 + Math.floor(rand() * 8);
+      const lines = Array.from({ length: lineCount }, () => Math.floor(rand() * 5000) + 1);
+      const total = lines.reduce((sum, value) => sum + value, 0);
+      const discount = Math.floor(rand() * (total + 1));
+
+      const allocated = allocateSaleDiscount(lines, discount);
+      const sum = allocated.reduce((acc, value) => acc + value, 0);
+
+      expect(sum).toBe(discount);
+      expect(allocated).toHaveLength(lineCount);
+      for (const value of allocated) {
+        expect(Number.isInteger(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("line profits sum to sale profit exactly across randomized baskets", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rand = mulberry32(seed);
+      const lineCount = 1 + Math.floor(rand() * 8);
+      const lineTotals = Array.from({ length: lineCount }, () => Math.floor(rand() * 5000) + 1);
+      const lineCosts = lineTotals.map(() => Math.floor(rand() * 4000));
+      const total = lineTotals.reduce((sum, value) => sum + value, 0);
+      const discount = Math.floor(rand() * (total + 1));
+
+      const netRevenue = netLineRevenue(lineTotals, discount);
+      const saleProfit = netRevenue.reduce((sum, value, i) => sum + (value - lineCosts[i]), 0);
+      const expectedSaleProfit = total - discount - lineCosts.reduce((sum, c) => sum + c, 0);
+
+      expect(saleProfit).toBe(expectedSaleProfit);
+    }
+  });
 });
 
 describe("averageBasketCents", () => {

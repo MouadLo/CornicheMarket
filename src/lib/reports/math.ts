@@ -5,6 +5,15 @@
 
 // A basket discount belongs to the sale, not to any line, so it is split
 // across lines in proportion to their value. Mirrors sale_line_economics.
+//
+// Uses the largest-remainder method, not independent per-line rounding:
+// each line's exact share is floored, then the leftover centimes (always a
+// non-negative integer less than the number of lines, since every floor is
+// at most 1 short of its exact share) are handed one at a time to the lines
+// with the biggest fractional remainder. This is what guarantees the parts
+// always sum to saleDiscountCents exactly. Independent rounding does not --
+// e.g. lines [333, 333, 334] with a 10-cent discount round to [3, 3, 3],
+// summing to 9, not 10.
 export function allocateSaleDiscount(
   lineTotalsCents: number[],
   saleDiscountCents: number
@@ -13,15 +22,29 @@ export function allocateSaleDiscount(
   if (total <= 0 || saleDiscountCents <= 0) {
     return lineTotalsCents.map(() => 0);
   }
-  return lineTotalsCents.map((lineTotal) =>
-    Math.round((saleDiscountCents * lineTotal) / total)
-  );
+
+  const exact = lineTotalsCents.map((lineTotal) => (saleDiscountCents * lineTotal) / total);
+  const floors = exact.map((value) => Math.floor(value));
+  const floorSum = floors.reduce((sum, value) => sum + value, 0);
+  let leftover = saleDiscountCents - floorSum;
+
+  // Ties (equal remainders) go to the lower index first, so the result is
+  // deterministic rather than depending on sort stability of equal floats.
+  const byRemainderDesc = exact
+    .map((value, index) => ({ index, remainder: value - floors[index] }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+
+  const result = [...floors];
+  for (const { index } of byRemainderDesc) {
+    if (leftover <= 0) break;
+    result[index] += 1;
+    leftover -= 1;
+  }
+
+  return result;
 }
 
-export function netLineRevenue(
-  lineTotalsCents: number[],
-  saleDiscountCents: number
-): number[] {
+export function netLineRevenue(lineTotalsCents: number[], saleDiscountCents: number): number[] {
   const allocated = allocateSaleDiscount(lineTotalsCents, saleDiscountCents);
   return lineTotalsCents.map((lineTotal, index) => lineTotal - allocated[index]);
 }
@@ -31,10 +54,7 @@ export function averageBasketCents(revenueCents: number, transactionCount: numbe
   return Math.round(revenueCents / transactionCount);
 }
 
-export function grossMarginPercent(
-  revenueCents: number,
-  cogsCents: number
-): number | null {
+export function grossMarginPercent(revenueCents: number, cogsCents: number): number | null {
   if (revenueCents <= 0) return null;
   return ((revenueCents - cogsCents) / revenueCents) * 100;
 }
