@@ -7,6 +7,7 @@ import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { StockInLine, type LineState } from "@/src/components/stock/StockInLine";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { fetchNegativeStockProducts } from "@/src/lib/inventory/queries";
 import {
   centsToDisplay,
   formatMAD,
@@ -40,12 +41,20 @@ export default function StockInScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [negativeStockCount, setNegativeStockCount] = useState(0);
 
   useEffect(() => {
     fetchSuppliers()
       .then(setSuppliers)
       .catch(() => setSuppliers([]));
   }, []);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    fetchNegativeStockProducts()
+      .then((rows) => setNegativeStockCount(rows.length))
+      .catch(() => setNegativeStockCount(0));
+  }, [isOwner]);
 
   if (profile && !isOwner) {
     return (
@@ -145,6 +154,16 @@ export default function StockInScreen() {
         <ToolLink label={t("stockIn.toolAdjust")} href="/(app)/stock-in/adjust" />
         <ToolLink label={t("stockIn.toolExpiring")} href="/(app)/stock-in/expiring" />
         <ToolLink label={t("stockIn.toolHistory")} href="/(app)/stock-in/history" />
+        {isOwner && negativeStockCount > 0 && (
+          <Pressable
+            style={styles.negativeStockTool}
+            onPress={() => router.push("/(app)/stock-in/negative-stock" as never)}
+          >
+            <Text style={styles.negativeStockToolText}>
+              {t("stockIn.toolNegativeStock", { count: negativeStockCount })}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {done && <Text style={styles.success}>{done}</Text>}
@@ -280,6 +299,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#eef3ef",
   },
   toolText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
+  negativeStockTool: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: "#fdeaea",
+  },
+  negativeStockToolText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },

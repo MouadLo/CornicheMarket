@@ -1,6 +1,14 @@
 import { Redirect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
@@ -98,7 +106,7 @@ export default function ReportsScreen() {
       setDeadStock(dead);
       setInventory(inventoryValue);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t('reports.loadError'));
+      setError(loadError instanceof Error ? loadError.message : t("reports.loadError"));
     } finally {
       setLoading(false);
     }
@@ -200,16 +208,31 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{t('reports.title')}</Text>
+      <Text style={styles.title}>{t("reports.title")}</Text>
 
       {today && (
         <View style={styles.todayCard}>
-          <Text style={styles.todayLabel}>{t('reports.today')}</Text>
+          <Text style={styles.todayLabel}>{t("reports.today")}</Text>
           <View style={styles.todayGrid}>
-            <Metric label={t('reports.metricRevenue')} value={formatMAD(today.revenue_cents)} large />
-            <Metric label={t('reports.profit')} value={formatMAD(today.gross_profit_cents)} large accent />
-            <Metric label={t('reports.metricTransactions')} value={String(today.transaction_count)} />
-            <Metric label={t('reports.metricAvgBasket')} value={formatMAD(today.average_basket_cents)} />
+            <Metric
+              label={t("reports.metricRevenue")}
+              value={formatMAD(today.revenue_cents)}
+              large
+            />
+            <Metric
+              label={t("reports.profit")}
+              value={formatMAD(today.gross_profit_cents)}
+              large
+              accent
+            />
+            <Metric
+              label={t("reports.metricTransactions")}
+              value={String(today.transaction_count)}
+            />
+            <Metric
+              label={t("reports.metricAvgBasket")}
+              value={formatMAD(today.average_basket_cents)}
+            />
           </View>
         </View>
       )}
@@ -234,14 +257,14 @@ export default function ReportsScreen() {
             style={styles.dateInput}
             value={customFrom}
             onChangeText={setCustomFrom}
-            placeholder={t('reports.fromDate')}
+            placeholder={t("reports.fromDate")}
             autoCapitalize="none"
           />
           <TextInput
             style={styles.dateInput}
             value={customTo}
             onChangeText={setCustomTo}
-            placeholder={t('reports.toDate')}
+            placeholder={t("reports.toDate")}
             autoCapitalize="none"
           />
         </View>
@@ -252,28 +275,41 @@ export default function ReportsScreen() {
 
       {!loading && summary && (
         <>
-          <Section title={t('reports.money', { label: range.label })}>
+          <Section title={t("reports.money", { label: range.label })}>
             <View style={styles.metricGrid}>
-              <Metric label={t('reports.metricRevenue')} value={formatMAD(summary.revenue_cents)} large />
-              <Metric label={t('reports.metricCogs')} value={formatMAD(summary.cogs_cents)} />
               <Metric
-                label={t('reports.metricGrossProfit')}
+                label={t("reports.metricRevenue")}
+                value={formatMAD(summary.revenue_cents)}
+                large
+              />
+              <Metric label={t("reports.metricCogs")} value={formatMAD(summary.cogs_cents)} />
+              <Metric
+                label={t("reports.metricGrossProfit")}
                 value={formatMAD(summary.gross_profit_cents)}
                 large
                 accent
               />
-              <Metric label={t('reports.metricMargin')} value={formatMargin(summary.margin_percent)} />
-              <Metric label={t('reports.metricTransactions')} value={String(summary.transaction_count)} />
-              <Metric label={t('reports.metricAvgBasket')} value={formatMAD(summary.average_basket_cents)} />
               <Metric
-                label={t('reports.metricLosses')}
+                label={t("reports.metricMargin")}
+                value={formatMargin(summary.margin_percent)}
+              />
+              <Metric
+                label={t("reports.metricTransactions")}
+                value={String(summary.transaction_count)}
+              />
+              <Metric
+                label={t("reports.metricAvgBasket")}
+                value={formatMAD(summary.average_basket_cents)}
+              />
+              <Metric
+                label={t("reports.metricLosses")}
                 value={formatMAD(summary.loss_cents)}
                 negative={summary.loss_cents > 0}
               />
             </View>
           </Section>
 
-          <Section title={t('reports.dailySales')}>
+          <Section title={t("reports.dailySales")}>
             <MiniBarChart
               points={daily.map<ChartPoint>((point) => ({
                 key: point.day,
@@ -281,11 +317,11 @@ export default function ReportsScreen() {
                 value: point.revenue_cents,
                 secondary: point.profit_cents,
               }))}
-              secondaryLabel={t('reports.profit')}
+              secondaryLabel={t("reports.profit")}
             />
           </Section>
 
-          <Section title={t('reports.byCategory')}>
+          <Section title={t("reports.byCategory")}>
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
@@ -293,11 +329,11 @@ export default function ReportsScreen() {
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}
-              secondaryLabel={t('reports.profit')}
+              secondaryLabel={t("reports.profit")}
             />
           </Section>
 
-          <Section title={t('reports.byHour')}>
+          <Section title={t("reports.byHour")}>
             <MiniBarChart
               points={hours.map<ChartPoint>((row) => ({
                 key: String(row.hour),
@@ -308,33 +344,47 @@ export default function ReportsScreen() {
           </Section>
 
           {inventory && (
-            <Section title={t('reports.inventoryValue')}>
+            <Section title={t("reports.inventoryValue")}>
               <View style={styles.metricGrid}>
-                <Metric label={t('reports.metricAtCost')} value={formatMAD(inventory.cost_value_cents)} large />
                 <Metric
-                  label={t('reports.metricAtSellingPrice')}
+                  label={t("reports.metricAtCost")}
+                  value={formatMAD(inventory.cost_value_cents)}
+                  large
+                />
+                <Metric
+                  label={t("reports.metricAtSellingPrice")}
                   value={formatMAD(inventory.retail_value_cents)}
                   large
                 />
                 <Metric
-                  label={t('reports.metricPotentialProfit')}
+                  label={t("reports.metricPotentialProfit")}
                   value={formatMAD(inventory.potential_profit_cents)}
                   accent
                 />
-                <Metric label={t('reports.metricProductsInStock')} value={String(inventory.product_count)} />
+                <Metric
+                  label={t("reports.metricProductsInStock")}
+                  value={String(inventory.product_count)}
+                />
               </View>
+              {inventory.oversold_value_cents < 0 && (
+                <Text style={styles.oversoldWarning}>
+                  {t("reports.oversoldWarning", {
+                    amount: formatMAD(-inventory.oversold_value_cents),
+                  })}
+                </Text>
+              )}
             </Section>
           )}
 
-          <Section title={t('reports.top20ByProfit')}>
+          <Section title={t("reports.top20ByProfit")}>
             <ProductTable rows={topByProfit} renderValue={(row) => formatMAD(row.profit_cents)} />
           </Section>
 
-          <Section title={t('reports.top20ByQuantity')}>
+          <Section title={t("reports.top20ByQuantity")}>
             <ProductTable rows={topByQuantity} renderValue={(row) => `${row.quantity}`} />
           </Section>
 
-          <Section title={t('reports.lowestMargin')}>
+          <Section title={t("reports.lowestMargin")}>
             <ProductTable
               rows={lowestMargin}
               renderValue={(row) => formatMargin(row.margin_percent)}
@@ -342,9 +392,9 @@ export default function ReportsScreen() {
             />
           </Section>
 
-          <Section title={t('reports.deadStock')}>
+          <Section title={t("reports.deadStock")}>
             {deadStock.length === 0 ? (
-              <Text style={styles.empty}>{t('reports.allSoldRecently')}</Text>
+              <Text style={styles.empty}>{t("reports.allSoldRecently")}</Text>
             ) : (
               deadStock.slice(0, 20).map((row) => (
                 <View key={row.product_id} style={styles.tableRow}>
@@ -353,8 +403,10 @@ export default function ReportsScreen() {
                     <Text style={styles.rowMeta}>
                       {row.stock_quantity} {row.unit} ·{" "}
                       {row.last_sold_at
-                        ? t('reports.deadStockLastSold', { date: new Date(row.last_sold_at).toLocaleDateString() })
-                        : t('reports.deadStockNeverSold')}
+                        ? t("reports.deadStockLastSold", {
+                            date: new Date(row.last_sold_at).toLocaleDateString(),
+                          })
+                        : t("reports.deadStockNeverSold")}
                     </Text>
                   </View>
                   <Text style={styles.rowValue}>{formatMAD(row.stock_value_cents)}</Text>
@@ -368,7 +420,7 @@ export default function ReportsScreen() {
               style={styles.exportButton}
               onPress={() => exportTablesAsCsv(`report-${fileStamp}.csv`, buildTables())}
             >
-              <Text style={styles.exportText}>{t('reports.exportCsv')}</Text>
+              <Text style={styles.exportText}>{t("reports.exportCsv")}</Text>
             </Pressable>
             <Pressable
               style={styles.exportButton}
@@ -380,7 +432,7 @@ export default function ReportsScreen() {
                 )
               }
             >
-              <Text style={styles.exportText}>{t('reports.exportPdf')}</Text>
+              <Text style={styles.exportText}>{t("reports.exportPdf")}</Text>
             </Pressable>
           </View>
         </>
@@ -439,7 +491,7 @@ function ProductTable({
 }) {
   const { t } = useTranslation();
   if (rows.length === 0) {
-    return <Text style={styles.empty}>{t('reports.noSales')}</Text>;
+    return <Text style={styles.empty}>{t("reports.noSales")}</Text>;
   }
 
   return (
@@ -474,6 +526,7 @@ const styles = StyleSheet.create({
   todayCard: { backgroundColor: "#f3f7f4", borderRadius: 14, padding: 16, gap: 10 },
   todayLabel: { fontSize: 13, fontWeight: "700", color: "#1d7a46", textTransform: "uppercase" },
   todayGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  oversoldWarning: { color: "#b3261e", fontSize: 13, marginTop: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
   chipActive: { backgroundColor: "#1d7a46" },

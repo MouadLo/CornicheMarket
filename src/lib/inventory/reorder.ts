@@ -31,10 +31,7 @@ export function roundUpForUnit(quantity: number, unit: string): number {
   return Math.ceil(quantity);
 }
 
-export function daysOfStockLeft(
-  quantitySold30d: number,
-  stockQuantity: number
-): number | null {
+export function daysOfStockLeft(quantitySold30d: number, stockQuantity: number): number | null {
   const rate = dailySalesRate(quantitySold30d);
   if (rate <= 0) return null;
   return stockQuantity / rate;
@@ -55,12 +52,18 @@ export function stockAfterCount(
   return Number((liveQuantity + countDiscrepancy(counted, systemQuantityAtCount)).toFixed(3));
 }
 
-export function lossValueCents(
-  quantityDelta: number,
-  unitCostCents: number | null
-): number | null {
+export function lossValueCents(quantityDelta: number, unitCostCents: number | null): number | null {
   if (unitCostCents === null) return null;
   // Only write-offs are losses; a positive correction is stock found, not lost.
   if (quantityDelta >= 0) return 0;
   return Math.round(-quantityDelta * unitCostCents);
+}
+
+// How long a product has been in negative stock, for the owner's negative-
+// stock screen. stock_went_negative_at is cleared (null) the moment stock
+// returns to zero or above, so null here means "not currently negative."
+export function daysNegative(wentNegativeAt: string | null, now: Date = new Date()): number | null {
+  if (!wentNegativeAt) return null;
+  const elapsedMs = now.getTime() - new Date(wentNegativeAt).getTime();
+  return Math.max(0, elapsedMs / (1000 * 60 * 60 * 24));
 }

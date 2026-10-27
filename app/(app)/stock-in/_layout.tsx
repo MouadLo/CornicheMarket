@@ -9,6 +9,7 @@ export default function StockInLayout() {
       <Stack.Screen name="adjust" options={{ title: "Stock adjustments" }} />
       <Stack.Screen name="count" options={{ title: "Stock count" }} />
       <Stack.Screen name="expiring" options={{ title: "Expiring soon" }} />
+      <Stack.Screen name="negative-stock" options={{ title: "Negative stock" }} />
     </Stack>
   );
 }

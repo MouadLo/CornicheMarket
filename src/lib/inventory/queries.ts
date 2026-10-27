@@ -89,7 +89,9 @@ export async function fetchRecentAdjustments(isOwner: boolean): Promise<Adjustme
   if (isOwner) {
     const { data, error } = await supabase
       .from("stock_adjustments")
-      .select("id, product_id, quantity_delta, reason, note, created_at, unit_cost_cents, products(name, unit)")
+      .select(
+        "id, product_id, quantity_delta, reason, note, created_at, unit_cost_cents, products(name, unit)"
+      )
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -142,10 +144,34 @@ export async function fetchExpiringBatches(withinDays: number): Promise<Expiring
 
   const { data, error } = await supabase
     .from("expiring_batches")
-    .select("id, product_id, product_name, unit, stock_quantity, delivered_quantity, expiry_date, days_left")
+    .select(
+      "id, product_id, product_name, unit, stock_quantity, delivered_quantity, expiry_date, days_left"
+    )
     .lte("expiry_date", cutoff.toISOString().slice(0, 10))
     .order("expiry_date");
 
   if (error) throw new Error(error.message);
   return (data ?? []) as ExpiringBatch[];
+}
+
+export type NegativeStockProduct = {
+  product_id: string;
+  product_name: string;
+  unit: string;
+  stock_quantity: number;
+  current_cost_cents: number | null;
+  stock_went_negative_at: string | null;
+};
+
+// Owner-only (negative_stock_products filters on is_owner() itself).
+export async function fetchNegativeStockProducts(): Promise<NegativeStockProduct[]> {
+  const { data, error } = await supabase
+    .from("negative_stock_products")
+    .select(
+      "product_id, product_name, unit, stock_quantity, current_cost_cents, stock_went_negative_at"
+    )
+    .order("stock_went_negative_at");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as NegativeStockProduct[];
 }
