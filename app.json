@@ -26,6 +26,7 @@
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
         "android.permission.VIBRATE"
       ]
     },
@@ -39,7 +40,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Corniche Market to scan product barcodes."
+          "cameraPermission": "Autoriser Corniche Market à scanner les codes-barres des produits."
         }
       ],
       "expo-localization"
