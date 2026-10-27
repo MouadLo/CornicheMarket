@@ -124,48 +124,75 @@ npx eas-cli@latest update --branch preview --rollback-to <update-group-id>
 Supabase does **not** support automatic migration rollback. To undo a migration:
 
 1. Write a new migration file in `supabase/migrations/` that reverses the change (e.g. drops the column you added, restores the old constraint).
-2. Merge it to `main` — it will be applied to staging automatically.
-3. Tag a release — it will be applied to production.
+2. Commit and merge to `main`.
+3. Tag a release — it will be applied when you push the version tag.
 
 For emergencies, you can use the Supabase dashboard → **SQL editor** to run a one-off fix while you write the proper migration.
 
 ---
 
+## Releasing a database change safely
+
+Because you have one Supabase project (no staging), migrations are **applied only when you push a version tag**, never on merge to main. This ensures an older app version never breaks if you apply a migration in advance.
+
+### Before you add a migration
+
+1. **Take a backup** (recommended):
+   - Go to Supabase dashboard → your project → Backups
+   - Click **Take Backup Now** and wait for it to complete (5–15 min)
+   - Note the backup date so you can restore it if needed
+
+2. **Test locally** with your migration and seed data:
+   ```bash
+   # This resets your local database and reruns all migrations in order
+   supabase db reset
+   ```
+   This catches syntax errors, constraint violations, and data loss issues *before* they reach production.
+
+3. **Design migrations to be backwards-compatible**:
+   - ✅ Add new columns/tables
+   - ✅ Add new constraints that allow existing data
+   - ❌ Never drop columns or rename them in one release (older app versions read the old column names)
+   - ❌ Never add `NOT NULL` without a default value
+   - ❌ Never change a column type if the old app still writes the old type
+
+   **Example:** Adding a feature that uses a new column:
+   - Release v1.1 with the app code that uses the new column (still works without it)
+   - Release v1.2 with the migration that creates the column
+   - Older app versions (v1.1) keep working; new versions (v1.2) use the column
+
+4. **When you're ready to release:**
+   - Push the migration to `main` via a PR (tested locally, reviewed)
+   - Update `app.json` to the next version (e.g. 1.1.0 → 1.2.0)
+   - Merge to `main` — CI runs, all tests pass
+   - Tag the version: `git tag v1.2.0 && git push origin v1.2.0`
+   - The mobile.yml workflow applies the migration to Supabase and builds the app
+   - Monitor the Expo dashboard for build success
+
+### If a migration fails halfway
+
+This is rare but can happen if the migration is invalid or the database is in a locked state.
+
+**Check the migration status:**
+- Go to Supabase dashboard → Migrations tab
+- See which migration succeeded and which failed
+
+**Rollback and fix:**
+1. Restore from the backup you took earlier (if one exists): Backups tab → Restore
+2. Fix the migration file in `supabase/migrations/` (e.g. syntax error, wrong column type)
+3. Test locally: `supabase db reset`
+4. Create a new commit and tag a new version (e.g. v1.2.1)
+
+**If you don't have a backup:**
+1. Use the Supabase SQL editor to manually undo the partial changes
+2. Fix the migration file
+3. Test locally and tag a new version
+
+---
+
 ## GitHub Secrets reference
 
-Set these in **GitHub → Settings → Secrets and variables → Actions**.
-
-Use **Environments** to separate staging and production secrets: create a `staging` environment and a `production` environment, then add the secrets listed below to each one.
-
-### CI (no secrets needed)
-CI uses placeholder values so it can run on forks and PRs without any real credentials.
-
-### `staging` environment
-
-| Secret | What it is | Where to get it |
-|---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | Staging Supabase project URL | Supabase dashboard → project → Settings → API → Project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Staging Supabase anon key | Supabase dashboard → project → Settings → API → `anon` key |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI personal token | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) → Generate new token |
-| `SUPABASE_STAGING_PROJECT_REF` | Staging project reference (20-char string) | Supabase dashboard → staging project → Settings → General → Reference ID |
-| `SUPABASE_STAGING_DB_PASSWORD` | Staging database password | Supabase dashboard → staging project → Settings → Database → Database password (or the one you set when creating the project) |
-| `VERCEL_TOKEN` | Vercel API token | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token |
-| `VERCEL_ORG_ID` | Your Vercel team/personal account ID | Run `npx vercel whoami --json` locally after `npx vercel login`, or Vercel dashboard → Settings → General → Team ID |
-| `VERCEL_PROJECT_ID` | Vercel project ID | Run `npx vercel link` locally in the project root; it writes `.vercel/project.json` containing `projectId` |
-| `EXPO_TOKEN` | Expo/EAS authentication token | [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens) → Create Token |
-
-### `production` environment
-
-| Secret | What it is | Where to get it |
-|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | Same Supabase CLI token (or a separate one) | Same as staging |
-| `SUPABASE_PROD_PROJECT_REF` | Production project reference | Supabase dashboard → production project → Settings → General → Reference ID |
-| `SUPABASE_PROD_DB_PASSWORD` | Production database password | Same location as staging |
-| `EXPO_TOKEN` | Same EAS token | Same as staging |
-
-### Protecting the `production` environment (recommended)
-
-In GitHub → Settings → Environments → `production` → **Required reviewers**: add yourself or a trusted reviewer. This means the production migration step pauses and waits for a manual approval before running. One-click rollout, not an accidental deploy.
+See [docs/SECRETS.md](./SECRETS.md) for the complete list of secrets and where to get each one. All secrets go in **GitHub → Settings → Secrets and variables → Actions** (not environment-specific, since you have one Supabase project).
 
 ---
 
@@ -176,7 +203,6 @@ Before the pipelines work end-to-end, complete these steps once:
 - [ ] Run `npx eas-cli@latest login` and `npx eas-cli@latest init` in the project root. This adds `extra.eas.projectId` to `app.json`. Commit the change.
 - [ ] Set `expo.android.package` and `expo.ios.bundleIdentifier` in `app.json`.
 - [ ] Create a Vercel project: `npx vercel link` in the project root. The `.vercel/project.json` it creates contains `projectId` and `orgId` — those go into GitHub Secrets. Add `.vercel/` to `.gitignore`.
-- [ ] Create a staging Supabase project at [supabase.com](https://supabase.com) (free tier is fine for staging).
-- [ ] Create a production Supabase project.
-- [ ] Add all secrets to GitHub as listed above.
+- [ ] Create one Supabase project at [supabase.com](https://supabase.com) for all environments (free tier is fine).
+- [ ] Add all secrets to GitHub (see [docs/SECRETS.md](./SECRETS.md)).
 - [ ] In GitHub → Settings → Branches → Add rule for `main`: enable **Require status checks to pass** and select the `check` job from the CI workflow.

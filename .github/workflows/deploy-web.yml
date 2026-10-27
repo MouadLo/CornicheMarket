@@ -1,6 +1,10 @@
 name: Deploy web
 
 # Only runs after the CI workflow passes on main — never deploys broken code.
+# Note: Database migrations are NOT applied here. They are applied only when
+# pushing a version tag (v1.0.0), via the mobile.yml workflow, which ensures
+# the migration is applied BEFORE the app build is released. This prevents
+# older app versions from breaking if a migration is applied in advance.
 on:
   workflow_run:
     workflows: [CI]
@@ -11,46 +15,15 @@ permissions:
   contents: read
 
 jobs:
-  # ── 1. Apply database migrations to the staging project ──────────────────
-  migrate-staging:
-    name: Staging DB migrations
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: staging
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Check out the exact commit that passed CI, not just HEAD of main.
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link staging project
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
-
-      - name: Apply pending migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase db push --password "${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}"
-
-  # ── 2. Build Expo web and deploy to Vercel ───────────────────────────────
+  # ── Build Expo web and deploy to Vercel ──────────────────────────────────
   deploy:
     name: Build web → Vercel
-    needs: migrate-staging
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: staging
     env:
       CI: "1"
       EXPO_NO_DOTENV: "1"
-      # Use the staging Supabase project's URL and anon key so the web app
-      # talks to staging, not production.
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
     steps:

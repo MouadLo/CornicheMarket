@@ -1,67 +1,42 @@
 # GitHub Secrets & Environment Configuration
 
-This document lists every secret required to deploy Corniche Market. Set these in **GitHub → Settings → Secrets and variables → Actions** under the `staging` and `production` environments.
+This document lists every secret required to deploy Corniche Market. Corniche Market uses **one Supabase project** (no staging/production split) and deploys to Vercel for web and EAS for mobile.
 
-## Environment setup
+Set these secrets in **GitHub → Settings → Secrets and variables → Actions** (no environment restriction — they apply to all workflows).
 
-Create two environments in GitHub (Settings → Environments):
-- **`staging`**: used by CI/CD to deploy to staging Supabase and Vercel preview
-- **`production`**: used by release workflows to deploy to production Supabase and Play Store
-
----
-
-## `staging` environment secrets
+## Required secrets (single project)
 
 | Secret | What it is | Where to get it |
 |--------|-----------|-----------------|
-| `EXPO_PUBLIC_SUPABASE_URL` | Staging Supabase project URL | [Supabase dashboard](https://supabase.com/dashboard) → your staging project → Settings → API → Project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Staging Supabase anon key | Same location → copy the `anon` key |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI personal token | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) → Generate new token (save it securely) |
-| `SUPABASE_STAGING_PROJECT_REF` | Staging project reference ID | Settings → General → Reference ID (20-char string like `abcdefghijklmnopqrst`) |
-| `SUPABASE_STAGING_DB_PASSWORD` | Staging database password | Settings → Database → Database password (or what you set when creating the project) |
+| `EXPO_PUBLIC_SUPABASE_URL` | Your Supabase project URL | [Supabase dashboard](https://supabase.com/dashboard) → your project → Settings → API → Project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key | Same location → `anon` key (public, safe to commit to environment variables) |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI personal token | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) → Generate new token |
+| `SUPABASE_PROJECT_REF` | Your project reference ID | Settings → General → Reference ID (20-char string) |
+| `SUPABASE_DB_PASSWORD` | Your database password | Settings → Database → Database password (what you set when creating the project) |
 | `VERCEL_TOKEN` | Vercel API token | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token (scope: `full`) |
-| `VERCEL_ORG_ID` | Your Vercel org/personal ID | Dashboard → Settings → General → Team ID, or run `npx vercel whoami --json` locally |
-| `VERCEL_PROJECT_ID` | Vercel project ID | Run `npx vercel link` locally in the project root; it creates `.vercel/project.json` containing `projectId` |
+| `VERCEL_ORG_ID` | Your Vercel org/personal ID | After running `npx vercel link` locally, read from `.vercel/project.json` → `orgId`, OR dashboard → Settings → General → Team ID |
+| `VERCEL_PROJECT_ID` | Your Vercel project ID | Same as above → `projectId` in `.vercel/project.json`, OR from dashboard |
 | `EXPO_TOKEN` | Expo/EAS authentication token | [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens) → Create Token |
-
----
-
-## `production` environment secrets
-
-| Secret | What it is | Where to get it |
-|--------|-----------|-----------------|
-| `SUPABASE_ACCESS_TOKEN` | Same Supabase CLI token (reuse from staging) | Same as staging |
-| `SUPABASE_PROD_PROJECT_REF` | Production project reference ID | Create a production Supabase project and copy its Reference ID |
-| `SUPABASE_PROD_DB_PASSWORD` | Production database password | Same location |
-| `EXPO_TOKEN` | Same EAS token (reuse from staging) | Same as staging |
-
----
-
-## CI secrets (no action needed)
-
-The **CI** workflow (`.github/workflows/ci.yml`) uses placeholder Supabase values and does not require any secrets. It runs on all PRs and branches.
-
----
 
 ## How to add secrets to GitHub
 
-1. Go to **GitHub → Settings → Environments**.
-2. Click **New environment** and name it `staging` (or `production`).
-3. Click the environment name → **Environment secrets**.
-4. Click **Add secret** and paste each secret from the table above.
-5. Repeat for the `production` environment (using production project values).
+1. Go to **GitHub → Settings → Secrets and variables → Actions**.
+2. Click **New repository secret** (not environment-specific).
+3. Add each secret from the table above.
 
----
+## How to find VERCEL_ORG_ID and VERCEL_PROJECT_ID
 
-## Protecting production
+Run locally:
+```bash
+npx vercel link
+```
 
-To require manual approval before production deployments:
+This creates `.vercel/project.json` containing `orgId` and `projectId`. Copy them to GitHub:
+```bash
+cat .vercel/project.json  # shows orgId and projectId
+```
 
-1. Go to **Settings → Environments → production → Required reviewers**.
-2. Add yourself or a trusted reviewer.
-3. Save.
-
-Now any production migration or EAS Build (triggered by a version tag) will pause and wait for approval.
+Add `.vercel/` to `.gitignore` so credentials are not committed.
 
 ---
 
