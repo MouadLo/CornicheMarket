@@ -27,9 +27,34 @@ export type StuckSale = {
   failedAt: string;
 };
 
-// True for transient failures (network, server unavailable) that should be
-// retried. False for permanent failures (validation, auth, bad data) that will
-// never succeed and must be quarantined immediately.
+// An expired or invalid access token, as distinct from a genuine permission
+// denial (RLS rejecting an action the user is not allowed to take, which
+// stays permanent). This gets its own check because the real fix is not
+// just "retry" but "refresh the session first" -- retrying with the same
+// stale token would only fail again the same way. See submitWithAuthRetry
+// in useSaleSync.ts.
+export function isAuthError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("jwt") ||
+    msg.includes("refresh token") ||
+    msg.includes("401") ||
+    msg.includes("unauthorized")
+  );
+}
+
+// True for transient failures (network, server unavailable, expired auth
+// token) that should be retried. False for permanent failures (validation,
+// RLS denial, missing product) that will never succeed and must be
+// quarantined immediately.
+//
+// An expired token after a long offline/background period is temporary:
+// it resolves the moment the session refreshes, which is exactly what
+// happens before a sale reaches isTemporaryError at all now (see
+// submitWithAuthRetry) -- but it is classified temporary here too, so a
+// sale whose refresh attempt itself fails (e.g. the refresh token has also
+// expired) still gets ordinary retry/backoff instead of being quarantined
+// on the very first attempt.
 export function isTemporaryError(message: string): boolean {
   const msg = message.toLowerCase();
   return (
@@ -40,7 +65,8 @@ export function isTemporaryError(message: string): boolean {
     msg.includes("socket") ||
     msg.includes("502") ||
     msg.includes("503") ||
-    msg.includes("504")
+    msg.includes("504") ||
+    isAuthError(message)
   );
 }
 

@@ -12,6 +12,7 @@ import {
   countPendingSales,
   countStuckSales,
   enqueueSale,
+  isAuthError,
   isTemporaryError,
   listPendingSales,
   listStuckSales,
@@ -20,18 +21,27 @@ import {
   retryStuckSale,
   type PendingSale,
 } from "../../src/lib/sales/offlineQueue";
-import { pendingSaleFrom } from "../../src/lib/sales/useSaleSync";
+import { pendingSaleFrom, submitWithAuthRetry } from "../../src/lib/sales/useSaleSync";
+
+// Prefixed with "mock" so Jest hoists these into the jest.mock() factories
+// below correctly.
+const mockSubmitSale = jest.fn();
+const mockRefreshSession = jest.fn();
 
 // useSaleSync imports submitSale from queries, which triggers the Supabase
 // client initializer that requires env vars. Mock the module so only the
-// pure pendingSaleFrom helper is exercised here.
+// pure pendingSaleFrom/submitWithAuthRetry helpers are exercised here.
 jest.mock("../../src/lib/sales/queries", () => ({
-  submitSale: jest.fn(),
+  submitSale: (...args: unknown[]) => mockSubmitSale(...args),
   fetchCustomers: jest.fn(),
   voidSale: jest.fn(),
 }));
 
-// Prefixed with "mock" so Jest hoists the factory correctly.
+// submitWithAuthRetry calls supabase.auth.refreshSession() directly.
+jest.mock("../../src/lib/supabase/client", () => ({
+  supabase: { auth: { refreshSession: (...args: unknown[]) => mockRefreshSession(...args) } },
+}));
+
 const mockStore = new Map<string, string>();
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -46,6 +56,8 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 
 beforeEach(() => {
   mockStore.clear();
+  mockSubmitSale.mockReset();
+  mockRefreshSession.mockReset();
 });
 
 describe("pendingSaleFrom", () => {
@@ -139,6 +151,14 @@ describe("isTemporaryError", () => {
     "503 Service Unavailable",
     "502 Bad Gateway",
     "504 Gateway Timeout",
+    // An expired/invalid token is a recoverable auth hiccup, not a
+    // permanent rejection -- see PRE-LAUNCH-GAPS.md#b3. It used to be
+    // classified permanent, which quarantined real sales on the first
+    // attempt after a session expiry.
+    "401 Unauthorized",
+    "JWT expired",
+    "invalid JWT",
+    "Invalid Refresh Token",
   ])("classifies '%s' as temporary", (msg) => {
     expect(isTemporaryError(msg)).toBe(true);
   });
@@ -148,12 +168,76 @@ describe("isTemporaryError", () => {
     "foreign key violation",
     "duplicate key value",
     "400 Bad Request",
-    "401 Unauthorized",
+    // 403 stays permanent: RLS denying an action the user genuinely isn't
+    // allowed to take (not an expired token) should never be retried.
     "403 Forbidden",
     "404 Not Found",
     "22P02",
   ])("classifies '%s' as permanent", (msg) => {
     expect(isTemporaryError(msg)).toBe(false);
+  });
+});
+
+describe("isAuthError", () => {
+  it.each(["JWT expired", "invalid JWT", "401 Unauthorized", "Invalid Refresh Token"])(
+    "classifies '%s' as an auth error",
+    (msg) => {
+      expect(isAuthError(msg)).toBe(true);
+    }
+  );
+
+  it.each(["403 Forbidden", "Network request failed", "foreign key violation"])(
+    "does not classify '%s' as an auth error",
+    (msg) => {
+      expect(isAuthError(msg)).toBe(false);
+    }
+  );
+});
+
+describe("submitWithAuthRetry: an expired token syncs after refresh and is never parked", () => {
+  function makeSale(id: string): PendingSale {
+    return pendingSaleFrom(
+      id,
+      { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 900 },
+      []
+    );
+  }
+
+  it("refreshes the session and resubmits once, succeeding without quarantine", async () => {
+    mockSubmitSale.mockRejectedValueOnce(new Error("JWT expired")).mockResolvedValueOnce(undefined);
+    mockRefreshSession.mockResolvedValueOnce({ error: null });
+
+    const sale = makeSale("auth-1");
+    await enqueueSale(sale);
+
+    await submitWithAuthRetry(sale);
+    await removePendingSale(sale.id);
+
+    expect(mockSubmitSale).toHaveBeenCalledTimes(2);
+    expect(mockRefreshSession).toHaveBeenCalledTimes(1);
+    expect(await countPendingSales()).toBe(0);
+    expect(await countStuckSales()).toBe(0);
+  });
+
+  it("propagates the original error if the refresh itself fails, rather than retrying blindly", async () => {
+    mockSubmitSale.mockRejectedValueOnce(new Error("JWT expired"));
+    mockRefreshSession.mockResolvedValueOnce({ error: new Error("Invalid Refresh Token") });
+
+    const sale = makeSale("auth-2");
+    await enqueueSale(sale);
+
+    await expect(submitWithAuthRetry(sale)).rejects.toThrow("JWT expired");
+    // submitSale must not be called a second time with a token we already
+    // know is bad.
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attempt a refresh for a non-auth error", async () => {
+    mockSubmitSale.mockRejectedValueOnce(new Error("Network request failed"));
+
+    await expect(submitWithAuthRetry(makeSale("auth-3"))).rejects.toThrow("Network request failed");
+    expect(mockRefreshSession).not.toHaveBeenCalled();
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   MAX_RETRY_ATTEMPTS,
   countPendingSales,
   countStuckSales,
+  isAuthError,
   isTemporaryError,
   listPendingSales,
   markAttempt,
@@ -13,6 +14,29 @@ import {
   type PendingSale,
 } from "@/src/lib/sales/offlineQueue";
 import { submitSale } from "@/src/lib/sales/queries";
+import { supabase } from "@/src/lib/supabase/client";
+
+// Submits a sale, and if it fails on an expired/invalid access token,
+// refreshes the session once and retries the SAME sale immediately -- a
+// stale token (the device was offline or backgrounded long enough that
+// supabase-js's own background refresh timer never got to run) then clears
+// within this single sync pass instead of surviving to backoff or
+// quarantine. A second failure (including the refresh call itself failing,
+// e.g. the refresh token has also expired) propagates to the caller, which
+// classifies and handles it exactly as any other sync error.
+export async function submitWithAuthRetry(sale: PendingSale): Promise<void> {
+  try {
+    await submitSale(sale);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Sync failed";
+    if (!isAuthError(message)) throw error;
+
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) throw error;
+
+    await submitSale(sale);
+  }
+}
 
 export type SyncState = {
   online: boolean;
@@ -56,7 +80,7 @@ export function useSaleSync() {
 
     for (const sale of queue) {
       try {
-        await submitSale(sale);
+        await submitWithAuthRetry(sale);
         await removePendingSale(sale.id);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Sync failed";
