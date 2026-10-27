@@ -14,7 +14,7 @@ import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
 SplashScreen.preventAutoHideAsync();
 
 function NavigationGuard({ children }: { children: React.ReactNode }) {
-  const { session, loading, profileError, retryProfile, signOut } = useAuth();
+  const { session, loading, profileError, loadTimedOut, retryProfile, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -30,6 +30,29 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       router.replace("/(app)/sell");
     }
   }, [session, loading, segments, router]);
+
+  // Still loading after LOAD_TIMEOUT_MS: something is hung (wrong Supabase
+  // URL, local stack not running, dead network) rather than slow. Without
+  // this, the user is stuck on app/index.tsx's bare spinner forever with
+  // no way out. No "Sign out" here -- signOut() is itself a network call
+  // that would hang the same way, and we may not even know yet whether
+  // there is a session to sign out of.
+  if (loading && loadTimedOut) {
+    return (
+      <View style={guardStyles.container}>
+        <Text style={guardStyles.title}>Le chargement prend trop de temps</Text>
+        <Text style={guardStyles.message}>
+          Impossible de contacter Supabase. Si vous utilisez Supabase local, vérifiez que `npx
+          supabase start` est lancé et que EXPO_PUBLIC_SUPABASE_URL (dans .env ou .env.local) est
+          bien l&apos;URL affichée par `npx supabase status` — pas la chaîne de connexion
+          postgresql://. Sinon, vérifiez votre connexion internet.
+        </Text>
+        <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
+          <Text style={guardStyles.retryText}>Réessayer</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (!loading && profileError) {
     return (

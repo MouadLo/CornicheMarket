@@ -22,14 +22,19 @@ insert into suppliers (id, name, phone) values
 
 -- A system-owned bootstrap profile used only as created_by/cashier_id for
 -- seed purchases and nothing else (real users sign up through Supabase Auth).
+-- LOCAL DEV ONLY: a real, working password (bcrypt via pgcrypto) so this
+-- account can actually sign in through the app, not just exist as a row.
+-- Never seed a real environment with known credentials like this.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+  email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change
 ) values (
   '00000000-0000-0000-0000-000000000000',
   '00000000-0000-0000-0000-0000000000aa',
-  'authenticated', 'authenticated', 'seed-system@corniche.local', '',
-  now(), now(), now(), '{}', '{}'
+  'authenticated', 'authenticated', 'owner@corniche.local', crypt('owner123', gen_salt('bf')),
+  now(), now(), now(), '{}', '{}',
+  '', '', '', ''
 )
   on conflict (id) do nothing;
 
@@ -121,14 +126,18 @@ join product_rows pr on pr.name = ip.name;
 insert into suppliers (id, name, phone) values
   ('00000000-0000-0000-0000-00000000a002', 'Distributeur Atlas', '0655555555');
 
+-- LOCAL DEV ONLY: see the owner account above for why this has a real
+-- working password instead of an empty one.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+  email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change
 ) values (
   '00000000-0000-0000-0000-000000000000',
   '00000000-0000-0000-0000-0000000000bb',
-  'authenticated', 'authenticated', 'seed-cashier@corniche.local', '',
-  now(), now(), now(), '{}', '{}'
+  'authenticated', 'authenticated', 'cashier@corniche.local', crypt('cashier123', gen_salt('bf')),
+  now(), now(), now(), '{}', '{}',
+  '', '', '', ''
 )
   on conflict (id) do nothing;
 
@@ -499,4 +508,19 @@ begin
     update sales set total_cents = (select sum(line_total_cents) from sale_items where sale_id = v_sale_id)
     where id = v_sale_id;
   end loop;
+end $$;
+
+-- ============================================================
+-- Print the local-only login credentials so `supabase db reset` always
+-- ends by telling you how to actually sign in, instead of leaving you to
+-- go dig through this file.
+-- ============================================================
+do $$
+begin
+  raise notice '';
+  raise notice '=====================================================';
+  raise notice 'Seeded accounts for LOCAL sign-in (never use in production):';
+  raise notice '  Owner:   owner@corniche.local   / owner123';
+  raise notice '  Cashier: cashier@corniche.local / cashier123';
+  raise notice '=====================================================';
 end $$;

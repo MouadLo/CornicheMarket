@@ -16,12 +16,21 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   profileError: string | null;
+  loadTimedOut: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   retryProfile: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+// If getSession()/the profile fetch hasn't resolved by the time this fires,
+// something is hung -- a misconfigured Supabase URL (e.g. a raw Postgres
+// connection string instead of the API gateway URL), the local stack not
+// running, or a dead network -- and "loading" would otherwise spin on
+// app/index.tsx's bare ActivityIndicator forever with no way out. The
+// loading state must always resolve to something the user can act on.
+const LOAD_TIMEOUT_MS = 10000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,9 +39,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileRetry, setProfileRetry] = useState(0);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
+    // Re-runs on profileRetry too, so clicking Retry gives the next
+    // attempt its own fresh LOAD_TIMEOUT_MS window instead of immediately
+    // re-showing the timeout error from the previous attempt.
+    setTimedOut(false);
+    const timer = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [profileRetry]);
+
+  // Re-runs on profileRetry too: the hang that needs retrying might be
+  // getSession() itself (e.g. a Supabase URL that can't be reached at
+  // all), not just the profile fetch below, so Retry has to be able to
+  // restart this step as well, not only the one after it.
+  useEffect(() => {
     let mounted = true;
+    setSessionLoaded(false);
 
     supabase.auth.getSession().then(({ data }) => {
       if (mounted) {
@@ -42,15 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setSessionLoaded(true);
+      if (mounted) {
+        setSession(nextSession);
+        setSessionLoaded(true);
+      }
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [profileRetry]);
 
   useEffect(() => {
     if (!session) {
@@ -87,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, profileRetry]);
 
   const loading = !sessionLoaded || !profileLoaded;
+  const loadTimedOut = loading && timedOut;
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -101,7 +128,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, profileError, signIn, signOut, retryProfile }}
+      value={{
+        session,
+        profile,
+        loading,
+        profileError,
+        loadTimedOut,
+        signIn,
+        signOut,
+        retryProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>
