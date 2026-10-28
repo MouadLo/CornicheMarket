@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { centsToDisplay } from "@/src/lib/money";
@@ -13,19 +14,15 @@ type Props = {
   points: ChartPoint[];
   height?: number;
   secondaryLabel?: string;
-  emptyMessage?: string;
 };
 
 // Bars built from Views. A charting library would mean an SVG dependency in
 // the mobile bundle for what is a handful of rectangles.
-export function MiniBarChart({
-  points,
-  height = 140,
-  secondaryLabel,
-  emptyMessage = "Nothing to show for this range.",
-}: Props) {
+export function MiniBarChart({ points, height = 140, secondaryLabel }: Props) {
+  const { t } = useTranslation();
+
   if (points.length === 0) {
-    return <Text style={styles.empty}>{emptyMessage}</Text>;
+    return <Text style={styles.empty}>{t("reports.noDataForRange")}</Text>;
   }
 
   const max = Math.max(...points.map((point) => Math.max(point.value, point.secondary ?? 0)), 1);
@@ -36,7 +33,7 @@ export function MiniBarChart({
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.swatch, styles.barPrimary]} />
-            <Text style={styles.legendText}>Revenue</Text>
+            <Text style={styles.legendText}>{t("reports.metricRevenue")}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.swatch, styles.barSecondary]} />

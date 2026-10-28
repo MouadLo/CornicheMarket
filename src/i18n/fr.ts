@@ -333,6 +333,7 @@ const fr = {
     deadStock: "Pas vendu en 30 jours",
     allSoldRecently: "Tout le stock a été vendu récemment.",
     noSales: "Aucune vente sur cette période.",
+    noDataForRange: "Rien à afficher pour cette période.",
     metricRevenue: "Chiffre d'affaires",
     metricCogs: "Coût des ventes",
     metricGrossProfit: "Bénéfice brut",
@@ -355,11 +356,27 @@ const fr = {
     profit: "Bénéfice",
   },
   units: {
+    // French/English only ever resolve to the "one"/"other" CLDR plural
+    // categories, but Arabic needs all six (see src/i18n/ar.ts) -- these
+    // extra keys exist only so Translations (typeof this file) accepts
+    // ar.ts's full set; fr/en never look them up.
+    piece_zero: "pièces",
     piece_one: "pièce",
+    piece_two: "pièces",
+    piece_few: "pièces",
+    piece_many: "pièces",
     piece_other: "pièces",
+    pack_zero: "paquets",
     pack_one: "paquet",
+    pack_two: "paquets",
+    pack_few: "paquets",
+    pack_many: "paquets",
     pack_other: "paquets",
+    kg_zero: "kg",
     kg_one: "kg",
+    kg_two: "kg",
+    kg_few: "kg",
+    kg_many: "kg",
     kg_other: "kg",
   },
 };
