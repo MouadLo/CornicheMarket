@@ -325,6 +325,8 @@ const ar: Translations = {
     colProfit: "الربح",
     colQuantity: "الكمية",
     colMargin: "الهامش",
+    colStock: "المخزون",
+    colValueAtCost: "القيمة بالتكلفة",
     deadStock: "غير مبيع منذ 30 يوم",
     allSoldRecently: "كل المخزون بيع مؤخرًا.",
     noSales: "لا توجد مبيعات في هذه الفترة.",

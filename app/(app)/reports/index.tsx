@@ -326,7 +326,7 @@ export default function ReportsScreen() {
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
-                label: row.category_name.slice(0, 10),
+                label: isolateBidi(row.category_name.slice(0, 10)),
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}
@@ -406,22 +406,28 @@ export default function ReportsScreen() {
             {deadStock.length === 0 ? (
               <Text style={styles.empty}>{t("reports.allSoldRecently")}</Text>
             ) : (
-              deadStock.slice(0, 20).map((row) => (
-                <View key={row.product_id} style={styles.tableRow}>
-                  <View style={styles.tableMain}>
-                    <Text style={styles.rowName}>{row.product_name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {row.stock_quantity} {row.unit} ·{" "}
-                      {row.last_sold_at
+              <>
+                <ReportTableHeader
+                  mainLabel={t("reports.colProduct")}
+                  metaLabel={t("reports.colStock")}
+                  valueLabel={t("reports.colValueAtCost")}
+                />
+                {deadStock.slice(0, 20).map((row, index) => (
+                  <ReportRow
+                    key={row.product_id}
+                    index={index}
+                    name={row.product_name}
+                    subtitle={`${row.stock_quantity} ${row.unit} · ${
+                      row.last_sold_at
                         ? t("reports.deadStockLastSold", {
                             date: new Date(row.last_sold_at).toLocaleDateString(),
                           })
-                        : t("reports.deadStockNeverSold")}
-                    </Text>
-                  </View>
-                  <Text style={styles.rowValue}>{formatMAD(row.stock_value_cents)}</Text>
-                </View>
-              ))
+                        : t("reports.deadStockNeverSold")
+                    }`}
+                    value={formatMAD(row.stock_value_cents)}
+                  />
+                ))}
+              </>
             )}
           </Section>
 
@@ -490,6 +496,71 @@ function Metric({
   );
 }
 
+// Shared by every row in Reports that pairs a product/line name with a
+// subtitle and a trailing value (the three ProductTable rankings and the
+// dead-stock list). Centralising it here is what makes the RTL isolation
+// fix (isolateBidi + appDirection) apply everywhere at once instead of
+// needing to be remembered per call site -- see
+// docs/PRE-LAUNCH-GAPS.md-style audits: a name-rendering spot that forgets
+// this wrapping is exactly how the original row-flip bug happened.
+function ReportTableHeader({
+  mainLabel,
+  metaLabel,
+  valueLabel,
+}: {
+  mainLabel: string;
+  metaLabel: string;
+  valueLabel: string;
+}) {
+  const { i18n } = useTranslation();
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
+
+  return (
+    <View style={[styles.tableHeader, { direction: dir }]}>
+      <Text style={[styles.tableHeaderMain, { textAlign }]}>{mainLabel}</Text>
+      <Text style={[styles.tableHeaderMeta, { textAlign }]}>{metaLabel}</Text>
+      <Text style={styles.tableHeaderValue}>{valueLabel}</Text>
+    </View>
+  );
+}
+
+function ReportRow({
+  name,
+  subtitle,
+  value,
+  valueNegative,
+  index,
+}: {
+  name: string;
+  subtitle: string;
+  value: string;
+  valueNegative?: boolean;
+  index: number;
+}) {
+  const { i18n } = useTranslation();
+  // The row's layout direction follows the APP language, never the
+  // content of any one row -- an Arabic product name must not flip a
+  // French-locale row (or vice versa). RN's `direction` style property is
+  // a real Yoga layout property, honoured on iOS/Android/web alike, unlike
+  // relying on global RTL state (which this intentionally overrides per
+  // row so every row is internally consistent with the table as a whole).
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
+
+  return (
+    <View style={[styles.tableRow, { direction: dir }, index % 2 === 1 && styles.tableRowOdd]}>
+      <View style={styles.tableMain}>
+        <Text style={[styles.rowName, { textAlign }]} numberOfLines={1}>
+          {isolateBidi(name)}
+        </Text>
+        <Text style={[styles.rowMeta, { textAlign }]}>{subtitle}</Text>
+      </View>
+      <Text style={[styles.rowValue, valueNegative && styles.rowValueNegative]}>{value}</Text>
+    </View>
+  );
+}
+
 function ProductTable({
   rows,
   renderValue,
@@ -501,49 +572,27 @@ function ProductTable({
   valueLabel: string;
   warnBelowZero?: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   if (rows.length === 0) {
     return <Text style={styles.empty}>{t("reports.noSales")}</Text>;
   }
 
-  // The row's layout direction follows the APP language, never the
-  // content of any one row -- an Arabic product name must not flip a
-  // French-locale row (or vice versa). RN's `direction` style property is
-  // a real Yoga layout property, honoured on iOS/Android/web alike, unlike
-  // relying on global RTL state (which this intentionally overrides per
-  // row so every row is internally consistent with the table as a whole).
-  const dir = appDirection(i18n.language);
-  const textAlign = dir === "rtl" ? "right" : "left";
-
   return (
     <>
-      <View style={[styles.tableHeader, { direction: dir }]}>
-        <Text style={[styles.tableHeaderMain, { textAlign }]}>{t("reports.colProduct")}</Text>
-        <Text style={[styles.tableHeaderMeta, { textAlign }]}>{t("reports.colQtyRevenue")}</Text>
-        <Text style={styles.tableHeaderValue}>{valueLabel}</Text>
-      </View>
+      <ReportTableHeader
+        mainLabel={t("reports.colProduct")}
+        metaLabel={t("reports.colQtyRevenue")}
+        valueLabel={valueLabel}
+      />
       {rows.map((row, index) => (
-        <View
+        <ReportRow
           key={row.product_id}
-          style={[styles.tableRow, { direction: dir }, index % 2 === 1 && styles.tableRowOdd]}
-        >
-          <View style={styles.tableMain}>
-            <Text style={[styles.rowName, { textAlign }]} numberOfLines={1}>
-              {isolateBidi(row.product_name)}
-            </Text>
-            <Text style={[styles.rowMeta, { textAlign }]}>
-              {row.quantity} {row.unit} · {formatMAD(row.revenue_cents)}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.rowValue,
-              warnBelowZero && (row.margin_percent ?? 0) < 0 && styles.rowValueNegative,
-            ]}
-          >
-            {renderValue(row)}
-          </Text>
-        </View>
+          index={index}
+          name={row.product_name}
+          subtitle={`${row.quantity} ${row.unit} · ${formatMAD(row.revenue_cents)}`}
+          value={renderValue(row)}
+          valueNegative={warnBelowZero && (row.margin_percent ?? 0) < 0}
+        />
       ))}
     </>
   );

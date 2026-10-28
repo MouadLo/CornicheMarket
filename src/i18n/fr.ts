@@ -324,6 +324,8 @@ const fr = {
     colProfit: "Bénéfice",
     colQuantity: "Quantité",
     colMargin: "Marge",
+    colStock: "Stock",
+    colValueAtCost: "Valeur au coût",
     deadStock: "Pas vendu en 30 jours",
     allSoldRecently: "Tout le stock a été vendu récemment.",
     noSales: "Aucune vente sur cette période.",

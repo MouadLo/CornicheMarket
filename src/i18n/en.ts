@@ -325,6 +325,8 @@ const en: Translations = {
     colProfit: "Profit",
     colQuantity: "Quantity",
     colMargin: "Margin",
+    colStock: "Stock",
+    colValueAtCost: "Value at cost",
     deadStock: "Not sold in 30 days",
     allSoldRecently: "Everything in stock has sold recently.",
     noSales: "No sales in this range.",
