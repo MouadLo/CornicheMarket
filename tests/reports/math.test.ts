@@ -1,6 +1,7 @@
 import {
   allocateSaleDiscount,
   averageBasketCents,
+  compareByMetricThenName,
   flooredInventoryValueCents,
   grossMarginPercent,
   inventoryPotentialProfitCents,
@@ -237,5 +238,51 @@ describe("flooredInventoryValueCents / oversoldValueCents (PRE-LAUNCH-GAPS B4)",
     expect(atCost).toBe(-37200); // 6 x 62.00 DH
     expect(atCost).not.toBe(-45000); // NOT 6 x 75.00 DH (-450.00) -- the suspected bug
     expect(atCost).not.toBe(atSellingPriceIfBuggy);
+  });
+});
+
+describe("compareByMetricThenName", () => {
+  it("sorts descending by value when values differ", () => {
+    const rows = [
+      { value: 100, name: "Zebra" },
+      { value: 300, name: "Apple" },
+      { value: 200, name: "Mango" },
+    ];
+    const sorted = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    expect(sorted.map((r) => r.name)).toEqual(["Apple", "Mango", "Zebra"]);
+  });
+
+  it("sorts ascending by value when values differ", () => {
+    const rows = [
+      { value: 100, name: "Zebra" },
+      { value: 300, name: "Apple" },
+      { value: 200, name: "Mango" },
+    ];
+    const sorted = [...rows].sort((a, b) => compareByMetricThenName(a, b, "asc"));
+    expect(sorted.map((r) => r.name)).toEqual(["Zebra", "Mango", "Apple"]);
+  });
+
+  it("breaks a tie on value with product name ascending, regardless of direction", () => {
+    const rows = [
+      { value: 500, name: "Couches bébé" },
+      { value: 500, name: "Ananas" },
+      { value: 500, name: "Zaatar" },
+    ];
+    const desc = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    const asc = [...rows].sort((a, b) => compareByMetricThenName(a, b, "asc"));
+    expect(desc.map((r) => r.name)).toEqual(["Ananas", "Couches bébé", "Zaatar"]);
+    expect(asc.map((r) => r.name)).toEqual(["Ananas", "Couches bébé", "Zaatar"]);
+  });
+
+  it("is stable and deterministic across repeated sorts of the same input order", () => {
+    const rows = [
+      { value: 10, name: "B" },
+      { value: 10, name: "A" },
+      { value: 10, name: "C" },
+    ];
+    const first = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    const second = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    expect(first.map((r) => r.name)).toEqual(["A", "B", "C"]);
+    expect(second.map((r) => r.name)).toEqual(["A", "B", "C"]);
   });
 });

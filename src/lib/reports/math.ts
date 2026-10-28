@@ -91,3 +91,19 @@ export function oversoldValueCents(stockQuantities: number[], unitValueCents: nu
     0
   );
 }
+
+// Deterministic tie-break for report tables ranked by a numeric metric
+// (profit, quantity, margin, ...): rows tied on the metric are ordered by
+// product name ascending, so the table renders the same way every time
+// instead of depending on whatever order the RPC happened to return tied
+// rows in (which Array.prototype.sort -- stable since ES2019 -- would
+// otherwise preserve as-is, silently reflecting fetch order).
+export function compareByMetricThenName(
+  a: { value: number; name: string },
+  b: { value: number; name: string },
+  direction: "asc" | "desc"
+): number {
+  const diff = direction === "desc" ? b.value - a.value : a.value - b.value;
+  if (diff !== 0) return diff;
+  return a.name.localeCompare(b.name);
+}

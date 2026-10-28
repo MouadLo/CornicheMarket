@@ -15,6 +15,7 @@ import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarC
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
 import { exportTablesAsCsv, exportTablesAsPdf, type ReportTable } from "@/src/lib/reports/export";
+import { compareByMetricThenName } from "@/src/lib/reports/math";
 import {
   fetchByCategory,
   fetchByHour,
@@ -141,11 +142,33 @@ export default function ReportsScreen() {
 
   if (profile && !isOwner) return <Redirect href="/(app)/sell" />;
 
-  const topByProfit = [...products].sort((a, b) => b.profit_cents - a.profit_cents).slice(0, 20);
-  const topByQuantity = [...products].sort((a, b) => b.quantity - a.quantity).slice(0, 20);
+  const topByProfit = [...products]
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.profit_cents, name: a.product_name },
+        { value: b.profit_cents, name: b.product_name },
+        "desc"
+      )
+    )
+    .slice(0, 20);
+  const topByQuantity = [...products]
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.quantity, name: a.product_name },
+        { value: b.quantity, name: b.product_name },
+        "desc"
+      )
+    )
+    .slice(0, 20);
   const lowestMargin = [...products]
     .filter((product) => product.margin_percent !== null)
-    .sort((a, b) => (a.margin_percent as number) - (b.margin_percent as number))
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.margin_percent as number, name: a.product_name },
+        { value: b.margin_percent as number, name: b.product_name },
+        "asc"
+      )
+    )
     .slice(0, 20);
 
   const buildTables = (): ReportTable[] => [
