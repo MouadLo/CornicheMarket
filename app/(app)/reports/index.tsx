@@ -75,6 +75,7 @@ export default function ReportsScreen() {
   // the day/hour buckets the server groups by). Defaults to Casablanca
   // while the setting is still loading.
   const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  const [showAllDeadStock, setShowAllDeadStock] = useState(false);
 
   useEffect(() => {
     fetchStoreTimezone()
@@ -126,6 +127,7 @@ export default function ReportsScreen() {
       setProducts(performance);
       setDeadStock(dead);
       setInventory(inventoryValue);
+      setShowAllDeadStock(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("reports.loadError"));
     } finally {
@@ -427,12 +429,19 @@ export default function ReportsScreen() {
               <Text style={styles.empty}>{t("reports.allSoldRecently")}</Text>
             ) : (
               <>
+                <Text style={styles.deadStockTotal}>
+                  {t("reports.deadStockTotal", {
+                    amount: formatMAD(
+                      deadStock.reduce((sum, row) => sum + row.stock_value_cents, 0)
+                    ),
+                  })}
+                </Text>
                 <ReportTableHeader
                   mainLabel={t("reports.colProduct")}
                   metaLabel={t("reports.colStock")}
                   valueLabel={t("reports.colValueAtCost")}
                 />
-                {deadStock.slice(0, 20).map((row, index) => (
+                {(showAllDeadStock ? deadStock : deadStock.slice(0, 20)).map((row, index) => (
                   <ReportRow
                     key={row.product_id}
                     index={index}
@@ -447,6 +456,18 @@ export default function ReportsScreen() {
                     value={formatMAD(row.stock_value_cents)}
                   />
                 ))}
+                {deadStock.length > 20 && (
+                  <Pressable
+                    style={styles.showAllButton}
+                    onPress={() => setShowAllDeadStock((prev) => !prev)}
+                  >
+                    <Text style={styles.showAllText}>
+                      {showAllDeadStock
+                        ? t("reports.showLess")
+                        : t("reports.showAll", { count: deadStock.length })}
+                    </Text>
+                  </Pressable>
+                )}
               </>
             )}
           </Section>
@@ -700,6 +721,9 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 15, fontWeight: "700", minWidth: 72, textAlign: "right" },
   rowValueNegative: { color: "#b3261e" },
   empty: { color: "#666", fontSize: 14 },
+  deadStockTotal: { color: "#444", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  showAllButton: { paddingVertical: 10, alignItems: "center" },
+  showAllText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
   exportRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   exportButton: {
     flex: 1,
