@@ -41,6 +41,9 @@ const ar: Translations = {
     signedInAs: "مسجل الدخول كـ",
     signOut: "تسجيل الخروج",
     inviteCashier: "دعوة أمين صندوق",
+    storeTimezone: "المنطقة الزمنية للمتجر",
+    storeTimezoneHint:
+      "تُستخدم لتقسيم المبيعات حسب اليوم والساعة في التقارير. غيّرها فقط إذا كان المتجر خارج المغرب.",
     fullName: "الاسم الكامل",
     email: "البريد الإلكتروني",
     sendInvite: "إرسال الدعوة",

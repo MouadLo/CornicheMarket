@@ -41,6 +41,9 @@ const en: Translations = {
     signedInAs: "Signed in as",
     signOut: "Sign out",
     inviteCashier: "Invite a cashier",
+    storeTimezone: "Store time zone",
+    storeTimezoneHint:
+      "Used to split sales by day and hour in reports. Only change this if the store is not in Morocco.",
     fullName: "Full name",
     email: "Email",
     sendInvite: "Send invite",

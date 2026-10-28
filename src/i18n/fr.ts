@@ -39,6 +39,9 @@ const fr = {
     signedInAs: "Connecté en tant que",
     signOut: "Se déconnecter",
     inviteCashier: "Inviter un caissier",
+    storeTimezone: "Fuseau horaire du magasin",
+    storeTimezoneHint:
+      "Utilisé pour découper les ventes par jour et par heure dans les rapports. À changer uniquement si le magasin n'est pas au Maroc.",
     fullName: "Nom complet",
     email: "Email",
     sendInvite: "Envoyer l'invitation",

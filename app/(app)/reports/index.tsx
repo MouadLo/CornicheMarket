@@ -22,6 +22,7 @@ import {
   fetchDeadStock,
   fetchInventoryValue,
   fetchProductPerformance,
+  fetchStoreTimezone,
   fetchSummary,
   type CategoryRow,
   type DailyPoint,
@@ -31,7 +32,12 @@ import {
   type ProductPerformance,
   type ReportSummary,
 } from "@/src/lib/reports/queries";
-import { isValidDateInput, resolveRange, type RangeKey } from "@/src/lib/reports/ranges";
+import {
+  DEFAULT_STORE_TIMEZONE,
+  isValidDateInput,
+  resolveRange,
+  type RangeKey,
+} from "@/src/lib/reports/ranges";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 
 const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
@@ -62,22 +68,34 @@ export default function ReportsScreen() {
   const [inventory, setInventory] = useState<InventoryValue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The owner-configured store time zone, fetched once and reused for
+  // every boundary computed on this screen (today/yesterday/month, and
+  // the day/hour buckets the server groups by). Defaults to Casablanca
+  // while the setting is still loading.
+  const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+
+  useEffect(() => {
+    fetchStoreTimezone()
+      .then(setTimeZone)
+      .catch(() => {});
+  }, []);
 
   const range = useMemo(
     () =>
       resolveRange(
         rangeKey,
         isValidDateInput(customFrom) ? customFrom : undefined,
-        isValidDateInput(customTo) ? customTo : undefined
+        isValidDateInput(customTo) ? customTo : undefined,
+        timeZone
       ),
-    [rangeKey, customFrom, customTo]
+    [rangeKey, customFrom, customTo, timeZone]
   );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const todayRange = resolveRange("today");
+      const todayRange = resolveRange("today", undefined, undefined, timeZone);
       const [
         todaySummary,
         rangeSummary,
@@ -111,7 +129,7 @@ export default function ReportsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [range.from, range.to, t]);
+  }, [range.from, range.to, t, timeZone]);
 
   useEffect(() => {
     if (isOwner) load();
