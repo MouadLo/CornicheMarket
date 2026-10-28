@@ -39,6 +39,8 @@ import {
   type RangeKey,
 } from "@/src/lib/reports/ranges";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 
 const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
   { key: "today", tKey: "reports.today" },
@@ -51,7 +53,7 @@ const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
 
 export default function ReportsScreen() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [rangeKey, setRangeKey] = useState<RangeKey>("today");
@@ -146,7 +148,7 @@ export default function ReportsScreen() {
 
   const buildTables = (): ReportTable[] => [
     {
-      title: `Summary (${range.label})`,
+      title: `Summary (${t(range.labelKey)})`,
       columns: ["Metric", "Value"],
       rows: [
         ["Revenue", centsToDisplay(summary?.revenue_cents ?? 0)],
@@ -218,7 +220,7 @@ export default function ReportsScreen() {
         row.product_name,
         row.stock_quantity,
         centsToDisplay(row.stock_value_cents),
-        row.last_sold_at ? new Date(row.last_sold_at).toLocaleDateString() : "never",
+        row.last_sold_at ? formatLocaleDate(new Date(row.last_sold_at), i18n.language) : "never",
       ]),
     },
   ];
@@ -294,7 +296,7 @@ export default function ReportsScreen() {
 
       {!loading && summary && (
         <>
-          <Section title={t("reports.money", { label: range.label })}>
+          <Section title={t("reports.money", { label: t(range.labelKey) })}>
             <View style={styles.metricGrid}>
               <Metric
                 label={t("reports.metricRevenue")}
@@ -435,10 +437,10 @@ export default function ReportsScreen() {
                     key={row.product_id}
                     index={index}
                     name={row.product_name}
-                    subtitle={`${row.stock_quantity} ${row.unit} · ${
+                    subtitle={`${row.stock_quantity} ${unitLabel(row.unit, row.stock_quantity, t)} · ${
                       row.last_sold_at
                         ? t("reports.deadStockLastSold", {
-                            date: new Date(row.last_sold_at).toLocaleDateString(),
+                            date: formatLocaleDate(new Date(row.last_sold_at), i18n.language),
                           })
                         : t("reports.deadStockNeverSold")
                     }`}
@@ -461,7 +463,7 @@ export default function ReportsScreen() {
               onPress={() =>
                 exportTablesAsPdf(
                   "Corniche Market report",
-                  `${range.label} · generated ${new Date().toLocaleString()}`,
+                  `${t(range.labelKey)} · generated ${formatLocaleDateTime(new Date(), i18n.language)}`,
                   buildTables()
                 )
               }
@@ -607,7 +609,7 @@ function ProductTable({
           key={row.product_id}
           index={index}
           name={row.product_name}
-          subtitle={`${row.quantity} ${row.unit} · ${formatMAD(row.revenue_cents)}`}
+          subtitle={`${row.quantity} ${unitLabel(row.unit, row.quantity, t)} · ${formatMAD(row.revenue_cents)}`}
           value={renderValue(row)}
           valueNegative={warnBelowZero && (row.margin_percent ?? 0) < 0}
         />

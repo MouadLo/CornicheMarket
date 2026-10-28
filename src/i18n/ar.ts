@@ -351,6 +351,14 @@ const ar: Translations = {
     toDate: "إلى YYYY-MM-DD",
     profit: "الربح",
   },
+  units: {
+    piece_one: "قطعة",
+    piece_other: "قطع",
+    pack_one: "عبوة",
+    pack_other: "عبوات",
+    kg_one: "كغ",
+    kg_other: "كغ",
+  },
 };
 
 export default ar;

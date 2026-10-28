@@ -351,6 +351,14 @@ const en: Translations = {
     toDate: "To YYYY-MM-DD",
     profit: "Profit",
   },
+  units: {
+    piece_one: "piece",
+    piece_other: "pieces",
+    pack_one: "pack",
+    pack_other: "packs",
+    kg_one: "kg",
+    kg_other: "kg",
+  },
 };
 
 export default en;

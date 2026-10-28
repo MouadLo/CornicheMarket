@@ -2,7 +2,11 @@ import { addDaysInTimeZone, startOfDayInTimeZone, startOfMonthInTimeZone } from 
 
 export type RangeKey = "today" | "yesterday" | "7d" | "month" | "30d" | "custom";
 
-export type DateRange = { from: Date; to: Date; label: string };
+// labelKey is an i18n key (e.g. "reports.today"), not display text -- the
+// caller must call t(range.labelKey). Reuses the exact same keys the range
+// chips already use (RANGE_KEYS in the Reports screen), so no new
+// translations were needed for this.
+export type DateRange = { from: Date; to: Date; labelKey: string };
 
 export const DEFAULT_STORE_TIMEZONE = "Africa/Casablanca";
 
@@ -24,37 +28,37 @@ export function resolveRange(
 
   switch (key) {
     case "today":
-      return { from: today, to: addDaysInTimeZone(today, 1, timeZone), label: "Today" };
+      return { from: today, to: addDaysInTimeZone(today, 1, timeZone), labelKey: "reports.today" };
     case "yesterday":
       return {
         from: addDaysInTimeZone(today, -1, timeZone),
         to: today,
-        label: "Yesterday",
+        labelKey: "reports.yesterday",
       };
     case "7d":
       return {
         from: addDaysInTimeZone(today, -6, timeZone),
         to: addDaysInTimeZone(today, 1, timeZone),
-        label: "Last 7 days",
+        labelKey: "reports.last7days",
       };
     case "month":
       return {
         from: startOfMonthInTimeZone(today, timeZone),
         to: addDaysInTimeZone(today, 1, timeZone),
-        label: "This month",
+        labelKey: "reports.thisMonth",
       };
     case "30d":
       return {
         from: addDaysInTimeZone(today, -29, timeZone),
         to: addDaysInTimeZone(today, 1, timeZone),
-        label: "Last 30 days",
+        labelKey: "reports.last30days",
       };
     case "custom": {
       const from = customFrom ? startOfDayInTimeZone(new Date(customFrom), timeZone) : today;
       const to = customTo
         ? addDaysInTimeZone(startOfDayInTimeZone(new Date(customTo), timeZone), 1, timeZone)
         : addDaysInTimeZone(today, 1, timeZone);
-      return { from, to, label: "Custom" };
+      return { from, to, labelKey: "reports.custom" };
     }
   }
 }

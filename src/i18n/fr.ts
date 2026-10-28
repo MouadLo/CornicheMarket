@@ -350,6 +350,14 @@ const fr = {
     toDate: "Au AAAA-MM-JJ",
     profit: "Bénéfice",
   },
+  units: {
+    piece_one: "pièce",
+    piece_other: "pièces",
+    pack_one: "paquet",
+    pack_other: "paquets",
+    kg_one: "kg",
+    kg_other: "kg",
+  },
 };
 
 export default fr;
