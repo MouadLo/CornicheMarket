@@ -169,9 +169,9 @@ suite("a cashier token cannot reach cost, WAC or profit", () => {
 
     const calls: [string, Record<string, unknown>][] = [
       ["report_summary", { p_from: from, p_to: to }],
-      ["report_daily_trend", { p_from: from, p_to: to, p_timezone: "UTC" }],
+      ["report_daily_trend", { p_from: from, p_to: to }],
       ["report_by_category", { p_from: from, p_to: to }],
-      ["report_by_hour", { p_from: from, p_to: to, p_timezone: "UTC" }],
+      ["report_by_hour", { p_from: from, p_to: to }],
       ["report_product_performance", { p_from: from, p_to: to }],
       ["report_dead_stock", { p_days: 30 }],
       ["report_inventory_value", {}],

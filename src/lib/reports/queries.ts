@@ -58,12 +58,32 @@ export type InventoryValue = {
   oversold_value_cents: number;
 };
 
-const storeTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Casablanca";
-
 async function callReport<T>(fn: string, params: Record<string, unknown>): Promise<T[]> {
   const { data, error } = await supabase.rpc(fn, params);
   if (error) throw new Error(error.message);
   return (data ?? []) as T[];
+}
+
+// The store's own configured time zone (owner setting, default
+// Africa/Casablanca) -- never the browser's. report_by_hour and
+// report_daily_trend read this server-side via store_timezone(); the
+// client only needs it to compute day-range boundaries (today/yesterday/
+// this month/etc.) in src/lib/reports/ranges.ts so the two layers agree
+// on what day a sale falls on.
+const DEFAULT_STORE_TIMEZONE = "Africa/Casablanca";
+
+export async function fetchStoreTimezone(): Promise<string> {
+  const { data, error } = await supabase.rpc("store_timezone");
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? DEFAULT_STORE_TIMEZONE;
+}
+
+export async function updateStoreTimezone(timezone: string): Promise<void> {
+  const { error } = await supabase
+    .from("store_settings")
+    .update({ timezone })
+    .eq("singleton", true);
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchSummary(from: Date, to: Date): Promise<ReportSummary> {
@@ -88,7 +108,6 @@ export function fetchDailyTrend(from: Date, to: Date): Promise<DailyPoint[]> {
   return callReport<DailyPoint>("report_daily_trend", {
     p_from: from.toISOString(),
     p_to: to.toISOString(),
-    p_tz: storeTimeZone,
   });
 }
 
@@ -103,7 +122,6 @@ export function fetchByHour(from: Date, to: Date): Promise<HourRow[]> {
   return callReport<HourRow>("report_by_hour", {
     p_from: from.toISOString(),
     p_to: to.toISOString(),
-    p_tz: storeTimeZone,
   });
 }
 

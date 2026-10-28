@@ -15,6 +15,7 @@ import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarC
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
 import { exportTablesAsCsv, exportTablesAsPdf, type ReportTable } from "@/src/lib/reports/export";
+import { compareByMetricThenName } from "@/src/lib/reports/math";
 import {
   fetchByCategory,
   fetchByHour,
@@ -22,6 +23,7 @@ import {
   fetchDeadStock,
   fetchInventoryValue,
   fetchProductPerformance,
+  fetchStoreTimezone,
   fetchSummary,
   type CategoryRow,
   type DailyPoint,
@@ -31,8 +33,15 @@ import {
   type ProductPerformance,
   type ReportSummary,
 } from "@/src/lib/reports/queries";
-import { isValidDateInput, resolveRange, type RangeKey } from "@/src/lib/reports/ranges";
+import {
+  DEFAULT_STORE_TIMEZONE,
+  isValidDateInput,
+  resolveRange,
+  type RangeKey,
+} from "@/src/lib/reports/ranges";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 
 const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
   { key: "today", tKey: "reports.today" },
@@ -45,7 +54,7 @@ const RANGE_KEYS: { key: RangeKey; tKey: string }[] = [
 
 export default function ReportsScreen() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [rangeKey, setRangeKey] = useState<RangeKey>("today");
@@ -62,22 +71,35 @@ export default function ReportsScreen() {
   const [inventory, setInventory] = useState<InventoryValue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The owner-configured store time zone, fetched once and reused for
+  // every boundary computed on this screen (today/yesterday/month, and
+  // the day/hour buckets the server groups by). Defaults to Casablanca
+  // while the setting is still loading.
+  const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  const [showAllDeadStock, setShowAllDeadStock] = useState(false);
+
+  useEffect(() => {
+    fetchStoreTimezone()
+      .then(setTimeZone)
+      .catch(() => {});
+  }, []);
 
   const range = useMemo(
     () =>
       resolveRange(
         rangeKey,
         isValidDateInput(customFrom) ? customFrom : undefined,
-        isValidDateInput(customTo) ? customTo : undefined
+        isValidDateInput(customTo) ? customTo : undefined,
+        timeZone
       ),
-    [rangeKey, customFrom, customTo]
+    [rangeKey, customFrom, customTo, timeZone]
   );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const todayRange = resolveRange("today");
+      const todayRange = resolveRange("today", undefined, undefined, timeZone);
       const [
         todaySummary,
         rangeSummary,
@@ -106,12 +128,13 @@ export default function ReportsScreen() {
       setProducts(performance);
       setDeadStock(dead);
       setInventory(inventoryValue);
+      setShowAllDeadStock(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("reports.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [range.from, range.to, t]);
+  }, [range.from, range.to, t, timeZone]);
 
   useEffect(() => {
     if (isOwner) load();
@@ -119,16 +142,38 @@ export default function ReportsScreen() {
 
   if (profile && !isOwner) return <Redirect href="/(app)/sell" />;
 
-  const topByProfit = [...products].sort((a, b) => b.profit_cents - a.profit_cents).slice(0, 20);
-  const topByQuantity = [...products].sort((a, b) => b.quantity - a.quantity).slice(0, 20);
+  const topByProfit = [...products]
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.profit_cents, name: a.product_name },
+        { value: b.profit_cents, name: b.product_name },
+        "desc"
+      )
+    )
+    .slice(0, 20);
+  const topByQuantity = [...products]
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.quantity, name: a.product_name },
+        { value: b.quantity, name: b.product_name },
+        "desc"
+      )
+    )
+    .slice(0, 20);
   const lowestMargin = [...products]
     .filter((product) => product.margin_percent !== null)
-    .sort((a, b) => (a.margin_percent as number) - (b.margin_percent as number))
+    .sort((a, b) =>
+      compareByMetricThenName(
+        { value: a.margin_percent as number, name: a.product_name },
+        { value: b.margin_percent as number, name: b.product_name },
+        "asc"
+      )
+    )
     .slice(0, 20);
 
   const buildTables = (): ReportTable[] => [
     {
-      title: `Summary (${range.label})`,
+      title: `Summary (${t(range.labelKey)})`,
       columns: ["Metric", "Value"],
       rows: [
         ["Revenue", centsToDisplay(summary?.revenue_cents ?? 0)],
@@ -200,7 +245,7 @@ export default function ReportsScreen() {
         row.product_name,
         row.stock_quantity,
         centsToDisplay(row.stock_value_cents),
-        row.last_sold_at ? new Date(row.last_sold_at).toLocaleDateString() : "never",
+        row.last_sold_at ? formatLocaleDate(new Date(row.last_sold_at), i18n.language) : "never",
       ]),
     },
   ];
@@ -211,7 +256,7 @@ export default function ReportsScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t("reports.title")}</Text>
 
-      {today && (
+      {today && rangeKey !== "today" && (
         <View style={styles.todayCard}>
           <Text style={styles.todayLabel}>{t("reports.today")}</Text>
           <View style={styles.todayGrid}>
@@ -276,7 +321,7 @@ export default function ReportsScreen() {
 
       {!loading && summary && (
         <>
-          <Section title={t("reports.money", { label: range.label })}>
+          <Section title={t("reports.money", { label: t(range.labelKey) })}>
             <View style={styles.metricGrid}>
               <Metric
                 label={t("reports.metricRevenue")}
@@ -326,7 +371,7 @@ export default function ReportsScreen() {
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
-                label: row.category_name.slice(0, 10),
+                label: isolateBidi(row.category_name.slice(0, 10)),
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}
@@ -346,6 +391,7 @@ export default function ReportsScreen() {
 
           {inventory && (
             <Section title={t("reports.inventoryValue")}>
+              <Text style={styles.snapshotLabel}>{t("reports.snapshotNotice")}</Text>
               <View style={styles.metricGrid}>
                 <Metric
                   label={t("reports.metricAtCost")}
@@ -406,22 +452,47 @@ export default function ReportsScreen() {
             {deadStock.length === 0 ? (
               <Text style={styles.empty}>{t("reports.allSoldRecently")}</Text>
             ) : (
-              deadStock.slice(0, 20).map((row) => (
-                <View key={row.product_id} style={styles.tableRow}>
-                  <View style={styles.tableMain}>
-                    <Text style={styles.rowName}>{row.product_name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {row.stock_quantity} {row.unit} ·{" "}
-                      {row.last_sold_at
+              <>
+                <Text style={styles.deadStockTotal}>
+                  {t("reports.deadStockTotal", {
+                    amount: formatMAD(
+                      deadStock.reduce((sum, row) => sum + row.stock_value_cents, 0)
+                    ),
+                  })}
+                </Text>
+                <ReportTableHeader
+                  mainLabel={t("reports.colProduct")}
+                  metaLabel={t("reports.colStock")}
+                  valueLabel={t("reports.colValueAtCost")}
+                />
+                {(showAllDeadStock ? deadStock : deadStock.slice(0, 20)).map((row, index) => (
+                  <ReportRow
+                    key={row.product_id}
+                    index={index}
+                    name={row.product_name}
+                    subtitle={`${row.stock_quantity} ${unitLabel(row.unit, row.stock_quantity, t)} · ${
+                      row.last_sold_at
                         ? t("reports.deadStockLastSold", {
-                            date: new Date(row.last_sold_at).toLocaleDateString(),
+                            date: formatLocaleDate(new Date(row.last_sold_at), i18n.language),
                           })
-                        : t("reports.deadStockNeverSold")}
+                        : t("reports.deadStockNeverSold")
+                    }`}
+                    value={formatMAD(row.stock_value_cents)}
+                  />
+                ))}
+                {deadStock.length > 20 && (
+                  <Pressable
+                    style={styles.showAllButton}
+                    onPress={() => setShowAllDeadStock((prev) => !prev)}
+                  >
+                    <Text style={styles.showAllText}>
+                      {showAllDeadStock
+                        ? t("reports.showLess")
+                        : t("reports.showAll", { count: deadStock.length })}
                     </Text>
-                  </View>
-                  <Text style={styles.rowValue}>{formatMAD(row.stock_value_cents)}</Text>
-                </View>
-              ))
+                  </Pressable>
+                )}
+              </>
             )}
           </Section>
 
@@ -437,7 +508,7 @@ export default function ReportsScreen() {
               onPress={() =>
                 exportTablesAsPdf(
                   "Corniche Market report",
-                  `${range.label} · generated ${new Date().toLocaleString()}`,
+                  `${t(range.labelKey)} · generated ${formatLocaleDateTime(new Date(), i18n.language)}`,
                   buildTables()
                 )
               }
@@ -490,6 +561,71 @@ function Metric({
   );
 }
 
+// Shared by every row in Reports that pairs a product/line name with a
+// subtitle and a trailing value (the three ProductTable rankings and the
+// dead-stock list). Centralising it here is what makes the RTL isolation
+// fix (isolateBidi + appDirection) apply everywhere at once instead of
+// needing to be remembered per call site -- see
+// docs/PRE-LAUNCH-GAPS.md-style audits: a name-rendering spot that forgets
+// this wrapping is exactly how the original row-flip bug happened.
+function ReportTableHeader({
+  mainLabel,
+  metaLabel,
+  valueLabel,
+}: {
+  mainLabel: string;
+  metaLabel: string;
+  valueLabel: string;
+}) {
+  const { i18n } = useTranslation();
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
+
+  return (
+    <View style={[styles.tableHeader, { direction: dir }]}>
+      <Text style={[styles.tableHeaderMain, { textAlign }]}>{mainLabel}</Text>
+      <Text style={[styles.tableHeaderMeta, { textAlign }]}>{metaLabel}</Text>
+      <Text style={styles.tableHeaderValue}>{valueLabel}</Text>
+    </View>
+  );
+}
+
+function ReportRow({
+  name,
+  subtitle,
+  value,
+  valueNegative,
+  index,
+}: {
+  name: string;
+  subtitle: string;
+  value: string;
+  valueNegative?: boolean;
+  index: number;
+}) {
+  const { i18n } = useTranslation();
+  // The row's layout direction follows the APP language, never the
+  // content of any one row -- an Arabic product name must not flip a
+  // French-locale row (or vice versa). RN's `direction` style property is
+  // a real Yoga layout property, honoured on iOS/Android/web alike, unlike
+  // relying on global RTL state (which this intentionally overrides per
+  // row so every row is internally consistent with the table as a whole).
+  const dir = appDirection(i18n.language);
+  const textAlign = dir === "rtl" ? "right" : "left";
+
+  return (
+    <View style={[styles.tableRow, { direction: dir }, index % 2 === 1 && styles.tableRowOdd]}>
+      <View style={styles.tableMain}>
+        <Text style={[styles.rowName, { textAlign }]} numberOfLines={1}>
+          {isolateBidi(name)}
+        </Text>
+        <Text style={[styles.rowMeta, { textAlign }]}>{subtitle}</Text>
+      </View>
+      <Text style={[styles.rowValue, valueNegative && styles.rowValueNegative]}>{value}</Text>
+    </View>
+  );
+}
+
 function ProductTable({
   rows,
   renderValue,
@@ -501,49 +637,27 @@ function ProductTable({
   valueLabel: string;
   warnBelowZero?: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   if (rows.length === 0) {
     return <Text style={styles.empty}>{t("reports.noSales")}</Text>;
   }
 
-  // The row's layout direction follows the APP language, never the
-  // content of any one row -- an Arabic product name must not flip a
-  // French-locale row (or vice versa). RN's `direction` style property is
-  // a real Yoga layout property, honoured on iOS/Android/web alike, unlike
-  // relying on global RTL state (which this intentionally overrides per
-  // row so every row is internally consistent with the table as a whole).
-  const dir = appDirection(i18n.language);
-  const textAlign = dir === "rtl" ? "right" : "left";
-
   return (
     <>
-      <View style={[styles.tableHeader, { direction: dir }]}>
-        <Text style={[styles.tableHeaderMain, { textAlign }]}>{t("reports.colProduct")}</Text>
-        <Text style={[styles.tableHeaderMeta, { textAlign }]}>{t("reports.colQtyRevenue")}</Text>
-        <Text style={styles.tableHeaderValue}>{valueLabel}</Text>
-      </View>
+      <ReportTableHeader
+        mainLabel={t("reports.colProduct")}
+        metaLabel={t("reports.colQtyRevenue")}
+        valueLabel={valueLabel}
+      />
       {rows.map((row, index) => (
-        <View
+        <ReportRow
           key={row.product_id}
-          style={[styles.tableRow, { direction: dir }, index % 2 === 1 && styles.tableRowOdd]}
-        >
-          <View style={styles.tableMain}>
-            <Text style={[styles.rowName, { textAlign }]} numberOfLines={1}>
-              {isolateBidi(row.product_name)}
-            </Text>
-            <Text style={[styles.rowMeta, { textAlign }]}>
-              {row.quantity} {row.unit} · {formatMAD(row.revenue_cents)}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.rowValue,
-              warnBelowZero && (row.margin_percent ?? 0) < 0 && styles.rowValueNegative,
-            ]}
-          >
-            {renderValue(row)}
-          </Text>
-        </View>
+          index={index}
+          name={row.product_name}
+          subtitle={`${row.quantity} ${unitLabel(row.unit, row.quantity, t)} · ${formatMAD(row.revenue_cents)}`}
+          value={renderValue(row)}
+          valueNegative={warnBelowZero && (row.margin_percent ?? 0) < 0}
+        />
       ))}
     </>
   );
@@ -631,6 +745,10 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 15, fontWeight: "700", minWidth: 72, textAlign: "right" },
   rowValueNegative: { color: "#b3261e" },
   empty: { color: "#666", fontSize: 14 },
+  deadStockTotal: { color: "#444", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  snapshotLabel: { color: "#888", fontSize: 12, fontStyle: "italic", marginBottom: 8 },
+  showAllButton: { paddingVertical: 10, alignItems: "center" },
+  showAllText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
   exportRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   exportButton: {
     flex: 1,

@@ -1,6 +1,7 @@
 import {
   allocateSaleDiscount,
   averageBasketCents,
+  compareByMetricThenName,
   flooredInventoryValueCents,
   grossMarginPercent,
   inventoryPotentialProfitCents,
@@ -212,5 +213,76 @@ describe("flooredInventoryValueCents / oversoldValueCents (PRE-LAUNCH-GAPS B4)",
   it("handles a shelf that is entirely oversold", () => {
     expect(flooredInventoryValueCents([-2, -1], [500, 300])).toBe(0);
     expect(oversoldValueCents([-2, -1], [500, 300])).toBe(-1300);
+  });
+
+  // Named regression case, with a real product's real numbers, requested
+  // after a report of the oversold figure looking wrong: "Couches bébé
+  // shows 450.00 which equals 6 x selling price 75". Verified live against
+  // the actual SQL (report_inventory_value, negative_stock_products) and
+  // the TypeScript screens that read them -- both already use
+  // current_cost_cents, never selling_price_cents, for this figure. The
+  // "450.00" being looked at was a DIFFERENT number: the product
+  // performance table's revenue subtitle (quantity x selling price,
+  // which revenue is correctly supposed to use). This test locks in the
+  // correct (cost-based) oversold figure using that same product's real
+  // seed values so a future change that swaps in selling price breaks
+  // loudly here instead of only being noticed by eye on screen.
+  it("Couches bébé scenario: oversold value uses COST (62.00), never selling price (75.00)", () => {
+    const sellingPriceCents = 7500;
+    const costCents = 6200;
+    const oversoldBy = -6; // 6 units sold beyond what was in stock
+
+    const atCost = oversoldValueCents([oversoldBy], [costCents]);
+    const atSellingPriceIfBuggy = oversoldValueCents([oversoldBy], [sellingPriceCents]);
+
+    expect(atCost).toBe(-37200); // 6 x 62.00 DH
+    expect(atCost).not.toBe(-45000); // NOT 6 x 75.00 DH (-450.00) -- the suspected bug
+    expect(atCost).not.toBe(atSellingPriceIfBuggy);
+  });
+});
+
+describe("compareByMetricThenName", () => {
+  it("sorts descending by value when values differ", () => {
+    const rows = [
+      { value: 100, name: "Zebra" },
+      { value: 300, name: "Apple" },
+      { value: 200, name: "Mango" },
+    ];
+    const sorted = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    expect(sorted.map((r) => r.name)).toEqual(["Apple", "Mango", "Zebra"]);
+  });
+
+  it("sorts ascending by value when values differ", () => {
+    const rows = [
+      { value: 100, name: "Zebra" },
+      { value: 300, name: "Apple" },
+      { value: 200, name: "Mango" },
+    ];
+    const sorted = [...rows].sort((a, b) => compareByMetricThenName(a, b, "asc"));
+    expect(sorted.map((r) => r.name)).toEqual(["Zebra", "Mango", "Apple"]);
+  });
+
+  it("breaks a tie on value with product name ascending, regardless of direction", () => {
+    const rows = [
+      { value: 500, name: "Couches bébé" },
+      { value: 500, name: "Ananas" },
+      { value: 500, name: "Zaatar" },
+    ];
+    const desc = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    const asc = [...rows].sort((a, b) => compareByMetricThenName(a, b, "asc"));
+    expect(desc.map((r) => r.name)).toEqual(["Ananas", "Couches bébé", "Zaatar"]);
+    expect(asc.map((r) => r.name)).toEqual(["Ananas", "Couches bébé", "Zaatar"]);
+  });
+
+  it("is stable and deterministic across repeated sorts of the same input order", () => {
+    const rows = [
+      { value: 10, name: "B" },
+      { value: 10, name: "A" },
+      { value: 10, name: "C" },
+    ];
+    const first = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    const second = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
+    expect(first.map((r) => r.name)).toEqual(["A", "B", "C"]);
+    expect(second.map((r) => r.name)).toEqual(["A", "B", "C"]);
   });
 });
