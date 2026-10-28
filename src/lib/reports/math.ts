@@ -65,3 +65,29 @@ export function inventoryPotentialProfitCents(
 ): number {
   return retailValueCents - costValueCents;
 }
+
+// Mirrors report_inventory_value's flooring: each product's own
+// contribution is floored at zero before summing, so one oversold product
+// (negative stock_quantity) can't offset the value of real stock held
+// elsewhere -- e.g. 10 units in stock plus one product oversold by -3 units
+// is NOT "7 units worth of value"; it is 10 units of real value plus a
+// separate, visible -3-unit discrepancy (see oversoldValueCents below).
+export function flooredInventoryValueCents(
+  stockQuantities: number[],
+  unitValueCents: number[]
+): number {
+  return stockQuantities.reduce(
+    (sum, quantity, i) => sum + Math.max(quantity, 0) * unitValueCents[i],
+    0
+  );
+}
+
+// The un-floored discrepancy that flooring excludes (always <= 0): what
+// flooredInventoryValueCents leaves out, surfaced separately rather than
+// silently vanishing.
+export function oversoldValueCents(stockQuantities: number[], unitValueCents: number[]): number {
+  return stockQuantities.reduce(
+    (sum, quantity, i) => sum + Math.min(quantity, 0) * unitValueCents[i],
+    0
+  );
+}

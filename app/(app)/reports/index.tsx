@@ -367,6 +367,13 @@ export default function ReportsScreen() {
                   value={String(inventory.product_count)}
                 />
               </View>
+              {inventory.oversold_value_cents < 0 && (
+                <Text style={styles.oversoldWarning}>
+                  {t("reports.oversoldWarning", {
+                    amount: formatMAD(-inventory.oversold_value_cents),
+                  })}
+                </Text>
+              )}
             </Section>
           )}
 
@@ -555,6 +562,7 @@ const styles = StyleSheet.create({
   todayCard: { backgroundColor: "#f3f7f4", borderRadius: 14, padding: 16, gap: 10 },
   todayLabel: { fontSize: 13, fontWeight: "700", color: "#1d7a46", textTransform: "uppercase" },
   todayGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  oversoldWarning: { color: "#b3261e", fontSize: 13, marginTop: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
   chipActive: { backgroundColor: "#1d7a46" },

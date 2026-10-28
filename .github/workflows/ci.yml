@@ -53,3 +53,33 @@ jobs:
 
       - name: Bundle (Android + iOS + web) — catches build-time errors
         run: npm run export:ci
+
+  # A migration can be syntactically fine and still fail to apply: Postgres
+  # refuses some statements that are legal SQL in isolation but illegal as a
+  # change to an existing object (e.g. `create or replace view` inserting a
+  # column instead of appending it, or `create or replace function`
+  # changing a return type). Those only ever surface by actually applying
+  # every migration, in order, to an empty database -- which is exactly
+  # what this job does, the same way a fresh clone or a new environment
+  # would. ubuntu-latest has Docker preinstalled, so the Supabase CLI can
+  # run its full local stack here without any extra setup.
+  migrations:
+    name: Migrations apply cleanly to an empty database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply every migration + seed.sql from scratch
+        run: supabase start
+
+      # Catches anything that only fails on a second run (e.g. a migration
+      # missing "if not exists" or "create or replace").
+      - name: Reset and reapply from scratch
+        run: supabase db reset

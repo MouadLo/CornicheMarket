@@ -129,6 +129,15 @@ grant execute on function public.record_sale(uuid, uuid, payment_method, bigint,
 -- sale_line_economics: add occurred_at as a new trailing column, alongside
 -- the existing created_at (sync time). Additive -- created_at is untouched,
 -- so anything that already reads it from this view is unaffected.
+--
+-- occurred_at is appended AFTER cost_cents, at the very end of the column
+-- list, not inserted next to created_at: `create or replace view` can only
+-- add columns at the end of the existing list (same names, same order) --
+-- inserting a column anywhere else fails with "cannot change name of view
+-- column ... to ..." because every column from that point on would shift
+-- position and appear to Postgres as a rename. This was wrong in the first
+-- cut of this migration (occurred_at was placed right after created_at,
+-- which failed to apply at all on a clean database) and is fixed here.
 -- ============================================================
 create or replace view sale_line_economics as
 with lines as (
@@ -152,7 +161,6 @@ select
   sale_id,
   product_id,
   created_at,
-  occurred_at,
   quantity,
   line_total_cents,
   case
@@ -165,7 +173,8 @@ select
       then round(sale_discount_cents * line_total_cents::numeric / sale_lines_total)
     else 0
   end)::bigint as net_revenue_cents,
-  round(unit_cost_cents * quantity)::bigint as cost_cents
+  round(unit_cost_cents * quantity)::bigint as cost_cents,
+  occurred_at
 from lines
 where public.is_owner();
 

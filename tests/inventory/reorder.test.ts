@@ -2,6 +2,7 @@ import {
   countDiscrepancy,
   COVER_DAYS,
   dailySalesRate,
+  daysNegative,
   daysOfStockLeft,
   lossValueCents,
   roundUpForUnit,
@@ -138,5 +139,23 @@ describe("lossValueCents", () => {
 
   it("is unknown when the cost was never recorded", () => {
     expect(lossValueCents(-3, null)).toBeNull();
+  });
+});
+
+describe("daysNegative", () => {
+  it("is null when the product is not currently negative", () => {
+    expect(daysNegative(null)).toBeNull();
+  });
+
+  it("measures elapsed days since stock_went_negative_at", () => {
+    const now = new Date("2026-01-10T00:00:00.000Z");
+    const wentNegativeAt = "2026-01-07T12:00:00.000Z";
+    expect(daysNegative(wentNegativeAt, now)).toBeCloseTo(2.5, 5);
+  });
+
+  it("is never negative even if the timestamp is slightly in the future", () => {
+    const now = new Date("2026-01-10T00:00:00.000Z");
+    const wentNegativeAt = "2026-01-10T00:00:01.000Z";
+    expect(daysNegative(wentNegativeAt, now)).toBe(0);
   });
 });

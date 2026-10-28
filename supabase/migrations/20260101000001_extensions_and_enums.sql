@@ -1,6 +1,9 @@
 -- Extensions
 create extension if not exists pg_trgm;
 create extension if not exists "uuid-ossp";
+-- crypt()/gen_salt(): used by seed.sql to give the local-only seeded auth
+-- users (owner/cashier) a real, working bcrypt password hash.
+create extension if not exists pgcrypto;
 
 -- Enums
 create type user_role as enum ('owner', 'cashier');

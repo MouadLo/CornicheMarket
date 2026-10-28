@@ -52,10 +52,13 @@ export type InventoryValue = {
   cost_value_cents: number;
   retail_value_cents: number;
   potential_profit_cents: number;
+  // Always <= 0: the cost of stock oversold below zero, excluded from
+  // cost_value_cents (floored at zero per product) rather than letting it
+  // silently offset the value of real stock elsewhere.
+  oversold_value_cents: number;
 };
 
-const storeTimeZone =
-  Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Casablanca";
+const storeTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Casablanca";
 
 async function callReport<T>(fn: string, params: Record<string, unknown>): Promise<T[]> {
   const { data, error } = await supabase.rpc(fn, params);
@@ -124,6 +127,7 @@ export async function fetchInventoryValue(): Promise<InventoryValue> {
       cost_value_cents: 0,
       retail_value_cents: 0,
       potential_profit_cents: 0,
+      oversold_value_cents: 0,
     }
   );
 }

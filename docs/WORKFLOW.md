@@ -27,6 +27,15 @@ npm run check
 
 The pre-commit hook runs `lint-staged` automatically when you commit, which fixes lint issues and formats changed files on the fly. No manual step needed.
 
+**If your branch adds or edits a file in `supabase/migrations/`**, also run this before pushing:
+
+```bash
+npx supabase start    # applies every migration + seed.sql to a fresh local database
+npx supabase db reset # tears it down and reapplies from scratch, to be sure
+```
+
+A migration can be syntactically valid SQL and still fail to *apply* — Postgres accepts some statements in isolation that it refuses as a change to an existing object: `create or replace view` can only append a column at the end, never insert or rename one; `create or replace function` can change a function's body but never its return type. Both of those failed only when actually applied to a database, not on review, which is why the **CI** workflow's `migrations` job runs `supabase start` and `supabase db reset` on every push — but catching it locally first is faster than waiting for CI. If you don't have Docker running locally, the CI job is the backstop; don't skip pushing because of that, just expect CI to catch it instead.
+
 ### 3. Push and open a pull request
 
 ```bash

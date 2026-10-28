@@ -1,9 +1,11 @@
 import {
   allocateSaleDiscount,
   averageBasketCents,
+  flooredInventoryValueCents,
   grossMarginPercent,
   inventoryPotentialProfitCents,
   netLineRevenue,
+  oversoldValueCents,
 } from "../../src/lib/reports/math";
 
 // The worked example below was also run through the report SQL functions in
@@ -168,5 +170,47 @@ describe("inventoryPotentialProfitCents", () => {
   it("is retail value less cost value", () => {
     // The seeded shelves: 13129.50 retail, 9826.20 at cost
     expect(inventoryPotentialProfitCents(1312950, 982620)).toBe(330330);
+  });
+});
+
+describe("flooredInventoryValueCents / oversoldValueCents (PRE-LAUNCH-GAPS B4)", () => {
+  it("one oversold product cannot offset the value of real stock elsewhere", () => {
+    // 10 units of real stock at 500 cents, plus one product oversold by
+    // 3 units at 400 cents. Naive sum*cost would be (10-3)*... mixing unit
+    // values incorrectly; per-product flooring must hold even with
+    // different unit costs across products.
+    const quantities = [10, -3];
+    const unitCosts = [500, 400];
+
+    // 10 * 500 = 5000, the oversold product contributes 0 (floored), not
+    // -3 * 400 = -1200 silently subtracted from real stock's value.
+    expect(flooredInventoryValueCents(quantities, unitCosts)).toBe(5000);
+
+    // The excluded discrepancy is surfaced separately, not dropped.
+    expect(oversoldValueCents(quantities, unitCosts)).toBe(-1200);
+  });
+
+  it("the floored value plus the oversold value never exceeds the naive (wrong) sum", () => {
+    const quantities = [10, -3];
+    const unitCosts = [500, 400];
+    const naiveSum = quantities.reduce((sum, q, i) => sum + q * unitCosts[i], 0); // 3800
+
+    const floored = flooredInventoryValueCents(quantities, unitCosts); // 5000
+    const oversold = oversoldValueCents(quantities, unitCosts); // -1200
+
+    expect(floored + oversold).toBe(naiveSum);
+    // The real-stock figure the owner sees (floored) is always >= the
+    // naive, silently-offset figure it replaces.
+    expect(floored).toBeGreaterThanOrEqual(naiveSum);
+  });
+
+  it("is zero for an empty or all-positive shelf", () => {
+    expect(oversoldValueCents([5, 10], [100, 200])).toBe(0);
+    expect(flooredInventoryValueCents([], [])).toBe(0);
+  });
+
+  it("handles a shelf that is entirely oversold", () => {
+    expect(flooredInventoryValueCents([-2, -1], [500, 300])).toBe(0);
+    expect(oversoldValueCents([-2, -1], [500, 300])).toBe(-1300);
   });
 });

@@ -25,7 +25,12 @@ import {
   type Customer,
   type PaymentMethod,
 } from "@/src/lib/sales/queries";
-import { cartSubtotal, saleTotal, type CartLine } from "@/src/lib/sales/totals";
+import {
+  cartSubtotal,
+  saleTotal,
+  validateSaleDiscounts,
+  type CartLine,
+} from "@/src/lib/sales/totals";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -51,6 +56,9 @@ export default function SellScreen() {
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
   const total = useMemo(() => saleTotal(lines, discountCents), [lines, discountCents]);
+  const discountError = validateSaleDiscounts(lines, discountCents);
+  const saleDiscountTooHigh = discountError === "sale";
+  const discountInvalid = discountError !== null;
 
   useEffect(() => {
     fetchCustomers()
@@ -160,6 +168,20 @@ export default function SellScreen() {
   const handleConfirm = async (method: PaymentMethod, customerId: string | null) => {
     if (!profile || lines.length === 0) return;
 
+    // A discount too large for what it discounts must never reach
+    // enqueueSale: anything already queued goes through the offline sync
+    // retry/quarantine pipeline, which is the wrong place to discover a
+    // data-entry error. Caught here, it never gets that far.
+    const discountCheck = validateSaleDiscounts(lines, discountCents);
+    if (discountCheck === "line") {
+      setError(t("sell.lineDiscountTooHigh"));
+      return;
+    }
+    if (discountCheck === "sale") {
+      setError(t("sell.saleDiscountTooHigh"));
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -265,13 +287,17 @@ export default function SellScreen() {
           <View style={styles.discountRow}>
             <Text style={styles.footerLabel}>{t("sell.saleDiscount")}</Text>
             <TextInput
-              style={styles.discountInput}
+              style={[styles.discountInput, saleDiscountTooHigh && styles.discountInputInvalid]}
               value={saleDiscount}
               onChangeText={setSaleDiscount}
               keyboardType="decimal-pad"
               placeholder="0.00"
             />
           </View>
+
+          {saleDiscountTooHigh && (
+            <Text style={styles.discountError}>{t("sell.saleDiscountTooHigh")}</Text>
+          )}
 
           <View style={styles.totalRow}>
             <Text style={styles.footerLabel}>
@@ -280,7 +306,11 @@ export default function SellScreen() {
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
           </View>
 
-          <BigButton label={t("sell.charge")} onPress={() => setPaymentOpen(true)} />
+          <BigButton
+            label={t("sell.charge")}
+            onPress={() => setPaymentOpen(true)}
+            disabled={discountInvalid}
+          />
         </View>
       )}
 
@@ -392,6 +422,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "right",
   },
+  discountInputInvalid: { borderColor: "#b3261e" },
+  discountError: { color: "#b3261e", fontSize: 13 },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   totalValue: { fontSize: 30, fontWeight: "800" },
   badge: {
