@@ -23,10 +23,16 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
     const onSignIn = segments[0] === "sign-in";
     const onAcceptInvite = segments[0] === "accept-invite";
+    const inApp = segments[0] === "(app)";
 
     if (!session && !onSignIn && !onAcceptInvite) {
       router.replace("/sign-in");
-    } else if (session && onSignIn) {
+    } else if (session && !inApp && !onAcceptInvite) {
+      // Covers both arriving at /sign-in while already signed in AND
+      // landing on the bare index route (segments is empty there) with a
+      // persisted session -- e.g. a web user reloading or bookmarking "/".
+      // Without the second case, app/index.tsx's spinner never resolves:
+      // nothing was ever redirecting a logged-in user away from "/" itself.
       router.replace("/(app)/sell");
     }
   }, [session, loading, segments, router]);
