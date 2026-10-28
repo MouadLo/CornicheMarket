@@ -233,7 +233,7 @@ export default function ReportsScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t("reports.title")}</Text>
 
-      {today && (
+      {today && rangeKey !== "today" && (
         <View style={styles.todayCard}>
           <Text style={styles.todayLabel}>{t("reports.today")}</Text>
           <View style={styles.todayGrid}>
@@ -368,6 +368,7 @@ export default function ReportsScreen() {
 
           {inventory && (
             <Section title={t("reports.inventoryValue")}>
+              <Text style={styles.snapshotLabel}>{t("reports.snapshotNotice")}</Text>
               <View style={styles.metricGrid}>
                 <Metric
                   label={t("reports.metricAtCost")}
@@ -722,6 +723,7 @@ const styles = StyleSheet.create({
   rowValueNegative: { color: "#b3261e" },
   empty: { color: "#666", fontSize: 14 },
   deadStockTotal: { color: "#444", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  snapshotLabel: { color: "#888", fontSize: 12, fontStyle: "italic", marginBottom: 8 },
   showAllButton: { paddingVertical: 10, alignItems: "center" },
   showAllText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
   exportRow: { flexDirection: "row", gap: 10, marginTop: 8 },

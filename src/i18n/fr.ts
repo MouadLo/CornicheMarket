@@ -319,6 +319,7 @@ const fr = {
     byCategory: "Ventes par catégorie",
     byHour: "Ventes par heure",
     inventoryValue: "Valeur du stock",
+    snapshotNotice: "Instantané — ne dépend pas de la période",
     top20ByProfit: "Top {{count}} par bénéfice",
     top20ByQuantity: "Top {{count}} par quantité",
     lowestMargin: "Marges les plus basses",

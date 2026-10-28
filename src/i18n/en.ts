@@ -320,6 +320,7 @@ const en: Translations = {
     byCategory: "Sales by category",
     byHour: "Sales by hour",
     inventoryValue: "Inventory value",
+    snapshotNotice: "Snapshot — does not depend on the selected period",
     top20ByProfit: "Top {{count}} by profit",
     top20ByQuantity: "Top {{count}} by quantity",
     lowestMargin: "Lowest margin",

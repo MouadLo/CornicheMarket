@@ -320,6 +320,7 @@ const ar: Translations = {
     byCategory: "المبيعات حسب الفئة",
     byHour: "المبيعات حسب الساعة",
     inventoryValue: "قيمة المخزون",
+    snapshotNotice: "لقطة لحظية — لا تعتمد على الفترة المحددة",
     top20ByProfit: "أفضل {{count}} بالربح",
     top20ByQuantity: "أفضل {{count}} بالكمية",
     lowestMargin: "أدنى هامش",
