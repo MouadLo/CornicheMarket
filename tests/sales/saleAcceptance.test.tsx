@@ -22,9 +22,14 @@ jest.mock("../../src/lib/products/offlineCache", () => ({
   getProductCacheMeta: async () => null,
 }));
 jest.mock("../../src/lib/products/queries", () => ({
-  fetchProducts: async () => [
-    { id: "p1", name: "Milk", unit: "piece", selling_price_cents: 700, current_cost_cents: null },
-  ],
+  fetchProducts: async () => [],
+  fetchProductByBarcode: async () => ({
+    id: "p1",
+    name: "Milk",
+    unit: "piece",
+    selling_price_cents: 700,
+    current_cost_cents: null,
+  }),
 }));
 jest.mock("../../src/lib/sales/queries", () => ({ fetchCustomers: async () => [] }));
 jest.mock("../../src/lib/sales/offlineQueue", () => ({ enqueueSale: jest.fn() }));

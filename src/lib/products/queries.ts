@@ -104,6 +104,27 @@ export async function fetchProduct(id: string, isOwner: boolean): Promise<Produc
   return { current_cost_cents: null, ...(data as object) } as Product;
 }
 
+// The lookup a barcode scan needs: the ACTIVE product whose barcode equals
+// the scanned code, and nothing else. fetchProducts({search}) is a text
+// search (name contains OR barcode starts with), so using it for a scan could
+// add the wrong product for a short or partial code. This is the online
+// counterpart of the offline cache's exact `barcode === code` match.
+export async function fetchProductByBarcode(
+  barcode: string,
+  isOwner: boolean
+): Promise<Product | null> {
+  const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
+  const { data, error } = await supabase
+    .from(productsSource(isOwner))
+    .select(columns)
+    .eq("barcode", barcode)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? ({ current_cost_cents: null, ...(data as object) } as Product) : null;
+}
+
 export async function findByBarcode(
   barcode: string,
   isOwner: boolean

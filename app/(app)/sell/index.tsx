@@ -18,7 +18,7 @@ import {
   searchCachedProducts,
   type CachedProduct,
 } from "@/src/lib/products/offlineCache";
-import { fetchProducts, type Product } from "@/src/lib/products/queries";
+import { fetchProductByBarcode, fetchProducts, type Product } from "@/src/lib/products/queries";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import {
   createCustomer,
@@ -163,11 +163,7 @@ export default function SellScreen() {
         if (!sync.online) {
           match = (await findCachedByBarcode(barcode)) ?? undefined;
         } else {
-          [match] = await fetchProducts(
-            { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
-            0,
-            isOwner
-          );
+          match = (await fetchProductByBarcode(barcode, isOwner)) ?? undefined;
         }
 
         if (!match) {
