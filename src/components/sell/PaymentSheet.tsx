@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { changeDue, isShortPayment } from "@/src/lib/sales/totals";
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
 
@@ -81,7 +82,7 @@ export function PaymentSheet({
                 onPress={() => setMethod(value)}
               >
                 <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
-                  {value === "credit" ? t("sell.payLater") : value}
+                  {value === "credit" ? t("sell.payLater") : t(paymentMethodKey(value))}
                 </Text>
               </Pressable>
             ))}
@@ -89,7 +90,7 @@ export function PaymentSheet({
 
           {method === "cash" && (
             <View style={styles.block}>
-              <Text style={styles.label}>Cash received</Text>
+              <Text style={styles.label}>{t("sell.cashReceived")}</Text>
               <TextInput
                 style={styles.input}
                 value={tendered}
@@ -110,10 +111,12 @@ export function PaymentSheet({
               </View>
 
               {short ? (
-                <Text style={styles.short}>Short by {formatMAD(totalCents - tenderedCents)}</Text>
+                <Text style={styles.short}>
+                  {t("sell.shortBy", { amount: formatMAD(totalCents - tenderedCents) })}
+                </Text>
               ) : (
                 <View style={styles.changeBox}>
-                  <Text style={styles.changeLabel}>Change</Text>
+                  <Text style={styles.changeLabel}>{t("sell.change")}</Text>
                   <Text style={styles.changeValue}>{formatMAD(change)}</Text>
                 </View>
               )}
@@ -122,7 +125,7 @@ export function PaymentSheet({
 
           {method === "credit" && (
             <View style={styles.block}>
-              <Text style={styles.label}>Who is paying later?</Text>
+              <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
               <View style={styles.customers}>
                 {customers.map((customer) => (
                   <Pressable
@@ -144,10 +147,10 @@ export function PaymentSheet({
                   style={[styles.input, styles.flex]}
                   value={newCustomer}
                   onChangeText={setNewCustomer}
-                  placeholder="New customer name"
+                  placeholder={t("sell.newCustomerName")}
                 />
                 <Pressable style={styles.addCustomer} onPress={handleCreateCustomer}>
-                  <Text style={styles.addCustomerText}>Add</Text>
+                  <Text style={styles.addCustomerText}>{t("common.add")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -208,6 +211,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   quickRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   quick: {
+    minHeight: 48,
+    justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -226,7 +231,14 @@ const styles = StyleSheet.create({
   changeValue: { fontSize: 26, fontWeight: "800", color: "#1d7a46" },
   short: { color: "#b3261e", fontSize: 16, fontWeight: "600" },
   customers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
+  chip: {
+    minHeight: 48,
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "#eee",
+  },
   chipActive: { backgroundColor: "#1d7a46" },
   chipText: { fontSize: 14, color: "#333" },
   chipTextActive: { color: "#fff", fontWeight: "600" },

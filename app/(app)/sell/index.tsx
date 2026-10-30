@@ -35,6 +35,7 @@ import {
 } from "@/src/lib/sales/totals";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
+import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
 export default function SellScreen() {
@@ -171,13 +172,13 @@ export default function SellScreen() {
           return t("sell.notFound", { barcode });
         }
         if (addProduct(match as Product)) {
-          setFlash(t("sell.added", { name: match.name }));
+          setFlash(t("sell.added", { name: isolateBidi(match.name) }));
         } else {
           // The weight keypad is a modal of its own; close the camera first
           // rather than stack two modals.
           setScannerOpen(false);
         }
-        return `${match.name} · ${centsToDisplay(match.selling_price_cents)} DH`;
+        return `${isolateBidi(match.name)} · ${centsToDisplay(match.selling_price_cents)} DH`;
       } catch {
         setFlash(t("sell.lookupFailed"));
         return null;
@@ -268,14 +269,17 @@ export default function SellScreen() {
           <SyncBadge online={sync.online} pending={sync.pending} syncing={sync.syncing} />
           <View style={styles.headerLinks}>
             {isOwner && sync.stuck > 0 && (
-              <Pressable onPress={() => router.push("/(app)/sell/stuck" as never)}>
+              <Pressable
+                style={styles.headerLink}
+                onPress={() => router.push("/(app)/sell/stuck" as never)}
+              >
                 <Text style={styles.stuckLink}>{t("sell.stuckBanner", { count: sync.stuck })}</Text>
               </Pressable>
             )}
-            <Pressable onPress={() => router.push("/(app)/sell/credit")}>
+            <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/credit")}>
               <Text style={styles.link}>{t("sell.credit")}</Text>
             </Pressable>
-            <Pressable onPress={() => router.push("/(app)/sell/history")}>
+            <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
               <Text style={styles.link}>{t("sell.history")}</Text>
             </Pressable>
           </View>
@@ -309,7 +313,7 @@ export default function SellScreen() {
 
         {results.map((product) => (
           <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
-            <Text style={styles.resultName}>{product.name}</Text>
+            <Text style={styles.resultName}>{isolateBidi(product.name)}</Text>
             <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
           </Pressable>
         ))}
@@ -436,7 +440,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerLinks: { flexDirection: "row", gap: 16 },
+  headerLinks: { flexDirection: "row", gap: 8 },
+  headerLink: { minHeight: 48, minWidth: 48, justifyContent: "center", paddingHorizontal: 8 },
   link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
   stuckLink: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   searchRow: { flexDirection: "row", gap: 10 },
