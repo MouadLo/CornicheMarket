@@ -334,6 +334,7 @@ const ar: Translations = {
     deadStock: "غير مبيع منذ 30 يوم",
     allSoldRecently: "كل المخزون بيع مؤخرًا.",
     noSales: "لا توجد مبيعات في هذه الفترة.",
+    noDataForRange: "لا شيء لعرضه لهذه الفترة.",
     metricRevenue: "الإيرادات",
     metricCogs: "تكلفة المبيعات",
     metricGrossProfit: "الربح الإجمالي",
@@ -356,11 +357,29 @@ const ar: Translations = {
     profit: "الربح",
   },
   units: {
+    // Arabic has six CLDR plural categories (zero/one/two/few/many/other),
+    // not just one/other -- i18next picks the category by the actual count
+    // (e.g. 9 is "few", 15 is "many"), and a missing category for the
+    // CURRENT language falls through to fallbackLng ('fr'), silently
+    // showing French to an Arabic-reading user. Only one/other were
+    // defined here, so any count of 2, 3-10, or 11-99 fell back to French.
+    piece_zero: "قطعة",
     piece_one: "قطعة",
-    piece_other: "قطع",
+    piece_two: "قطعتان",
+    piece_few: "قطع",
+    piece_many: "قطعة",
+    piece_other: "قطعة",
+    pack_zero: "عبوة",
     pack_one: "عبوة",
-    pack_other: "عبوات",
+    pack_two: "عبوتان",
+    pack_few: "عبوات",
+    pack_many: "عبوة",
+    pack_other: "عبوة",
+    kg_zero: "كغ",
     kg_one: "كغ",
+    kg_two: "كغ",
+    kg_few: "كغ",
+    kg_many: "كغ",
     kg_other: "كغ",
   },
 };

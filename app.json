@@ -16,10 +16,12 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.cornichemarket.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +40,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "b624706b-c813-4151-8a02-8b2812aa9796"
+      }
+    },
+    "owner": "mouadls"
   }
 }
