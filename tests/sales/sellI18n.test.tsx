@@ -14,6 +14,16 @@ jest.mock("react-i18next", () => ({
 }));
 
 let mockGranted = false;
+jest.mock("expo-av", () => ({
+  Audio: {
+    setAudioModeAsync: jest.fn(async () => {}),
+    Sound: {
+      createAsync: jest.fn(async () => ({
+        sound: { replayAsync: jest.fn(), unloadAsync: jest.fn() },
+      })),
+    },
+  },
+}));
 jest.mock("expo-camera", () => ({
   useCameraPermissions: () => [{ granted: mockGranted }, jest.fn()],
   CameraView: () => null,
@@ -94,13 +104,25 @@ describe("no hardcoded English in the Sell flow", () => {
   it("camera scanner, permission prompt and live view", () => {
     mockGranted = false;
     act(() => {
-      tree = create(<ContinuousScanner visible onClose={() => {}} onScanned={async () => null} />);
+      tree = create(
+        <ContinuousScanner
+          visible
+          onClose={() => {}}
+          onScanned={async () => ({ status: "added" as const, message: null })}
+        />
+      );
     });
     expect(hardcodedTexts(tree.root)).toEqual([]);
 
     mockGranted = true;
     act(() =>
-      tree.update(<ContinuousScanner visible onClose={() => {}} onScanned={async () => null} />)
+      tree.update(
+        <ContinuousScanner
+          visible
+          onClose={() => {}}
+          onScanned={async () => ({ status: "added" as const, message: null })}
+        />
+      )
     );
     expect(hardcodedTexts(tree.root)).toEqual([]);
   });

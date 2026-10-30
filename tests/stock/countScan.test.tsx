@@ -53,7 +53,7 @@ afterEach(() => act(() => tree.unmount()));
 async function scan(code: string): Promise<string | null> {
   let message: string | null = null;
   await act(async () => {
-    message = await tree.root.findByType(ContinuousScanner).props.onScanned(code);
+    message = (await tree.root.findByType(ContinuousScanner).props.onScanned(code)).message;
   });
   return message;
 }

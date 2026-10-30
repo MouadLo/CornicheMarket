@@ -5,14 +5,14 @@ import { Modal, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { useScanFeedback } from "@/src/lib/sales/scanFeedback";
+import { shouldAcceptScan, type LastScan, type ScanOutcome } from "@/src/lib/sales/scanRules";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onScanned: (barcode: string) => Promise<string | null>;
+  onScanned: (barcode: string) => Promise<ScanOutcome>;
 };
-
-const RESCAN_DELAY_MS = 1500;
 
 // Stays open across scans so a cashier can run a whole basket through
 // without reopening the camera between items.
@@ -20,22 +20,28 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
   const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [feed, setFeed] = useState<string[]>([]);
-  const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const lastScan = useRef<LastScan>(null);
+  const feedback = useScanFeedback(visible);
 
   const handleScan = async (code: string) => {
     const now = Date.now();
-    // The camera reports the same code many times per second while it stays
-    // in frame; only a repeat after the delay counts as a second item.
-    if (lastScan.current.code === code && now - lastScan.current.at < RESCAN_DELAY_MS) return;
+    // Window starts at the last ACCEPTED scan; see shouldAcceptScan.
+    if (!shouldAcceptScan(lastScan.current, code, now)) return;
     lastScan.current = { code, at: now };
 
-    const message = await onScanned(code);
-    if (message) setFeed((current) => [message, ...current].slice(0, 6));
+    let outcome: ScanOutcome;
+    try {
+      outcome = await onScanned(code);
+    } catch {
+      outcome = { status: "error", message: null };
+    }
+    feedback(outcome.status);
+    if (outcome.message) setFeed((current) => [outcome.message as string, ...current].slice(0, 6));
   };
 
   const close = () => {
     setFeed([]);
-    lastScan.current = { code: "", at: 0 };
+    lastScan.current = null;
     onClose();
   };
 
@@ -52,6 +58,7 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
           <>
             <CameraView
               style={StyleSheet.absoluteFill}
+              facing="back"
               barcodeScannerSettings={{
                 barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
               }}
