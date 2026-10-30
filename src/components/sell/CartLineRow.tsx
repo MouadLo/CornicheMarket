@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -39,16 +40,10 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
 
       <View style={styles.controls}>
         {weighted ? (
-          <View style={styles.weightBox}>
-            <Text style={styles.label}>kg</Text>
-            <TextInput
-              style={styles.weightInput}
-              value={String(line.quantity)}
-              onChangeText={(value) => onChange({ ...line, quantity: parseQuantity(value) ?? 0 })}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-            />
-          </View>
+          <WeightField
+            quantity={line.quantity}
+            onQuantity={(quantity) => onChange({ ...line, quantity })}
+          />
         ) : (
           <View style={styles.stepper}>
             <Pressable style={styles.stepButton} onPress={() => step(-1)}>
@@ -80,10 +75,45 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
       </View>
 
       {discountTooHigh && <Text style={styles.discountError}>{t("sell.lineDiscountTooHigh")}</Text>}
+      {weighted && !(line.quantity > 0) && (
+        <Text style={styles.discountError}>{t("sell.weightRequired")}</Text>
+      )}
 
       <Text style={styles.unitPrice}>
         {formatMAD(line.unit_price_cents)} / {line.unit}
       </Text>
+    </View>
+  );
+}
+
+// The field shows what the cashier typed, not String(quantity): the parsed
+// value of "0." is 0, which would be shown back as "0" and swallow the ".".
+// If the quantity is changed from outside (a second weighing added to the
+// line), the typed text no longer matches it and the field shows the new
+// quantity instead.
+function WeightField({
+  quantity,
+  onQuantity,
+}: {
+  quantity: number;
+  onQuantity: (quantity: number) => void;
+}) {
+  const [text, setText] = useState(String(quantity));
+  const shown = (parseQuantity(text) ?? 0) === quantity ? text : String(quantity);
+
+  return (
+    <View style={styles.weightBox}>
+      <Text style={styles.label}>kg</Text>
+      <TextInput
+        style={[styles.weightInput, !(quantity > 0) && styles.weightInputInvalid]}
+        value={shown}
+        onChangeText={(value) => {
+          setText(value);
+          onQuantity(parseQuantity(value) ?? 0);
+        }}
+        keyboardType="decimal-pad"
+        selectTextOnFocus
+      />
     </View>
   );
 }
@@ -135,5 +165,6 @@ const styles = StyleSheet.create({
   remove: { color: "#b3261e", fontWeight: "600", fontSize: 14 },
   unitPrice: { fontSize: 13, color: "#666" },
   discountInputInvalid: { borderColor: "#b3261e" },
+  weightInputInvalid: { borderColor: "#b3261e" },
   discountError: { color: "#b3261e", fontSize: 12 },
 });

@@ -101,6 +101,7 @@ const ar: Translations = {
     lineDiscountTooHigh: "الخصم يتجاوز سعر هذا المنتج.",
     saleDiscountTooHigh: "الخصم يتجاوز إجمالي السلة.",
     remove: "إزالة",
+    weightRequired: "أدخل الوزن.",
     stuck: {
       title: "المبيعات العالقة",
       empty: "لا توجد مبيعات عالقة.",

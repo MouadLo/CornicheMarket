@@ -101,6 +101,7 @@ const en: Translations = {
     lineDiscountTooHigh: "Discount exceeds this item's price.",
     saleDiscountTooHigh: "Discount exceeds the basket total.",
     remove: "Remove",
+    weightRequired: "Enter the weight.",
     stuck: {
       title: "Stuck sales",
       empty: "No stuck sales.",

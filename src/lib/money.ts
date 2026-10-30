@@ -24,9 +24,7 @@ export function weightedAverageCost(
   if (oldQty <= 0) {
     return boughtCostCents;
   }
-  return Math.round(
-    (oldQty * oldCostCents + boughtQty * boughtCostCents) / (oldQty + boughtQty)
-  );
+  return Math.round((oldQty * oldCostCents + boughtQty * boughtCostCents) / (oldQty + boughtQty));
 }
 
 export function lineTotalCents(
@@ -37,7 +35,11 @@ export function lineTotalCents(
   return Math.round(quantity * unitPriceCents) - discountCents;
 }
 
-export function profitCents(unitPriceCents: number, unitCostCents: number, quantity: number): number {
+export function profitCents(
+  unitPriceCents: number,
+  unitCostCents: number,
+  quantity: number
+): number {
   return Math.round((unitPriceCents - unitCostCents) * quantity);
 }
 
@@ -58,8 +60,9 @@ export function applyPercent(priceCents: number, percent: number): number {
 }
 
 // CSV comes from Excel/Sheets in whatever locale the supplier used, so
-// "1 234,56", "1,234.56" and "12.50" all have to land on the same centimes.
-export function parseMoneyToCents(raw: string): number | null {
+// "1 234,56", "1,234.56" and "12.50" all have to land on the same number.
+// This only normalizes the text; money and quantities round differently.
+function parseLocaleDecimal(raw: string): number | null {
   const cleaned = raw.replace(/[\s ]/g, "").replace(/[^\d.,-]/g, "");
   if (!cleaned) return null;
 
@@ -77,10 +80,19 @@ export function parseMoneyToCents(raw: string): number | null {
 
   const value = Number(normalized);
   if (!Number.isFinite(value) || value < 0) return null;
-  return Math.round(value * 100);
+  return value;
 }
 
+// Money: integer centimes.
+export function parseMoneyToCents(raw: string): number | null {
+  const value = parseLocaleDecimal(raw);
+  return value === null ? null : Math.round(value * 100);
+}
+
+// Quantities: stock_quantity and sale_items.quantity are numeric(12,3), so
+// a weight is kept to the gram (0.125 kg stays 0.125). Never route a
+// quantity through cents -- that rounds it to 2 decimals.
 export function parseQuantity(raw: string): number | null {
-  const cents = parseMoneyToCents(raw);
-  return cents === null ? null : cents / 100;
+  const value = parseLocaleDecimal(raw);
+  return value === null ? null : Math.round(value * 1000) / 1000;
 }

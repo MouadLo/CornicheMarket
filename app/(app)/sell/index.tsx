@@ -8,6 +8,7 @@ import { BigButton } from "@/src/components/BigButton";
 import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
+import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/src/lib/sales/queries";
 import {
   cartSubtotal,
+  hasInvalidQuantity,
   saleTotal,
   validateSaleDiscounts,
   type CartLine,
@@ -49,6 +51,8 @@ export default function SellScreen() {
   const [results, setResults] = useState<Product[]>([]);
   const [saleDiscount, setSaleDiscount] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  // A weighed (kg) product waiting for its weight on the keypad.
+  const [weighing, setWeighing] = useState<Product | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [saving, setSaving] = useState(false);
@@ -62,6 +66,7 @@ export default function SellScreen() {
   const discountError = validateSaleDiscounts(lines, discountCents);
   const saleDiscountTooHigh = discountError === "sale";
   const discountInvalid = discountError !== null;
+  const quantityInvalid = hasInvalidQuantity(lines);
 
   useEffect(() => {
     fetchCustomers()
@@ -107,12 +112,15 @@ export default function SellScreen() {
     };
   }, [debounced, isOwner, sync.online]);
 
-  const addProduct = useCallback((product: Product) => {
+  const addLine = useCallback((product: Product, quantity: number) => {
     setLines((current) => {
       const existing = current.findIndex((line) => line.product_id === product.id);
       if (existing >= 0) {
         const next = [...current];
-        next[existing] = { ...next[existing], quantity: next[existing].quantity + 1 };
+        next[existing] = {
+          ...next[existing],
+          quantity: Number((next[existing].quantity + quantity).toFixed(3)),
+        };
         return next;
       }
       return [
@@ -121,16 +129,31 @@ export default function SellScreen() {
           product_id: product.id,
           name: product.name,
           unit: product.unit,
-          quantity: product.unit === "kg" ? 1 : 1,
+          quantity,
           unit_price_cents: product.selling_price_cents,
           discount_cents: 0,
           unit_cost_cents: product.current_cost_cents,
         },
       ];
     });
-    setSearch("");
-    setResults([]);
   }, []);
+
+  // Returns false when nothing was added yet because the product is sold by
+  // weight: the keypad opens and the line is added once a weight is entered,
+  // instead of defaulting to 1 kg.
+  const addProduct = useCallback(
+    (product: Product): boolean => {
+      setSearch("");
+      setResults([]);
+      if (product.unit === "kg") {
+        setWeighing(product);
+        return false;
+      }
+      addLine(product, 1);
+      return true;
+    },
+    [addLine]
+  );
 
   const addByBarcode = useCallback(
     async (barcode: string): Promise<string | null> => {
@@ -151,8 +174,13 @@ export default function SellScreen() {
           setFlash(t("sell.notFound", { barcode }));
           return t("sell.notFound", { barcode });
         }
-        addProduct(match as Product);
-        setFlash(t("sell.added", { name: match.name }));
+        if (addProduct(match as Product)) {
+          setFlash(t("sell.added", { name: match.name }));
+        } else {
+          // The weight keypad is a modal of its own; close the camera first
+          // rather than stack two modals.
+          setScannerOpen(false);
+        }
         return `${match.name} · ${centsToDisplay(match.selling_price_cents)} DH`;
       } catch {
         setFlash(t("sell.lookupFailed"));
@@ -166,10 +194,15 @@ export default function SellScreen() {
   useKeyboardWedge((barcode) => {
     setSearch("");
     addByBarcode(barcode);
-  }, !paymentOpen);
+  }, !paymentOpen && !weighing);
 
   const handleConfirm = async (method: PaymentMethod, customerId: string | null) => {
     if (accepting.current || !profile || lines.length === 0) return;
+
+    if (hasInvalidQuantity(lines)) {
+      setError(t("sell.weightRequired"));
+      return;
+    }
 
     // A discount too large for what it discounts must never reach
     // enqueueSale: anything already queued goes through the offline sync
@@ -328,7 +361,7 @@ export default function SellScreen() {
           <BigButton
             label={t("sell.charge")}
             onPress={() => setPaymentOpen(true)}
-            disabled={discountInvalid}
+            disabled={discountInvalid || quantityInvalid}
           />
         </View>
       )}
@@ -338,6 +371,19 @@ export default function SellScreen() {
         onClose={() => setScannerOpen(false)}
         onScanned={addByBarcode}
       />
+
+      {weighing && (
+        <WeightPad
+          productName={weighing.name}
+          unitPriceCents={weighing.selling_price_cents}
+          onCancel={() => setWeighing(null)}
+          onConfirm={(quantity) => {
+            addLine(weighing, quantity);
+            setFlash(t("sell.added", { name: weighing.name }));
+            setWeighing(null);
+          }}
+        />
+      )}
 
       <PaymentSheet
         visible={paymentOpen}
