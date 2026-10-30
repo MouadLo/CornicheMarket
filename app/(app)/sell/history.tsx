@@ -130,6 +130,8 @@ const styles = StyleSheet.create({
   total: { fontSize: 17, fontWeight: "700" },
   totalVoided: { textDecorationLine: "line-through", color: "#999" },
   voidButton: {
+    minHeight: 48,
+    justifyContent: "center",
     paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: "#fdecea",

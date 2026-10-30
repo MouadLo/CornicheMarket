@@ -95,7 +95,7 @@ export default function StuckSalesScreen() {
             >
               <Text style={styles.exportText}>{t("sell.stuck.export")}</Text>
             </Pressable>
-            <Pressable onPress={() => handleDismiss(entry.sale.id)}>
+            <Pressable style={styles.dismissBtn} onPress={() => handleDismiss(entry.sale.id)}>
               <Text style={styles.dismissText}>{t("sell.stuck.dismiss")}</Text>
             </Pressable>
           </View>
@@ -121,10 +121,17 @@ const styles = StyleSheet.create({
   cardTotal: { fontSize: 18, fontWeight: "700" },
   cardError: { fontSize: 13, color: "#b3261e", fontStyle: "italic" },
   actions: { flexDirection: "row", gap: 10, alignItems: "center", marginTop: 4 },
-  actionBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 },
+  actionBtn: {
+    minHeight: 48,
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+  },
   retryBtn: { backgroundColor: "#1d7a46" },
   exportBtn: { backgroundColor: "#2563eb" },
   retryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
   exportText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  dismissBtn: { minHeight: 48, minWidth: 48, justifyContent: "center", paddingHorizontal: 8 },
   dismissText: { color: "#888", fontSize: 14, paddingVertical: 10 },
 });
