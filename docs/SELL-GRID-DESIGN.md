@@ -477,6 +477,10 @@ Each step is one PR off `main` that's independently shippable and keeps `npm run
 
 Each PR is reviewed and merged before the next one starts, so `main` never holds half a grid. Steps 3–5 can sit behind a simple "grid configured?" check: with no tabs in the database, Sell renders exactly as today.
 
+### 2.10 Decisions recorded, and what is still open
+
+All 12 original questions and the 5 follow-up questions are answered (section 2.0, decisions 1-17). Nothing is open. If a new question comes up while building, it is added here.
+
 ### 2.11 How to test the touch-only laptop
 
 **Chrome DevTools device mode with touch emulation (everyday check).**
@@ -500,7 +504,3 @@ Each PR is reviewed and merged before the next one starts, so `main` never holds
 - **G. USB scanner.** Plug a USB barcode scanner: scan a barcode, the product is added; scan with the in-app keyboard open, still added and no digits left in the search field; scan while a pad is open, nothing is added to the pad.
 - **H. Layout.** At the laptop's native resolution the tablet layout shows (grid and cart side by side); rotate/resize the window narrower than 900 dp and the phone layout appears with the cart collapsible; Arabic mirrors correctly in both.
 - **I. Long shift.** Leave the PWA open for an hour, then sell: no stale session or frozen UI; a deliberately interrupted sale (disconnect Wi-Fi mid-sale) queues and syncs when back online.
-
-### 2.10 Decisions recorded, and what is still open
-
-All 12 original questions and the 5 follow-up questions are answered (section 2.0, decisions 1-17). Nothing is open. If a new question comes up while building, it is added here.
