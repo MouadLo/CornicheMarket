@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { centsToDisplay, formatMAD, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 import { isLineDiscountValid, lineTotal, type CartLine } from "@/src/lib/sales/totals";
+import { isolateBidi } from "@/src/lib/text/bidi";
 
 type Props = {
   line: CartLine;
@@ -33,7 +35,7 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
     <View style={styles.row}>
       <View style={styles.header}>
         <Text style={styles.name} numberOfLines={1}>
-          {line.name}
+          {isolateBidi(line.name)}
         </Text>
         <Text style={styles.total}>{formatMAD(lineTotal(line))}</Text>
       </View>
@@ -69,7 +71,7 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
           />
         </View>
 
-        <Pressable onPress={onRemove} hitSlop={8}>
+        <Pressable onPress={onRemove} style={styles.removeButton}>
           <Text style={styles.remove}>{t("sell.remove")}</Text>
         </Pressable>
       </View>
@@ -80,7 +82,7 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
       )}
 
       <Text style={styles.unitPrice}>
-        {formatMAD(line.unit_price_cents)} / {line.unit}
+        {formatMAD(line.unit_price_cents)} / {unitLabel(line.unit, 1, t)}
       </Text>
     </View>
   );
@@ -98,12 +100,13 @@ function WeightField({
   quantity: number;
   onQuantity: (quantity: number) => void;
 }) {
+  const { t } = useTranslation();
   const [text, setText] = useState(String(quantity));
   const shown = (parseQuantity(text) ?? 0) === quantity ? text : String(quantity);
 
   return (
     <View style={styles.weightBox}>
-      <Text style={styles.label}>kg</Text>
+      <Text style={styles.label}>{unitLabel("kg", quantity, t)}</Text>
       <TextInput
         style={[styles.weightInput, !(quantity > 0) && styles.weightInputInvalid]}
         value={shown}
@@ -162,6 +165,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   label: { fontSize: 12, color: "#666" },
+  removeButton: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   remove: { color: "#b3261e", fontWeight: "600", fontSize: 14 },
   unitPrice: { fontSize: 13, color: "#666" },
   discountInputInvalid: { borderColor: "#b3261e" },

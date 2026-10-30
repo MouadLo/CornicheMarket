@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { formatMAD } from "@/src/lib/money";
+import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { fetchRecentSales, voidSale, type SaleSummary } from "@/src/lib/sales/queries";
 
 export default function SalesHistory() {
@@ -24,7 +33,7 @@ export default function SalesHistory() {
     fetchRecentSales()
       .then(setSales)
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t('sell.historyLoadError'))
+        setError(loadError instanceof Error ? loadError.message : t("sell.historyLoadError"))
       )
       .finally(() => setLoading(false));
   }, [t]);
@@ -35,12 +44,12 @@ export default function SalesHistory() {
     setSaving(true);
     setError(null);
     try {
-      await voidSale(saleId, reason.trim() || t('sell.voidReason'));
+      await voidSale(saleId, reason.trim() || t("sell.voidReason"));
       setVoidingId(null);
       setReason("");
       load();
     } catch (voidError) {
-      setError(voidError instanceof Error ? voidError.message : t('sell.historyVoidError'));
+      setError(voidError instanceof Error ? voidError.message : t("sell.historyVoidError"));
     } finally {
       setSaving(false);
     }
@@ -51,7 +60,7 @@ export default function SalesHistory() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
-      {sales.length === 0 && <Text style={styles.empty}>{t('sell.historyEmpty')}</Text>}
+      {sales.length === 0 && <Text style={styles.empty}>{t("sell.historyEmpty")}</Text>}
 
       {sales.map((sale) => (
         <View key={sale.id} style={[styles.row, sale.voided_at ? styles.rowVoided : null]}>
@@ -59,9 +68,11 @@ export default function SalesHistory() {
             <View style={styles.rowMain}>
               <Text style={styles.time}>{new Date(sale.created_at).toLocaleString()}</Text>
               <Text style={styles.meta}>
-                {sale.payment_method === "credit" ? t('sell.historyPayLater') : sale.payment_method}
-                {sale.discount_cents > 0 ? ` ${t('sell.historyDiscount', { amount: formatMAD(sale.discount_cents) })}` : ""}
-                {sale.voided_at ? ` ${t('sell.historyVoided', { reason: sale.void_reason })}` : ""}
+                {t(paymentMethodKey(sale.payment_method))}
+                {sale.discount_cents > 0
+                  ? ` ${t("sell.historyDiscount", { amount: formatMAD(sale.discount_cents) })}`
+                  : ""}
+                {sale.voided_at ? ` ${t("sell.historyVoided", { reason: sale.void_reason })}` : ""}
               </Text>
             </View>
             <Text style={[styles.total, sale.voided_at ? styles.totalVoided : null]}>
@@ -69,24 +80,25 @@ export default function SalesHistory() {
             </Text>
           </View>
 
-          {isOwner && !sale.voided_at && (
-            voidingId === sale.id ? (
+          {isOwner &&
+            !sale.voided_at &&
+            (voidingId === sale.id ? (
               <View style={styles.voidBox}>
                 <TextInput
                   style={styles.input}
                   value={reason}
                   onChangeText={setReason}
-                  placeholder={t('sell.voidReason')}
+                  placeholder={t("sell.voidReason")}
                   autoFocus
                 />
                 <BigButton
-                  label={saving ? t('sell.voiding') : t('sell.voidAndRestore')}
+                  label={saving ? t("sell.voiding") : t("sell.voidAndRestore")}
                   variant="danger"
                   onPress={() => handleVoid(sale.id)}
                   disabled={saving}
                 />
                 <BigButton
-                  label={t('common.cancel')}
+                  label={t("common.cancel")}
                   variant="secondary"
                   onPress={() => {
                     setVoidingId(null);
@@ -96,16 +108,13 @@ export default function SalesHistory() {
               </View>
             ) : (
               <Pressable style={styles.voidButton} onPress={() => setVoidingId(sale.id)}>
-                <Text style={styles.voidButtonText}>{t('sell.voidRefund')}</Text>
+                <Text style={styles.voidButtonText}>{t("sell.voidRefund")}</Text>
               </Pressable>
-            )
-          )}
+            ))}
         </View>
       ))}
 
-      {!isOwner && sales.length > 0 && (
-        <Text style={styles.note}>{t('sell.ownerOnlyVoid')}</Text>
-      )}
+      {!isOwner && sales.length > 0 && <Text style={styles.note}>{t("sell.ownerOnlyVoid")}</Text>}
     </ScrollView>
   );
 }
@@ -120,7 +129,12 @@ const styles = StyleSheet.create({
   meta: { fontSize: 13, color: "#666", textTransform: "capitalize" },
   total: { fontSize: 17, fontWeight: "700" },
   totalVoided: { textDecorationLine: "line-through", color: "#999" },
-  voidButton: { paddingVertical: 10, borderRadius: 10, backgroundColor: "#fdecea", alignItems: "center" },
+  voidButton: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#fdecea",
+    alignItems: "center",
+  },
   voidButtonText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   voidBox: { gap: 10 },
   input: {

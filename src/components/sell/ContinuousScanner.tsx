@@ -2,6 +2,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 
+import { useTranslation } from "react-i18next";
+
 import { BigButton } from "@/src/components/BigButton";
 
 type Props = {
@@ -15,6 +17,7 @@ const RESCAN_DELAY_MS = 1500;
 // Stays open across scans so a cashier can run a whole basket through
 // without reopening the camera between items.
 export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [feed, setFeed] = useState<string[]>([]);
   const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
@@ -41,9 +44,9 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
       <View style={styles.container}>
         {!permission?.granted ? (
           <View style={styles.center}>
-            <Text style={styles.message}>Camera access is needed to scan barcodes.</Text>
-            <BigButton label="Allow camera" onPress={requestPermission} />
-            <BigButton label="Cancel" variant="secondary" onPress={close} />
+            <Text style={styles.message}>{t("sell.scannerCameraNeeded")}</Text>
+            <BigButton label={t("sell.scannerAllowCamera")} onPress={requestPermission} />
+            <BigButton label={t("common.cancel")} variant="secondary" onPress={close} />
           </View>
         ) : (
           <>
@@ -64,8 +67,8 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
             </View>
 
             <View style={styles.overlay}>
-              <Text style={styles.hint}>Keep scanning — the camera stays open</Text>
-              <BigButton label="Done" onPress={close} />
+              <Text style={styles.hint}>{t("sell.scannerKeepScanning")}</Text>
+              <BigButton label={t("sell.scannerDone")} onPress={close} />
             </View>
           </>
         )}
