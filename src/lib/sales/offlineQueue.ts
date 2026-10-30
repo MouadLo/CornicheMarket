@@ -70,103 +70,173 @@ export function isTemporaryError(message: string): boolean {
   );
 }
 
-async function readQueue(): Promise<PendingSale[]> {
-  try {
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as PendingSale[]) : [];
-  } catch {
-    // A corrupt queue must not take the till down; worst case the cashier
-    // re-enters unsynced sales, which is better than the app refusing to open.
-    return [];
-  }
+// One coordinator per JS runtime (not a cross-tab/process lock). Reads also
+// participate so callers never observe half of a pending <-> stuck transfer.
+let storageTail: Promise<unknown> = Promise.resolve();
+function withStorage<T>(operation: () => Promise<T>): Promise<T> {
+  const result = storageTail.then(operation);
+  storageTail = result.catch(() => undefined);
+  return result;
 }
 
-async function writeQueue(sales: PendingSale[]): Promise<void> {
-  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(sales));
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
-
-export async function listPendingSales(): Promise<PendingSale[]> {
-  return readQueue();
-}
-
-export async function countPendingSales(): Promise<number> {
-  return (await readQueue()).length;
-}
-
-export async function enqueueSale(sale: PendingSale): Promise<void> {
-  const queue = await readQueue();
-  if (queue.some((pending) => pending.id === sale.id)) return;
-  await writeQueue([...queue, sale]);
-}
-
-export async function removePendingSale(id: string): Promise<void> {
-  const queue = await readQueue();
-  await writeQueue(queue.filter((pending) => pending.id !== id));
-}
-
-export async function markAttempt(id: string, error: string): Promise<void> {
-  const queue = await readQueue();
-  await writeQueue(
-    queue.map((pending) =>
-      pending.id === id
-        ? { ...pending, attempts: pending.attempts + 1, last_error: error }
-        : pending
+function isSale(value: unknown): value is PendingSale {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    (value.customer_id === null || typeof value.customer_id === "string") &&
+    typeof value.payment_method === "string" &&
+    ["cash", "card", "credit"].includes(value.payment_method) &&
+    Number.isSafeInteger(value.discount_cents) &&
+    Number.isSafeInteger(value.total_cents) &&
+    Number.isSafeInteger(value.attempts) &&
+    typeof value.created_at === "string" &&
+    (value.last_error === undefined || typeof value.last_error === "string") &&
+    Array.isArray(value.lines) &&
+    value.lines.every(
+      (line: unknown) =>
+        isRecord(line) &&
+        typeof line.product_id === "string" &&
+        typeof line.name === "string" &&
+        typeof line.unit === "string" &&
+        typeof line.quantity === "number" &&
+        Number.isFinite(line.quantity) &&
+        Number.isSafeInteger(line.unit_price_cents) &&
+        Number.isSafeInteger(line.discount_cents) &&
+        (line.unit_cost_cents === null || Number.isSafeInteger(line.unit_cost_cents))
     )
   );
 }
-
-export async function clearQueue(): Promise<void> {
-  await AsyncStorage.removeItem(QUEUE_KEY);
+function isStuck(value: unknown): value is StuckSale {
+  return (
+    isRecord(value) &&
+    isSale(value.sale) &&
+    typeof value.error === "string" &&
+    typeof value.failedAt === "string"
+  );
 }
-
-// ── Stuck (permanently-failed) sales ────────────────────────────────────────
-
-async function readStuck(): Promise<StuckSale[]> {
+async function readEntries<T>(key: string, valid: (value: unknown) => value is T): Promise<T[]> {
+  const raw = await AsyncStorage.getItem(key);
+  if (raw === null) return [];
+  let parsed: unknown;
   try {
-    const raw = await AsyncStorage.getItem(STUCK_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as StuckSale[]) : [];
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    throw new Error(
+      `Unreadable sales storage: ${key}. Original data preserved; export raw sales storage for recovery.`
+    );
   }
-}
-
-async function writeStuck(stuck: StuckSale[]): Promise<void> {
-  await AsyncStorage.setItem(STUCK_KEY, JSON.stringify(stuck));
-}
-
-// Moves a sale out of the retry queue and into the stuck list. Safe to call
-// more than once for the same id (idempotent).
-export async function quarantineSale(sale: PendingSale, error: string): Promise<void> {
-  const stuck = await readStuck();
-  if (!stuck.some((s) => s.sale.id === sale.id)) {
-    await writeStuck([...stuck, { sale, error, failedAt: new Date().toISOString() }]);
+  if (!Array.isArray(parsed) || !parsed.every(valid)) {
+    throw new Error(
+      `Invalid sales storage: ${key}. Original data preserved; export raw sales storage for recovery.`
+    );
   }
-  await removePendingSale(sale.id);
+  return parsed;
 }
+const readQueue = () => readEntries(QUEUE_KEY, isSale);
+const readStuck = () => readEntries(STUCK_KEY, isStuck);
+const writeQueue = (sales: PendingSale[]) => AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(sales));
+const writeStuck = (sales: StuckSale[]) => AsyncStorage.setItem(STUCK_KEY, JSON.stringify(sales));
 
-export async function listStuckSales(): Promise<StuckSale[]> {
-  return readStuck();
+// Recovery primitive: returns exact stored strings without parsing or changing
+// them. A read failure propagates; callers must save/share this sensitive data
+// deliberately. Never clear/repair an unreadable queue as a side effect.
+export function exportRawSalesStorage(): Promise<{ pending: string | null; stuck: string | null }> {
+  return withStorage(async () => ({
+    pending: await AsyncStorage.getItem(QUEUE_KEY),
+    stuck: await AsyncStorage.getItem(STUCK_KEY),
+  }));
 }
-
-export async function countStuckSales(): Promise<number> {
-  return (await readStuck()).length;
+export function listPendingSales(): Promise<PendingSale[]> {
+  return withStorage(readQueue);
 }
-
-// Moves a stuck sale back to the retry queue (resets attempt count).
-export async function retryStuckSale(id: string): Promise<void> {
-  const stuck = await readStuck();
-  const entry = stuck.find((s) => s.sale.id === id);
-  if (!entry) return;
-  await enqueueSale({ ...entry.sale, attempts: 0, last_error: undefined });
-  await writeStuck(stuck.filter((s) => s.sale.id !== id));
+export function countPendingSales(): Promise<number> {
+  return withStorage(async () => (await readQueue()).length);
 }
-
-// Removes a stuck sale after the owner has exported / acknowledged it.
-export async function dismissStuckSale(id: string): Promise<void> {
-  const stuck = await readStuck();
-  await writeStuck(stuck.filter((s) => s.sale.id !== id));
+export function enqueueSale(sale: PendingSale): Promise<void> {
+  return withStorage(async () => {
+    const queue = await readQueue();
+    if (!isSale(sale)) throw new Error("Invalid pending sale; nothing written");
+    if (!queue.some((pending) => pending.id === sale.id)) await writeQueue([...queue, sale]);
+  });
+}
+export function removePendingSale(id: string): Promise<void> {
+  return withStorage(async () => {
+    const queue = await readQueue();
+    await writeQueue(queue.filter((pending) => pending.id !== id));
+  });
+}
+// After backend acknowledgement, remove the stuck copy first. If either
+// write fails, the pending copy remains and the same UUID is safe to replay.
+export function confirmPendingSale(id: string): Promise<void> {
+  return withStorage(async () => {
+    const queue = await readQueue();
+    const stuck = await readStuck();
+    if (stuck.some((entry) => entry.sale.id === id)) {
+      await writeStuck(stuck.filter((entry) => entry.sale.id !== id));
+    }
+    await writeQueue(queue.filter((sale) => sale.id !== id));
+  });
+}
+export function markAttempt(id: string, error: string): Promise<void> {
+  return withStorage(async () => {
+    const queue = await readQueue();
+    await writeQueue(
+      queue.map((pending) =>
+        pending.id === id
+          ? { ...pending, attempts: pending.attempts + 1, last_error: error }
+          : pending
+      )
+    );
+  });
+}
+export function clearQueue(): Promise<void> {
+  return withStorage(async () => {
+    await readQueue(); // Explicit clear must not destroy unreadable financial data.
+    await AsyncStorage.removeItem(QUEUE_KEY);
+  });
+}
+export function quarantineSale(sale: PendingSale, error: string): Promise<void> {
+  return withStorage(async () => {
+    const queue = await readQueue();
+    const stuck = await readStuck();
+    if (!isSale(sale)) throw new Error("Invalid pending sale; nothing written");
+    // Destination first: a crash/failed second write leaves a recoverable copy
+    // in both lists, never neither. Backend UUID idempotency handles replays.
+    if (!stuck.some((entry) => entry.sale.id === sale.id)) {
+      await writeStuck([...stuck, { sale, error, failedAt: new Date().toISOString() }]);
+    }
+    await writeQueue(queue.filter((pending) => pending.id !== sale.id));
+  });
+}
+export function listStuckSales(): Promise<StuckSale[]> {
+  return withStorage(readStuck);
+}
+export function countStuckSales(): Promise<number> {
+  return withStorage(async () => (await readStuck()).length);
+}
+export function retryStuckSale(id: string): Promise<void> {
+  return withStorage(async () => {
+    const stuck = await readStuck();
+    const queue = await readQueue();
+    const entry = stuck.find((value) => value.sale.id === id);
+    if (!entry) return;
+    if (queue.some((sale) => sale.id === id)) {
+      await writeStuck(stuck.filter((value) => value.sale.id !== id));
+      return;
+    }
+    const retry = { ...entry.sale, attempts: 0, last_error: undefined };
+    await writeQueue([...queue.filter((sale) => sale.id !== id), retry]);
+    await writeStuck(stuck.filter((value) => value.sale.id !== id));
+  });
+}
+// Explicit owner acknowledgement retains its existing meaning.
+export function dismissStuckSale(id: string): Promise<void> {
+  return withStorage(async () => {
+    const stuck = await readStuck();
+    await writeStuck(stuck.filter((entry) => entry.sale.id !== id));
+  });
 }

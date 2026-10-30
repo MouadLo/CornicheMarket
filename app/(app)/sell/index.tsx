@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -18,7 +18,7 @@ import {
   type CachedProduct,
 } from "@/src/lib/products/offlineCache";
 import { fetchProducts, type Product } from "@/src/lib/products/queries";
-import { enqueueSale } from "@/src/lib/sales/offlineQueue";
+import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import {
   createCustomer,
   fetchCustomers,
@@ -40,6 +40,9 @@ export default function SellScreen() {
   const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
   const sync = useSaleSync();
+  const accepting = useRef(false);
+  // Retain the operation in memory across an ambiguous storage failure.
+  const attemptedSale = useRef<PendingSale | null>(null);
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
@@ -166,7 +169,7 @@ export default function SellScreen() {
   }, !paymentOpen);
 
   const handleConfirm = async (method: PaymentMethod, customerId: string | null) => {
-    if (!profile || lines.length === 0) return;
+    if (accepting.current || !profile || lines.length === 0) return;
 
     // A discount too large for what it discounts must never reach
     // enqueueSale: anything already queued goes through the offline sync
@@ -182,33 +185,49 @@ export default function SellScreen() {
       return;
     }
 
+    accepting.current = true;
     setSaving(true);
     setError(null);
 
-    const sale = pendingSaleFrom(
-      Crypto.randomUUID(),
-      {
-        customer_id: method === "credit" ? customerId : null,
-        payment_method: method,
-        discount_cents: discountCents,
-        total_cents: total,
-      },
-      lines
-    );
-
     try {
+      const sale = pendingSaleFrom(
+        attemptedSale.current?.id ?? Crypto.randomUUID(),
+        {
+          customer_id: method === "credit" ? customerId : null,
+          payment_method: method,
+          discount_cents: discountCents,
+          total_cents: total,
+        },
+        lines
+      );
+      if (
+        attemptedSale.current &&
+        JSON.stringify({ ...sale, created_at: attemptedSale.current.created_at }) !==
+          JSON.stringify(attemptedSale.current)
+      ) {
+        throw new Error(
+          "The previous sale may already be saved. Restore the original basket and payment before retrying."
+        );
+      }
+      attemptedSale.current = attemptedSale.current ?? sale;
       // Queued first, then synced: if the request dies midway the sale is
       // still on the device, and the id makes a retry safe to repeat.
-      await enqueueSale(sale);
-      await sync.sync();
+      await enqueueSale(attemptedSale.current);
+      attemptedSale.current = null;
+      // Local persistence is the acceptance boundary. Sync is best effort;
+      // its failure must never leave this basket available to submit again.
 
       setLines([]);
       setSaleDiscount("");
       setPaymentOpen(false);
       setFlash(t("sell.recorded", { amount: formatMAD(total) }));
+      void sync.sync().catch(() => {
+        /* Hook reports sync errors; sale is already accepted. */
+      });
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : t("sell.couldNotRecord"));
     } finally {
+      accepting.current = false;
       setSaving(false);
     }
   };

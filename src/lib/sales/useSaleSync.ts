@@ -1,5 +1,5 @@
 import NetInfo from "@react-native-community/netinfo";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   MAX_RETRY_ATTEMPTS,
@@ -10,7 +10,7 @@ import {
   listPendingSales,
   markAttempt,
   quarantineSale,
-  removePendingSale,
+  confirmPendingSale,
   type PendingSale,
 } from "@/src/lib/sales/offlineQueue";
 import { submitSale } from "@/src/lib/sales/queries";
@@ -46,6 +46,48 @@ export type SyncState = {
   lastError: string | null;
 };
 
+// Shared ownership is assigned synchronously, before any storage/network await.
+// Network requests never hold the storage coordinator. Concurrent callers join
+// this run and request a follow-up pass for sales enqueued during submission.
+let activeSync: Promise<string | null> | null = null;
+let passRequested = false;
+export function syncPendingSales(): Promise<string | null> {
+  if (activeSync) {
+    passRequested = true;
+    return activeSync;
+  }
+  activeSync = Promise.resolve()
+    .then(async () => {
+      let lastError: string | null = null;
+      do {
+        passRequested = false;
+        const queue = await listPendingSales();
+        for (const sale of queue) {
+          try {
+            await submitWithAuthRetry(sale);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Sync failed";
+            lastError = message;
+            if (!isTemporaryError(message) || sale.attempts + 1 >= MAX_RETRY_ATTEMPTS) {
+              await quarantineSale(sale, message);
+              continue;
+            }
+            await markAttempt(sale.id, message);
+            return message;
+          }
+          // Storage failures must not be classified as backend rejections or
+          // consume the retry budget. Leave the sale for an idempotent replay.
+          await confirmPendingSale(sale.id);
+        }
+      } while (passRequested);
+      return lastError;
+    })
+    .finally(() => {
+      activeSync = null;
+    });
+  return activeSync;
+}
+
 export function useSaleSync() {
   const [state, setState] = useState<SyncState>({
     online: true,
@@ -54,71 +96,40 @@ export function useSaleSync() {
     syncing: false,
     lastError: null,
   });
-
-  // Guards against two syncs overlapping (e.g. reconnect while a manual
-  // sync is already running), which would retry the same sale twice.
-  const syncing = useRef(false);
-
+  const reportError = useCallback((error: unknown) => {
+    setState((current) => ({
+      ...current,
+      lastError: error instanceof Error ? error.message : "Sync failed",
+    }));
+  }, []);
   const refreshPending = useCallback(async () => {
-    const [pending, stuck] = await Promise.all([countPendingSales(), countStuckSales()]);
-    setState((current) => ({ ...current, pending, stuck }));
-  }, []);
-
+    try {
+      const [pending, stuck] = await Promise.all([countPendingSales(), countStuckSales()]);
+      setState((current) => ({ ...current, pending, stuck }));
+    } catch (error) {
+      reportError(error);
+    }
+  }, [reportError]);
   const sync = useCallback(async () => {
-    if (syncing.current) return;
-
-    const queue = await listPendingSales();
-    if (queue.length === 0) {
-      setState((current) => ({ ...current, pending: 0 }));
-      return;
-    }
-
-    syncing.current = true;
     setState((current) => ({ ...current, syncing: true, lastError: null }));
-
-    let lastError: string | null = null;
-
-    for (const sale of queue) {
-      try {
-        await submitWithAuthRetry(sale);
-        await removePendingSale(sale.id);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Sync failed";
-        lastError = message;
-
-        const temporary = isTemporaryError(message);
-        const exhausted = sale.attempts + 1 >= MAX_RETRY_ATTEMPTS;
-
-        if (!temporary || exhausted) {
-          // Permanent failure or retry budget spent → quarantine so the rest
-          // of the queue is not blocked. Data is never deleted.
-          await quarantineSale(sale, message);
-        } else {
-          // Transient network error → record the attempt and stop this run
-          // to preserve the sale's position in the ordering.
-          await markAttempt(sale.id, message);
-          break;
-        }
-      }
+    try {
+      const lastError = await syncPendingSales();
+      setState((current) => ({ ...current, lastError }));
+      await refreshPending();
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setState((current) => ({ ...current, syncing: false }));
     }
-
-    syncing.current = false;
-    const [pending, stuck] = await Promise.all([countPendingSales(), countStuckSales()]);
-    setState((current) => ({ ...current, syncing: false, pending, stuck, lastError }));
-  }, []);
-
+  }, [refreshPending, reportError]);
   useEffect(() => {
-    refreshPending();
-
-    const unsubscribe = NetInfo.addEventListener((netState) => {
+    void refreshPending();
+    return NetInfo.addEventListener((netState) => {
       const online = Boolean(netState.isConnected && netState.isInternetReachable !== false);
       setState((current) => ({ ...current, online }));
-      if (online) sync();
+      if (online) void sync();
     });
-
-    return unsubscribe;
   }, [refreshPending, sync]);
-
   return { ...state, sync, refreshPending };
 }
 

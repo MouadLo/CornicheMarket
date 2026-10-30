@@ -1,3 +1,6 @@
+import React from "react";
+import { act, create } from "react-test-renderer";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 /**
  * Locks in two properties the offline sync relies on:
  *   1. pendingSaleFrom builds the correct PendingSale shape.
@@ -21,7 +24,12 @@ import {
   retryStuckSale,
   type PendingSale,
 } from "../../src/lib/sales/offlineQueue";
-import { pendingSaleFrom, submitWithAuthRetry } from "../../src/lib/sales/useSaleSync";
+import {
+  pendingSaleFrom,
+  submitWithAuthRetry,
+  syncPendingSales,
+  useSaleSync,
+} from "../../src/lib/sales/useSaleSync";
 
 // Prefixed with "mock" so Jest hoists these into the jest.mock() factories
 // below correctly.
@@ -287,4 +295,235 @@ describe("quarantine: stuck queue", () => {
     const [queued] = await listPendingSales();
     expect(queued.attempts).toBe(0);
   });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+function queued(id: string) {
+  return pendingSaleFrom(
+    id,
+    { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 100 },
+    []
+  );
+}
+
+describe("shared sync ownership", () => {
+  it("acquires ownership before the first read, across simultaneous callers", async () => {
+    await enqueueSale(queued("A"));
+    const entered = deferred<void>();
+    const read = deferred<string | null>();
+    const raw = mockStore.get("corniche.pendingSales.v1")!;
+    jest.mocked(AsyncStorage.getItem).mockImplementationOnce(() => {
+      entered.resolve();
+      return read.promise;
+    });
+    mockSubmitSale.mockResolvedValue(undefined);
+    const first = syncPendingSales();
+    await entered.promise;
+    const second = syncPendingSales();
+    expect(second).toBe(first);
+    read.resolve(raw);
+    await Promise.all([first, second]);
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+    expect(await listPendingSales()).toEqual([]);
+  });
+
+  it("does not lock storage during network calls and drains an overlapping enqueue", async () => {
+    await enqueueSale(queued("A"));
+    const entered = deferred<void>();
+    const network = deferred<void>();
+    mockSubmitSale
+      .mockImplementationOnce(() => {
+        entered.resolve();
+        return network.promise;
+      })
+      .mockResolvedValue(undefined);
+    const first = syncPendingSales();
+    await entered.promise;
+    await enqueueSale(queued("B"));
+    const second = syncPendingSales();
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+    network.resolve();
+    await Promise.all([first, second]);
+    expect(mockSubmitSale.mock.calls.map(([sale]) => sale.id)).toEqual(["A", "B"]);
+    expect(await listPendingSales()).toEqual([]);
+  });
+
+  it("releases ownership after a read failure", async () => {
+    await enqueueSale(queued("A"));
+    jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error("read failed"));
+    await expect(syncPendingSales()).rejects.toThrow("read failed");
+    mockSubmitSale.mockResolvedValue(undefined);
+    await syncPendingSales();
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves acknowledged backend sale ID when local removal fails", async () => {
+    await enqueueSale(queued("A"));
+    mockSubmitSale.mockResolvedValue(undefined);
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
+    await expect(syncPendingSales()).rejects.toThrow("disk full");
+    expect((await listPendingSales())[0].attempts).toBe(0);
+    expect(await listStuckSales()).toEqual([]);
+    await syncPendingSales();
+    expect(mockSubmitSale.mock.calls.map(([sale]) => sale.id)).toEqual(["A", "A"]);
+    expect(await listPendingSales()).toEqual([]);
+  });
+
+  it("releases ownership if persisting a network failure fails", async () => {
+    await enqueueSale(queued("A"));
+    mockSubmitSale
+      .mockRejectedValueOnce(new Error("Network request failed"))
+      .mockResolvedValue(undefined);
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
+    await expect(syncPendingSales()).rejects.toThrow("disk full");
+    await syncPendingSales();
+    expect(await listPendingSales()).toEqual([]);
+  });
+
+  it("normal sync quarantines permanent failures and continues with the next sale", async () => {
+    await enqueueSale(queued("A"));
+    await enqueueSale(queued("B"));
+    mockSubmitSale
+      .mockRejectedValueOnce(new Error("foreign key violation"))
+      .mockResolvedValue(undefined);
+    expect(await syncPendingSales()).toBe("foreign key violation");
+    expect(await listPendingSales()).toEqual([]);
+    expect((await listStuckSales())[0].sale.id).toBe("A");
+    expect(mockSubmitSale).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops on a temporary error without discarding the sale or looping immediately", async () => {
+    await enqueueSale(queued("A"));
+    await enqueueSale(queued("B"));
+    mockSubmitSale.mockRejectedValue(new Error("Network request failed"));
+    await Promise.all([syncPendingSales(), syncPendingSales()]);
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+    expect((await listPendingSales()).map((sale) => [sale.id, sale.attempts])).toEqual([
+      ["A", 1],
+      ["B", 0],
+    ]);
+  });
+});
+
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: { addEventListener: jest.fn(() => () => {}) },
+}));
+
+it("coordinates two mounted hooks and reports storage failures without an unhandled rejection", async () => {
+  const values: ReturnType<typeof useSaleSync>[] = [];
+  function Probe({ index }: { index: number }) {
+    values[index] = useSaleSync();
+    return null;
+  }
+  let tree!: ReturnType<typeof create>;
+  await act(async () => {
+    tree = create(
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(Probe, { index: 0 }),
+        React.createElement(Probe, { index: 1 })
+      )
+    );
+  });
+  try {
+    await enqueueSale(queued("hook-sale"));
+    jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error("storage unreadable"));
+    await act(async () => {
+      await Promise.all([values[0].sync(), values[1].sync()]);
+    });
+    expect(
+      values.every((value) => !value.syncing && value.lastError === "storage unreadable")
+    ).toBe(true);
+    expect(mockSubmitSale).not.toHaveBeenCalled();
+    mockSubmitSale.mockResolvedValue(undefined);
+    await act(async () => {
+      await Promise.all([values[0].sync(), values[1].sync()]);
+    });
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+    expect(
+      values.every((value) => !value.syncing && value.pending === 0 && value.lastError === null)
+    ).toBe(true);
+  } finally {
+    act(() => tree.unmount());
+  }
+});
+
+it("runs a requested follow-up after a permanent rejection", async () => {
+  await enqueueSale(queued("A"));
+  const entered = deferred<void>();
+  const network = deferred<void>();
+  mockSubmitSale
+    .mockImplementationOnce(() => {
+      entered.resolve();
+      return network.promise;
+    })
+    .mockResolvedValue(undefined);
+  const first = syncPendingSales();
+  await entered.promise;
+  await enqueueSale(queued("B"));
+  const second = syncPendingSales();
+  network.reject(new Error("foreign key violation"));
+  await Promise.all([first, second]);
+  expect(mockSubmitSale.mock.calls.map(([sale]) => sale.id)).toEqual(["A", "B"]);
+  expect((await listStuckSales()).map((entry) => entry.sale.id)).toEqual(["A"]);
+  expect(await listPendingSales()).toEqual([]);
+});
+
+it.each(["quarantine", "retry"])(
+  "reconciles interrupted %s after a restart and successful sync",
+  async (operation) => {
+    const sale = queued("A");
+    await enqueueSale(sale);
+    if (operation === "retry") await quarantineSale(sale, "invalid");
+    jest
+      .mocked(AsyncStorage.setItem)
+      .mockImplementationOnce(async (key, value) => {
+        mockStore.set(key, value);
+      })
+      .mockRejectedValueOnce(new Error("interrupted"));
+    await expect(
+      operation === "retry" ? retryStuckSale("A") : quarantineSale(sale, "invalid")
+    ).rejects.toThrow("interrupted");
+    expect(await countPendingSales()).toBe(1);
+    expect(await countStuckSales()).toBe(1);
+    // The queues in mockStore are the persisted state read by a fresh sync run.
+    mockSubmitSale.mockResolvedValue(undefined);
+    await syncPendingSales();
+    expect(await countPendingSales()).toBe(0);
+    expect(await countStuckSales()).toBe(0);
+    await retryStuckSale("A");
+    expect(await countPendingSales()).toBe(0);
+    expect(mockSubmitSale).toHaveBeenCalledTimes(1);
+  }
+);
+
+it("preserves the pending copy when reconciliation fails and succeeds on retry", async () => {
+  const sale = queued("A");
+  await enqueueSale(sale);
+  jest
+    .mocked(AsyncStorage.setItem)
+    .mockImplementationOnce(async (key, value) => {
+      mockStore.set(key, value);
+    })
+    .mockRejectedValueOnce(new Error("interrupted"));
+  await expect(quarantineSale(sale, "invalid")).rejects.toThrow();
+  mockSubmitSale.mockResolvedValue(undefined);
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("reconciliation failed"));
+  await expect(syncPendingSales()).rejects.toThrow("reconciliation failed");
+  expect(await countPendingSales()).toBe(1);
+  expect(await countStuckSales()).toBe(1);
+  await syncPendingSales();
+  expect(await countPendingSales()).toBe(0);
+  expect(await countStuckSales()).toBe(0);
+  expect(mockSubmitSale.mock.calls.map(([item]) => item.id)).toEqual(["A", "A"]);
 });
