@@ -8,7 +8,7 @@ import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker"
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { applyStockCount } from "@/src/lib/inventory/queries";
 import { parseQuantity } from "@/src/lib/money";
-import { fetchProducts, type Product } from "@/src/lib/products/queries";
+import { fetchProductByBarcode, type Product } from "@/src/lib/products/queries";
 
 type CountLine = {
   product: Product;
@@ -33,15 +33,12 @@ export default function StockCountScreen() {
   };
 
   const handleScanned = async (barcode: string): Promise<string | null> => {
-    const [match] = await fetchProducts(
-      { search: barcode, categoryId: null, lowStockOnly: false, status: "active" },
-      0,
-      true
-    ).catch(() => []);
+    // Exact barcode only: a partial code must never pick a product to count.
+    const match = await fetchProductByBarcode(barcode, true).catch(() => null);
 
-    if (!match) return t('stockIn.countUnknown', { barcode });
+    if (!match) return t("stockIn.countUnknown", { barcode });
     addProduct(match);
-    return t('stockIn.countAdded', { name: match.name });
+    return t("stockIn.countAdded", { name: match.name });
   };
 
   const apply = async () => {
@@ -64,7 +61,7 @@ export default function StockCountScreen() {
         } catch (error) {
           return {
             ...line,
-            applied: { error: error instanceof Error ? error.message : t('common.error') },
+            applied: { error: error instanceof Error ? error.message : t("common.error") },
           };
         }
       })
@@ -75,17 +72,17 @@ export default function StockCountScreen() {
     const changed = results.filter(
       (line) => line.applied && "delta" in line.applied && line.applied.delta !== 0
     ).length;
-    setDone(t('stockIn.countDone', { count: changed }));
+    setDone(t("stockIn.countDone", { count: changed }));
   };
 
   const countable = lines.filter((line) => parseQuantity(line.counted) !== null && !line.applied);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.intro}>{t('stockIn.countIntro')}</Text>
+      <Text style={styles.intro}>{t("stockIn.countIntro")}</Text>
 
       {Platform.OS !== "web" && (
-        <BigButton label={t('stockIn.countScanItems')} onPress={() => setScannerOpen(true)} />
+        <BigButton label={t("stockIn.countScanItems")} onPress={() => setScannerOpen(true)} />
       )}
 
       <ProductSearchPicker onPick={addProduct} excludeIds={lines.map((line) => line.product.id)} />
@@ -104,13 +101,13 @@ export default function StockCountScreen() {
                 onPress={() => setLines((current) => current.filter((_, i) => i !== index))}
                 hitSlop={8}
               >
-                <Text style={styles.remove}>{t('stockIn.countRemove')}</Text>
+                <Text style={styles.remove}>{t("stockIn.countRemove")}</Text>
               </Pressable>
             </View>
 
             <View style={styles.countRow}>
               <Text style={styles.systemQty}>
-                {t('stockIn.countSystem')} {line.product.stock_quantity} {line.product.unit}
+                {t("stockIn.countSystem")} {line.product.stock_quantity} {line.product.unit}
               </Text>
               <TextInput
                 style={styles.input}
@@ -121,7 +118,7 @@ export default function StockCountScreen() {
                   )
                 }
                 keyboardType="decimal-pad"
-                placeholder={t('stockIn.countCounted')}
+                placeholder={t("stockIn.countCounted")}
               />
             </View>
 
@@ -129,8 +126,13 @@ export default function StockCountScreen() {
               "delta" in line.applied ? (
                 <Text style={styles.appliedOk}>
                   {line.applied.delta === 0
-                    ? t('stockIn.countMatched')
-                    : t('stockIn.countCorrected', { delta: line.applied.delta > 0 ? `+${line.applied.delta}` : String(line.applied.delta) })}
+                    ? t("stockIn.countMatched")
+                    : t("stockIn.countCorrected", {
+                        delta:
+                          line.applied.delta > 0
+                            ? `+${line.applied.delta}`
+                            : String(line.applied.delta),
+                      })}
                 </Text>
               ) : (
                 <Text style={styles.error}>{line.applied.error}</Text>
@@ -145,7 +147,7 @@ export default function StockCountScreen() {
                   ]}
                 >
                   {difference === 0
-                    ? t('stockIn.countMatched')
+                    ? t("stockIn.countMatched")
                     : `${difference > 0 ? "+" : ""}${Number(difference.toFixed(3))}`}
                 </Text>
               )
@@ -156,7 +158,11 @@ export default function StockCountScreen() {
 
       {countable.length > 0 && (
         <BigButton
-          label={applying ? t('stockIn.countApplying') : t('stockIn.countApply', { count: countable.length })}
+          label={
+            applying
+              ? t("stockIn.countApplying")
+              : t("stockIn.countApply", { count: countable.length })
+          }
           onPress={apply}
           disabled={applying}
         />
@@ -178,7 +184,12 @@ const styles = StyleSheet.create({
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   name: { fontSize: 16, fontWeight: "600", flex: 1 },
   remove: { color: "#b3261e", fontWeight: "600", fontSize: 14 },
-  countRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  countRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   systemQty: { fontSize: 14, color: "#666" },
   input: {
     minHeight: 52,
