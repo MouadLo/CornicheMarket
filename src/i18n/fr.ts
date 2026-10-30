@@ -71,7 +71,7 @@ const fr = {
     charge: "Encaisser",
     empty: "Scannez ou cherchez pour commencer.",
     added: "Ajouté {{name}}",
-    notFound: "Code inconnu {{barcode}}",
+    notFound: "Code-barres inconnu {{barcode}}",
     lookupFailed: "Recherche échouée",
     recorded: "Vente · {{amount}}",
     couldNotRecord: "Impossible d'enregistrer la vente.",

@@ -73,7 +73,7 @@ const ar: Translations = {
     charge: "تحصيل",
     empty: "امسح أو ابحث لبدء البيع.",
     added: "تمت إضافة {{name}}",
-    notFound: "لا يوجد منتج للرمز {{barcode}}",
+    notFound: "رمز شريطي غير معروف {{barcode}}",
     lookupFailed: "فشل البحث",
     recorded: "تم تسجيل البيع · {{amount}}",
     couldNotRecord: "تعذر تسجيل البيع.",

@@ -73,7 +73,7 @@ const en: Translations = {
     charge: "Charge",
     empty: "Scan or search to start a sale.",
     added: "Added {{name}}",
-    notFound: "No product for {{barcode}}",
+    notFound: "Unknown barcode {{barcode}}",
     lookupFailed: "Lookup failed",
     recorded: "Sale · {{amount}}",
     couldNotRecord: "Could not record the sale.",
