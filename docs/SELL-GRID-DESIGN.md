@@ -1,6 +1,6 @@
 # Sell screen: UX assessment and product grid design
 
-Status: proposal, no code written. Assessed against `main` at `4cddc78`.
+Status: proposal with the owner's final decisions applied (section 2.0), no code written. Assessed against `main` at `4cddc78`.
 Scope: `app/(app)/sell/index.tsx`, `src/components/sell/*`, `src/lib/products/offlineCache.ts`, `src/lib/sales/totals.ts`.
 
 Method: code read plus a live run of the web build against local Supabase as the seeded cashier (desktop width, 375 px phone width, Arabic). Items marked **[verified]** were reproduced in the browser, not just read in code.
@@ -61,7 +61,7 @@ Counted from an empty cart to a recorded sale. Phone is native with the camera. 
 **Tablet**
 
 - One stretched column. Cart rows span the full width, about half the screen is empty, and there's no side-by-side layout.
-- On Android or iOS with a **USB or Bluetooth (HID) scanner**, the keyboard-wedge hook is web-only (`useKeyboardWedge.ts:20`). Scans only land if the search field happens to have focus, Enter isn't handled, and each scan then needs a tap on the result. A tablet at a counter is exactly where people plug in a scanner.
+- On Android or iOS with a **USB or Bluetooth (HID) scanner**, the keyboard-wedge hook is web-only (`useKeyboardWedge.ts:20`). Scans only land if the search field happens to have focus, Enter isn't handled, and each scan then needs a tap on the result. (Not a target any more: the owner chose camera-only scanning, see 2.0.)
 
 **Web with a USB scanner**
 
@@ -94,9 +94,25 @@ Counted from an empty cart to a recorded sale. Phone is native with the camera. 
 
 ## Part 2: Design for the category product grid
 
+### 2.0 Owner decisions (final)
+
+These replace the open questions in the first version of this doc. Where a decision changed the design, the relevant section below says so.
+
+| # | Decision | Effect on the design |
+|---|---|---|
+| 1 | **Favoris is hand-picked by the owner only.** An optional "suggest from best sellers" helper exists. No automatic reordering, ever. | 2.4: the helper only proposes; nothing is saved until the owner confirms. |
+| 2 | **Out-of-stock tiles stay sellable** and show a small stock badge. Never blocked. | 2.2 and 2.6. Matches the existing rule that oversold stock is visible, not forbidden. |
+| 3 | **No open-price flag.** Instead one built-in **"Divers"** item: a tile that opens the amount keypad and adds a "Divers" line, with an optional short note. No stock tracking. Cost is estimated from an owner-set default margin (marked "estimated" in reports) and Divers is reported as its own separate line, excluded from per-product margin rankings. Owner-set maximum amount per Divers line, default 200 DH. Every Divers line is written to an activity log with the cashier. | `open_price` is removed everywhere. New: 2.5 (Divers columns, settings, activity log), 2.6, 2.9 steps 1 and 6. |
+| 4 | **Weighed items accept weight and "by amount"** (the cashier types DH and the app computes the weight to 3 decimals). | 2.3: the weight pad gets a Poids / Montant switch. |
+| 5 | **Category tabs auto-fill** with the category's active products. The owner can hide, pin to the top and reorder products per tab. **Favoris is the only fully hand-picked tab.** | 2.4 and 2.5: `auto_fill` is the default for category tabs; tile rows are overrides (`hidden`, `pinned`, `position`). |
+| 6 | **One grid per store**, the same on every device. Tile size and last open tab stay per device. | As already designed (2.5). |
+| 7 | **The credit customer picker gets a search field**, regardless of how many customers there are. | New build step 0e. |
+| 8 | **Hardware: an Android tablet (primary: grid and cart side by side) and a phone (secondary: grid dominant, collapsible cart). Camera scanning only, no USB or Bluetooth scanner.** The camera must stay open between scans, use the rear camera, beep and vibrate on each scan, and ignore the same code twice within 1 second. | 2.7 (tablet is the primary layout), new 2.7.1 scanner requirements, new build step S. The native HID scanner path is dropped from the plan. |
+| 9-12 | Remaining questions: **keep the recommendations** (tile colors per tile from the 8-color palette; tile size S/M/L per device; no product photos for now; only the owner edits the grid). | No change. |
+
 ### 2.1 Principles
 
-1. **The grid is an addition.** Search, camera scan and the keyboard wedge behave exactly as today. Typing in search temporarily replaces the grid with results. Clearing the search brings the grid back on the same tab.
+1. **The grid is an addition.** Search and camera scan behave as today (the keyboard wedge stays for web, but no hardware scanner is planned). The camera scanner gets the upgrades in 2.7.1. Typing in search temporarily replaces the grid with results. Clearing the search brings the grid back on the same tab.
 2. **Muscle memory beats cleverness.** Tiles don't move unless the owner moves them. Nothing re-sorts automatically under the cashier's thumb.
 3. **No cost data, ever.** Grid tables hold no money columns. Tiles read name, price and unit from the cashier-safe product cache, and a tile never puts a cost into the cart (`unit_cost_cents: null`; the server stamps cost as it does today).
 4. **Works offline.** The layout is cached with the products.
@@ -105,34 +121,34 @@ Counted from an empty cart to a recorded sale. Phone is native with the camera. 
 
 ```
 ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-│ Pain rond      │   │ Tomates        │   │ Recharge       │   │ Coca-Cola 33cl │
-│                │   │                │   │                │   │           ×3   │ ← already in cart
-│ 1.20 DH        │   │ 9.00 DH/kg  ⚖ │   │ Prix libre  ✎ │   │ 7.00 DH        │
+│ Pain rond      │   │ Tomates        │   │ Divers         │   │ Coca-Cola 33cl │
+│            24  │   │             6  │   │                │   │       ×3    9  │ ← ×3 in cart, 9 in stock
+│ 1.20 DH        │   │ 9.00 DH/kg  ⚖ │   │ Montant     ✎ │   │ 7.00 DH        │
 └────────────────┘   └────────────────┘   └────────────────┘   └────────────────┘
-   piece/pack           weighed             open price            in cart
+   piece/pack           weighed             built-in Divers       in cart
 ```
 
 - **Size.** At least 64 dp (the requirement), aiming for 88–104 dp on phones (3 columns at 360 dp width) and about 120 dp on tablets (5–6 columns). An optional per-device setting offers S, M or L.
-- **Content.** The name takes up to 2 lines, is wrapped in `isolateBidi()`, and aligns to the start edge. The selling price is bold and always LTR-isolated. A small icon marks weighed (⚖) or open-price (✎) items. A **"×N" badge** shows how many are already in the cart, so the cashier gets instant feedback without looking at the cart.
-- **Status badges.** "0" or "Rupture" when stock ≤ 0 (see 2.6). "Inactif" appears only in edit mode.
+- **Content.** The name takes up to 2 lines, is wrapped in `isolateBidi()`, and aligns to the start edge. The selling price is bold and always LTR-isolated. A small icon marks weighed (⚖) items and the built-in Divers tile (✎). A **"×N" badge** shows how many are already in the cart, so the cashier gets instant feedback without looking at the cart.
+- **Stock badge.** A small number in the corner shows the stock on hand (from the product cache, so it can be stale offline). It turns amber at or below the low-stock threshold and red at 0 or below. The tile stays tappable in every case (decision 2). The Divers tile has no badge (no stock tracking). "Inactif" appears only in edit mode.
 - **Color.** An optional choice from a fixed **8-color palette**, stored as a key such as `green` or `amber`. Free hex isn't offered. The palette guarantees readable text in light and dark mode, and the value can be validated with a CHECK constraint.
 - **Accessibility label.** For example "Pain rond, 1.20 dirhams, 2 dans le panier".
 
 ### 2.3 Interactions
 
-| Gesture | Piece or pack | Weighed (kg) | Open price |
+| Gesture | Piece or pack | Weighed (kg) | Divers |
 |---|---|---|---|
-| **Tap** | add 1 (haptic and flash on the tile) | open the **weight pad** | open the **price pad** |
-| **Long-press** (400 ms) | open the **quantity pad** | weight pad | price pad |
+| **Tap** | add 1 (haptic and flash on the tile) | open the **weight pad** | open the **amount pad** |
+| **Long-press** (400 ms) | open the **quantity pad** | weight pad | amount pad |
 | **× key, then tap** | add N | — | add N at the entered price |
 
 - **Multiplier key "× Qté".** This is the visible, discoverable alternative to long-press, and a classic POS pattern: tap ×, type `6`, then tap a tile **or scan a barcode**, which adds 6. It also removes the 11-tap problem for scanned items.
 - **Pads are custom on-screen keypads, not the OS keyboard.** They avoid the C1 decimal bug entirely: the pad keeps the raw string and parses once on OK. They don't cover the screen and work the same on every platform.
 
 ```
- Weight pad (bottom sheet)              Quantity pad                  Price pad
+ Weight pad (bottom sheet)              Quantity pad                  Amount pad (Divers)
 ┌──────────────────────────────┐   ┌────────────────────────┐   ┌────────────────────────┐
-│ Tomates · 9.00 DH/kg         │   │ Coca-Cola 33cl         │   │ Recharge Inwi          │
+│ Tomates · 9.00 DH/kg         │   │ Coca-Cola 33cl         │   │ Divers                 │
 │        0.500 kg  = 4.50 DH   │   │          6             │   │      20.00 DH          │
 │ [0.25] [0.5] [1] [1.5] [2]   │   │ [2] [3] [6] [12] [24]  │   │ [10] [20] [50] [100]   │
 │  7  8  9                     │   │  7  8  9               │   │  7  8  9               │
@@ -144,7 +160,9 @@ Counted from an empty cart to a recorded sale. Phone is native with the camera. 
 ```
 
 - **Weight-pad presets add immediately.** Tapping `0.5` adds the line and closes the pad, so the common case takes 1 extra tap. Both `,` and `.` are accepted as the decimal separator. Weight is capped at 3 decimals and 99.999 kg. A live price preview appears under the weight.
-- **Price-pad presets** are owner-defined for each open-price product (for example 10/20/50/100 for top-ups).
+- **Weight or amount (decision 4).** The weight pad has a **Poids | Montant** switch. In Montant mode the cashier types DH (for example 10.00 for olives at 40.00 DH/kg) and the app shows and adds the computed weight, rounded to 3 decimals (0.250 kg). The line total is then recomputed from the rounded weight, so it can differ from the typed amount by a few centimes (10.00 DH at 30.00 DH/kg is 0.333 kg = 9.99 DH); the pad shows the actual total before adding. The same pure function converts in both directions and is tested.
+- **Divers amount pad.** Opens on tile tap. The cashier types an amount (up to the owner's maximum, default 200 DH, enforced on the pad and again by the server), optionally taps "Note" for a short text (up to 60 characters), and adds. Quantity is always 1. Divers has no presets.
+- **Physical keyboard on web.** All pads also accept the keyboard (digits, decimal point, Backspace, Enter), which a tablet with a keyboard dock or the web register can use.
 - The pad keys are 64 dp and laid out like a phone keypad, which RTL doesn't mirror.
 
 ### 2.4 Owner-only "Edit grid" mode
@@ -153,9 +171,11 @@ Entered with a "Modifier la grille" button that only owners see (the role comes 
 
 In edit mode:
 
-- **Tabs:** add a tab (pick a category, or "Favoris"), rename the display label, hide or show, drag to reorder, delete. For category tabs there's an "Afficher automatiquement tous les produits de la catégorie" toggle (see `auto_fill` below).
-- **Tiles:** "+ Ajouter" opens the existing product search picker (reusing `ProductSearchPicker`). Drag to reorder (with ↑/↓ buttons as an accessible fallback). Tap a tile to set its color or short label, or remove it.
-- **"Remplir avec les meilleures ventes"** seeds Favoris with the top 24 products by quantity over 30 days, using the existing `report_product_performance` RPC. It runs once, on demand, and never on its own.
+- **Tabs:** add a tab (pick a category, or "Favoris"), rename the display label, hide or show, drag to reorder, delete. A category tab **auto-fills** with all of that category's active products (decision 5), so a new product appears on its tab without any setup.
+- **Products on a category tab:** the owner can **hide** a product from the tab, **pin** it to the top, and **reorder** the products. Order on a tab is: pinned products (in the owner's order), then products the owner has placed (in the owner's order), then everything else alphabetically by name. The alphabetical tail is deterministic, so nothing shuffles under the cashier's thumb.
+- **Favoris** is the only fully hand-picked tab: only products the owner adds appear there, in the owner's order. "+ Ajouter" opens the existing product search picker (reusing `ProductSearchPicker`). Tapping a tile sets its color or short label, or removes it.
+- **"Suggérer les meilleures ventes"** (optional helper, decision 1) shows the top 24 products by quantity over 30 days, using the existing `report_product_performance` RPC, as a checklist. Nothing is added until the owner confirms, and it never runs on its own or reorders anything.
+- **Divers** is a built-in product the owner places like any other (default: on Favoris). It can't be deleted or deactivated. Its two settings live in Settings, owner only: the **maximum amount per line** (default 200.00 DH) and the **default margin %** used to estimate its cost (see 2.5).
 - **Saving needs a connection.** Edits are written straight to the server, with no offline edit queue. Offline, edit mode shows "Connexion requise pour modifier la grille." Every save refreshes the local cache.
 - Inactive products stay visible here, greyed out with an "Inactif" badge, so the owner can clean them up.
 
@@ -164,16 +184,64 @@ In edit mode:
 New **additive** migration, using whatever number is next free at merge time. There are three Codex branches in flight (`codex/t01…t03`) that may also add migrations, so the filename shouldn't be picked until rebase.
 
 ```sql
--- Products the cashier rings up at a price typed at sale time (top-ups, misc).
-alter table products add column open_price boolean not null default false;
+-- Decision 3: no open_price flag. One built-in "Divers" product instead.
+alter table products add column kind text not null default 'regular'
+  check (kind in ('regular', 'misc'));
+alter table products add column track_stock boolean not null default true;
+create unique index one_misc_product on products (kind) where kind = 'misc';
+insert into products (name, kind, track_stock, selling_price_cents, unit)
+  values ('Divers', 'misc', false, 0, 'piece');
+-- A trigger refuses to deactivate or delete the misc product.
+-- apply_sale_item_stock skips products with track_stock = false.
 
--- create or replace view can only APPEND columns: open_price goes last.
+-- create or replace view can only APPEND columns: kind, track_stock go last.
 create or replace view products_cashier_view as
 select id, name, barcode, category_id, unit,
        selling_price_cents, stock_quantity, low_stock_threshold, active,
        created_at, updated_at, is_low_stock,
-       open_price
+       kind, track_stock
 from products;
+
+-- Divers lines: optional note, and a flag for a cost that is an estimate.
+alter table sale_items add column note text check (char_length(note) <= 60);
+alter table sale_items add column cost_estimated boolean not null default false;
+-- trg_sale_items_before_insert (it already stamps unit_cost_cents server-side):
+-- for kind = 'misc' it stamps round(unit_price * (1 - divers_margin_percent/100))
+-- and cost_estimated = true. The client never sets either.
+
+-- The max amount is not secret (the pad needs it), so it goes in the existing
+-- singleton row, which every signed-in user can read.
+alter table store_settings
+  add column divers_max_cents bigint not null default 20000
+    check (divers_max_cents > 0);                       -- 200.00 DH
+-- The margin IS cost information, and store_settings is readable by cashiers,
+-- so it lives in its own owner-only singleton table.
+create table owner_settings (
+  singleton              boolean primary key default true check (singleton),
+  divers_margin_percent  numeric(5,2) not null default 20
+    check (divers_margin_percent between 0 and 95)      -- placeholder, owner sets it
+);
+insert into owner_settings (singleton) values (true);
+alter table owner_settings enable row level security;
+create policy "owner reads owner settings"   on owner_settings for select using (public.is_owner());
+create policy "owner updates owner settings" on owner_settings for update using (public.is_owner()) with check (public.is_owner());
+-- record_sale rejects a Divers line above divers_max_cents, or with quantity <> 1.
+-- The cost trigger reads owner_settings as security definer, so cashiers' sales still get a cost.
+
+-- Every Divers line is logged with the cashier. There is no activity log
+-- today, so this is a new, owner-readable, append-only table.
+create table activity_log (
+  id          uuid primary key default gen_random_uuid(),
+  occurred_at timestamptz not null default now(),
+  actor_id    uuid not null references profiles (id),
+  action      text not null,                 -- 'divers_sale'
+  entity_id   uuid,                          -- the sale_items row
+  details     jsonb not null default '{}'    -- {sale_id, amount_cents, note, cost_estimated}
+);
+alter table activity_log enable row level security;
+create policy "owner reads activity log" on activity_log for select using (public.is_owner());
+-- No insert/update/delete policy: rows are written only by an
+-- after-insert trigger on sale_items (security definer) for misc lines.
 
 create table sell_grid_tabs (
   id          uuid primary key default gen_random_uuid(),
@@ -182,7 +250,7 @@ create table sell_grid_tabs (
   label       text,                 -- null = category name, or translated "Favoris"
   position    integer not null,
   visible     boolean not null default true,
-  auto_fill   boolean not null default false,  -- category tabs: append the rest of the category
+  auto_fill   boolean not null default true,   -- category tabs auto-fill (decision 5)
   updated_at  timestamptz not null default now(),
   constraint tab_kind_matches_category
     check ((kind = 'category') = (category_id is not null)),
@@ -192,11 +260,15 @@ create table sell_grid_tabs (
 create unique index sell_grid_one_favorites on sell_grid_tabs (kind) where kind = 'favorites';
 create unique index sell_grid_one_tab_per_category on sell_grid_tabs (category_id) where category_id is not null;
 
+-- On Favoris a row means "this product is on the tab". On an auto-filled
+-- category tab a row is an OVERRIDE of the automatic list (hide, pin, order).
 create table sell_grid_tiles (
   id          uuid primary key default gen_random_uuid(),
   tab_id      uuid not null references sell_grid_tabs (id) on delete cascade,
   product_id  uuid not null references products (id) on delete cascade,
   position    integer not null,
+  hidden      boolean not null default false,   -- category tabs only: suppress this product
+  pinned      boolean not null default false,   -- category tabs only: sort to the top
   color       text check (color in ('green','teal','blue','indigo','purple','red','amber','grey')),
   short_label text check (char_length(short_label) <= 24),
   unique (tab_id, product_id)
@@ -210,10 +282,14 @@ create policy "owner writes grid tabs"         on sell_grid_tabs  for all    usi
 create policy "authenticated reads grid tiles" on sell_grid_tiles for select using (auth.role() = 'authenticated');
 create policy "owner writes grid tiles"        on sell_grid_tiles for all    using (public.is_owner()) with check (public.is_owner());
 
--- Atomic "replace this tab's tiles in this order" so a reorder never leaves
--- half-written positions. security invoker: RLS above still applies.
+-- Atomic "replace this tab's overrides in this order" so a reorder never
+-- leaves half-written positions. security invoker: RLS above still applies.
 create function public.set_sell_grid_tiles(p_tab_id uuid, p_tiles jsonb) returns void ...
 ```
+
+**Reports for Divers.** `sale_line_economics` gets two trailing columns (`is_misc`, `cost_estimated`; append only). `report_product_performance` excludes Divers, so it never appears in the per-product margin rankings (top by profit, lowest margin). A new `report_divers(p_from, p_to)` returns count, revenue, estimated cost and estimated profit for the period, shown on the Reports screen as its own line labelled "estimé". The headline revenue, cost and profit in `report_summary` still include Divers (it is real money), with the Divers share and an "estimated" marker shown beneath so the owner knows part of the cost is not a purchase cost.
+
+**Cost is never visible to cashiers.** The margin lives in `owner_settings` (owner-only RLS) and the estimated cost in `sale_items`, which cashiers can't read. A cashier can read only `store_settings.divers_max_cents`, which the pad needs and which isn't cost information. (Putting the margin in `store_settings` would have leaked it: that table is readable by every signed-in user.)
 
 **Per store, not per device.** The layout lives in the database and every device in the shop reads the same grid. Reasons:
 
@@ -228,13 +304,14 @@ Display preferences that really are per device stay local in AsyncStorage: tile 
 
 ```ts
 type ProductCache = {
-  products: CachedProduct[];           // + category_id, stock_quantity, open_price (still NO cost)
+  products: CachedProduct[];           // + category_id, stock_quantity, kind, track_stock (still NO cost)
   grid: { tabs: GridTab[]; tiles: GridTile[] };
+  diversMaxCents: number;              // the pad's limit; the server re-checks
   refreshedAt: string;
 };
 ```
 
-It's refreshed by the same "came online" trigger as today and after every owner save. A pure function `resolveGrid(tabs, tiles, products)` turns the snapshot into what's on screen. That one function owns every edge case in 2.6, which makes it straightforward to test.
+It's refreshed by the same "came online" trigger as today and after every owner save. A pure function `resolveGrid(tabs, tiles, products)` turns the snapshot into what's on screen. That one function owns every edge case in 2.6 and the tab ordering rule in 2.4, which makes it straightforward to test.
 
 ### 2.6 Edge cases
 
@@ -243,14 +320,19 @@ It's refreshed by the same "came online" trigger as today and after every owner 
 | **Product deactivated** | The tile is **hidden**, because the cache only holds active products and you can't sell an inactive one. | A greyed tile with an "Inactif" badge and a remove button. | The tile row is **kept**, so reactivating restores it in the same place. |
 | **Product deleted** | Gone. | Gone. | `on delete cascade` removes its tiles. (Sold products can't be hard-deleted anyway, because `sale_items` references them.) |
 | **Category deleted** | Its tab disappears. | Same. | The tab and its tiles cascade. Favoris tiles for those products remain. |
-| **Product moved to another category** | A curated tile **stays where the owner put it**. The `auto_fill` section of each tab updates. | Same. | No change. |
-| **No stock** (≤ 0) | The tile is **still tappable**, with a "0" badge. Scanning allows overselling today and the app already reports negative stock, so the grid doesn't make it stricter. See open question 3. | Same, plus the low-stock color. | Stock comes from the cache and can be stale offline, just like prices today. |
+| **Product moved to another category** | It leaves the old category tab and appears on the new one automatically. Its hide/pin/position overrides belong to the old tab and no longer apply; on Favoris it stays where the owner put it. | Same. | No change. |
+| **No stock** (≤ 0) | The tile is **still tappable** (decision 2), with a red stock badge showing 0 or the negative number. Scanning allows overselling today and the app already reports negative stock, so the grid doesn't make it stricter. It's never blocked and never asks for confirmation. | Same, plus the low-stock color. | Stock comes from the cache and can be stale offline, just like prices today. |
 | **Price changed** | The tile shows the new price after the next cache refresh. | Same. | Same staleness rules as scanning today. |
 | **Product created after the last refresh, while offline** | The tile is hidden until the next refresh. | The edit button is disabled while offline. | No change. |
-| **Open-price product without a price entered** | The price pad blocks "Ajouter" until the amount is above 0. | — | The server already accepts the client's `unit_price_cents`. |
+| **Divers amount is 0, empty, or above the maximum** | The amount pad blocks "Ajouter" and shows the limit (default 200.00 DH). | — | The server enforces the same limit in `record_sale`. If the owner lowers the limit while a device is offline with the old value, the sale is rejected on sync and lands in the stuck-sales list like any other rejected sale. |
+| **Divers line sold** | Appears in the cart as "Divers" with its note. No stock, no barcode. | The sale shows in the activity log with the cashier, amount and note, and in the Reports "Divers" line (cost marked estimated). | One `activity_log` row per Divers line. Voiding the sale doesn't delete the log row (see open point 5 for whether the void is logged too). |
+| **Owner tries to deactivate or delete Divers** | — | Refused with an explanation. | A trigger on `products` enforces it. |
+| **Weighed "by amount" gives a weight that rounds to 0.000** | The pad blocks Add (a 0.01 DH amount on an expensive item). | Same. | Weight must be at least 0.001 kg. |
 | **Empty tab, or no grid configured yet** | The tab is hidden. With no tabs at all, Sell looks like today plus a hint that the owner can set up the grid. | An "Ajouter des produits" call to action. | — |
 
 ### 2.7 Screen layouts
+
+The **Android tablet is the primary device** (decision 8) and the **phone is secondary**. Tablet layout is therefore the reference design; the phone layout below is the compact variant.
 
 **Phone, portrait (360 × 800 dp, native)**: the grid takes most of the screen and the cart collapses to a bar.
 
@@ -302,6 +384,18 @@ On web, the existing 220 px sidebar sits to the left of this. Below 900 dp the p
 
 **RTL.** The whole layout mirrors with `appDirection()`: tabs read right to left, the cart sits on the left in landscape, the grid fills from the right, and × Qté and Charge swap sides. Prices, quantities and the keypads stay LTR. Product and category names go through `isolateBidi()`.
 
+#### 2.7.1 Camera scanner requirements (decision 8)
+
+There is no USB or Bluetooth scanner, so the camera is the only scanner and has to be fast. Against today's `ContinuousScanner`:
+
+| Requirement | Today | Change |
+|---|---|---|
+| Stays open between scans | Yes (it's a modal that only closes on Done) | Keep. On tablet, show it as a camera panel next to the cart instead of a full-screen modal, so the cashier sees the cart grow while scanning. |
+| Rear camera | `CameraView` has no `facing`, and the default is the **back** camera on most devices, but this isn't guaranteed on tablets | Set `facing="back"` explicitly. |
+| Beep and vibrate on each accepted scan | None | Play a short sound (`expo-av` or `expo-audio` with a bundled asset) and vibrate (`Vibration.vibrate(40)`). A different, longer pattern for "unknown barcode". Both are skipped for a scan that was ignored as a duplicate. |
+| Ignore the same code twice within 1 second | 1.5 seconds (`RESCAN_DELAY_MS = 1500`) | Set to 1000 ms. A pure `shouldAcceptScan(last, code, now)` function holds the rule so it's unit-tested. The same code after 1 second counts as a second item, which is how a cashier scans two identical items. |
+| Product with a weight (kg) scanned | Not handled by the camera modal | The weight pad opens over the camera panel (today it closes the camera to avoid stacking modals; the panel layout on tablet removes that problem). |
+
 **Compact cart lines.** Each line becomes a single 56 dp row (name, quantity control, total). Discount and remove move behind a tap on the line. This alone roughly doubles how many lines fit on a phone.
 
 ### 2.8 Tap counts: today vs. with the grid
@@ -311,17 +405,19 @@ Same rules as 1.2. "+1" is a tab switch when the item isn't on the open tab. The
 | Scenario | Today | With grid | Change |
 |---|---|---|---|
 | 1. Scanned item (phone camera) | 4 | 4 (scan is unchanged), or **3** if it's a tile | −1 for tiled items |
-| 1b. Scanned item (web, USB) | 2 | 2 | unchanged, as required |
+| 1b. Scanned item (web, keyboard-wedge) | 2 | 2 | unchanged. Not a target device (decision 8), kept as is. |
 | 2. Item with no barcode | 5 + typing + network wait | **3** (+1) | −2 taps, **no typing**, instant offline |
 | 3. Three of the same | 6 (barcoded) / 7 + typing | **5** (+1): tile ×3, Charge, Complete | −1 / −2; for 12 units: 15 today vs **6** with × Qté |
 | 4. Weighed 0.5 kg | 6 + typing, **and can't be entered correctly (C1)** | **4** (+1): tile, preset 0.5, Charge, Complete | −2, no keyboard, correct amount |
-| 5. Credit sale, no-barcode item | 7 + typing | **5** (+1): tile, Charge, Pay later, customer, Complete | −2, no typing |
+| 4b. 10 DH of olives (by amount) | not possible | **5** (+1): tile, Montant, type `1` `0` (2 key taps), Add, then Charge, Complete = 7 | new capability; no scale arithmetic by the cashier |
+| 5. Credit sale, no-barcode item | 7 + typing | **5** (+1): tile, Charge, Pay later, customer, Complete (search optional) | −2, no typing |
+| 6. Divers: 12 DH, no note | no way to ring it up except an existing product at the wrong price | **7** (+1): Divers tile, `1` `2`, Add, Charge, Complete (4 + 2 key taps) | new; adds a note with 1 more tap and short typing |
 
-The payment part of scenario 5 doesn't change with the grid. With more than about 20 regulars, add a search field to the credit customer list (open question 11).
+The payment part of scenario 5 doesn't change with the grid, except that the customer picker gets a search field (decision 7, step 0e), so with many regulars it stays a type-and-tap, not a scroll.
 
 ### 2.9 Build plan
 
-Each step is one PR off `main` that's independently shippable and keeps `npm run check` green. Steps 0a–0d come first because they fix real money bugs regardless of the grid.
+Each step is one PR off `main` that's independently shippable and keeps `npm run check` green. Steps 0a–0e come first because they fix real money bugs or are independent of the grid, and step S (the scanner) is independent too.
 
 | Step | PR | Tests |
 |---|---|---|
@@ -329,29 +425,24 @@ Each step is one PR off `main` that's independently shippable and keeps `npm run
 | **0b** | Reset `PaymentSheet` to cash, no customer and empty tendered every time it opens (C2). | Component test: credit sale, then reopen → method is cash and customerId is null. |
 | **0c** | Exact barcode lookup online (C3): use `findByBarcode` semantics with the full row, falling back to "not found". | Unit test: code `1234` doesn't match `12345678` or a product named "Pack 1234". |
 | **0d** | Translate `PaymentSheet`, `ContinuousScanner`, Stack titles and the `CartLineRow` unit label. Add `isolateBidi` on every product and customer name in the Sell flow. Make header links and "Retirer" 48 dp. | Extend `tests/i18n` with a check that the Sell-flow components have no raw English literals (a lint-style grep test). |
-| **1** | Migration: `open_price`, the view append, `sell_grid_tabs`, `sell_grid_tiles`, RLS, `set_sell_grid_tiles`. | `supabase db reset` from scratch. New `tests/security/sellGridRls.live.test.ts`: cashier reads OK, cashier insert/update/delete refused, owner writes OK, no cost columns returned. Extend `cashierIsolation` with the new view column. |
-| **2** | Data layer: `src/lib/sellGrid/queries.ts`, pure `src/lib/sellGrid/layout.ts` (`resolveGrid`), and cache v2 with the grid snapshot and extra product fields. | `tests/sellGrid/layout.test.ts` covers every row of the 2.6 table (inactive hidden, cascade, auto_fill order, empty tab hidden, stale product). Cache test: the serialized cache contains **no key matching `/cost/`**. v1 to v2 migration test. |
-| **3** | Read-only grid on Sell: tabs, tiles, tap = add 1, ×N badge, phone and tablet layouts, compact cart lines, collapsible phone cart, swipe between tabs. FR/EN/AR keys. | Pure `addToCart(lines, product, qty, priceOverride?)` in `src/lib/sales/cart.ts` (money rule: tested) that merges lines, keeps `unit_cost_cents: null` from tiles, and passes an open price through. Pure `sellLayoutFor(width)` breakpoint test. |
-| **4** | Pads: quantity, weight (with presets) and price pads, plus the × Qté multiplier, which also applies to the next scan. | Pure `keypadReducer` tests: decimal with `,` and `.`, max 3 decimals for kg, max digits, 0 blocked for price. Test that the multiplier applies once and then resets. |
+| **0e** | Customer search in the payment sheet's credit picker (decision 7): a search field filtering the chips by name, accent- and case-insensitive. | Pure `filterCustomers(list, query)` tests (accents, Arabic, empty query returns all). Sheet test: typing narrows the chips. |
+| **S** | Camera scanner upgrades (2.7.1): `facing="back"`, beep and vibrate on accepted scans, 1000 ms duplicate window. Independent of the grid, so it can ship first. | Pure `shouldAcceptScan` tests (same code at 999 ms ignored, at 1000 ms accepted, different code accepted immediately). Component test with mocked sound/vibration: one beep and one vibration per accepted scan, none for a duplicate. Device check on the tablet and phone. |
+| **1** | Migration: `kind`/`track_stock` on products (and the Divers row), the view append, `sale_items.note`/`cost_estimated`, the stock and cost triggers for Divers, `store_settings.divers_max_cents`, the owner-only `owner_settings` (margin), `activity_log` with its trigger, `sell_grid_tabs`, `sell_grid_tiles`, RLS, `set_sell_grid_tiles`. No `open_price`. | `supabase db reset` from scratch. New live tests: grid RLS (cashier reads, writes refused, owner writes; no cost columns); a Divers sale does not change stock, stamps an estimated cost from the margin, is refused above the max or with quantity 2, and writes one activity-log row with the cashier; cashier can't read `activity_log` or `owner_settings`; the Divers product can't be deactivated or deleted. Extend `cashierIsolation` with the new view columns. |
+| **2** | Data layer: `src/lib/sellGrid/queries.ts`, pure `src/lib/sellGrid/layout.ts` (`resolveGrid`, including the pinned / placed / alphabetical order and hidden products), and cache v2 with the grid snapshot, Divers limit and extra product fields. | `tests/sellGrid/layout.test.ts` covers every row of the 2.6 table (inactive hidden, cascade, auto_fill order, hidden and pinned overrides, Favoris is curated only, empty tab hidden, stale product). Cache test: the serialized cache contains **no key matching `/cost/`**. v1 to v2 migration test. |
+| **3** | Read-only grid on Sell: tabs, tiles, tap = add 1, ×N badge, phone and tablet layouts, compact cart lines, collapsible phone cart, swipe between tabs. FR/EN/AR keys. | Pure `addToCart(lines, product, qty)` in `src/lib/sales/cart.ts` (money rule: tested) that merges lines, keeps `unit_cost_cents: null` from tiles, and never merges Divers lines (each is its own line with its own note). Stock badge thresholds as a pure function. Pure `sellLayoutFor(width)` breakpoint test. |
+| **4** | Pads: quantity pad, weight pad with the Poids / Montant switch and presets, and the Divers amount pad (max amount, optional note), plus the × Qté multiplier, which also applies to the next scan. | Pure `weightFromAmount` / `amountFromWeight` tests (rounding to 3 decimals, 0.001 kg minimum, the 10 DH at 30 DH/kg = 0.333 kg = 9.99 DH case). Keypad reducer tests (decimal with `,` and `.`, max digits, 0 blocked, Divers max). Divers line: quantity 1, note 60 characters. Test that the multiplier applies once and then resets. |
 | **5** | Owner edit mode: tabs CRUD and order, tile add/remove/reorder/color/short label, auto_fill toggle, "Remplir avec les meilleures ventes", offline lock. | Pure reorder helper tests. Live test: owner `set_sell_grid_tiles` is atomic (a bad payload leaves the old order intact). Hidden-for-cashier test via `useAuth` mock. |
-| **6** | Product form: "Prix libre" checkbox and price-pad presets (owner only). | Form validation tests in the existing products tests. |
-| **7** | Polish: haptics, empty states, a11y labels, RTL pass on device, a collapsible web sidebar below 900 dp, and a native HID scanner path (handle `onSubmitEditing` and keep a focused hidden input) if open question 12 is yes. | Manual RTL and device checklist, attached to the PR. |
+| **6** | Divers in Settings and Reports (owner only): maximum amount and default margin settings, the Reports "Divers" line marked estimated, Divers excluded from the per-product rankings, and an activity-log screen (or a filtered view) showing Divers lines with the cashier. | Reports math tests (Divers excluded from rankings and shown separately, cost marked estimated). Settings validation tests (max above 0, margin 0-95). Live test: `report_product_performance` never returns the Divers product. |
+| **7** | Polish: haptics, empty states, a11y labels, RTL pass on the tablet and phone, the tablet camera panel, and a collapsible web sidebar below 900 dp. (The native HID scanner path is dropped: decision 8.) | Manual RTL and device checklist, attached to the PR. |
 
 Each PR is reviewed and merged before the next one starts, so `main` never holds half a grid. Steps 3–5 can sit behind a simple "grid configured?" check: with no tabs in the database, Sell renders exactly as today.
 
-### 2.10 Open questions for you
+### 2.10 Decisions recorded, and what is still open
 
-These are business decisions. I've noted my recommendation where I have one.
+The 12 original questions are answered in section 2.0. These smaller points came out of the decisions and still need an answer; each has a default I'll use if you don't say otherwise.
 
-1. **Favoris: picked by you, or automatic best sellers?** I recommend hand-picked, with the one-off "fill from best sellers" button. Automatic re-ranking moves tiles under the cashier's fingers.
-2. **One grid for the whole shop?** I designed for one shared grid on every device. Does any device (for example a second counter) need a different set of tiles?
-3. **Out-of-stock tiles:** sell normally with a "0" badge (as scanning does today), ask for confirmation, or block the sale?
-4. **Open-price items:** which products (phone top-ups, loose bread, a generic "Divers" item)? Can a cashier type any price, or should you set a minimum and maximum per product?
-5. **Weighed items:** weight only, or also "by amount" ("10 DH of olives" → the app computes the weight)?
-6. **Category tabs:** show every active product in the category automatically, or only the ones you pick? (Both are designed via `auto_fill`; which should be the default?)
-7. **Tile colors:** chosen per tile, or automatically by category?
-8. **Size:** roughly how many tabs and tiles per tab do you expect? (This affects tile size and whether tabs need to scroll.)
-9. **Product photos on tiles:** wanted later? (This needs image storage. It's not in this design.)
-10. **Who can edit the grid:** owner only (as specified), or should a trusted cashier get a "manager" permission later?
-11. **Credit customers:** how many regulars buy on credit? Past about 20, the payment sheet needs a customer search.
-12. **Hardware:** will the counter use an Android tablet with a USB or Bluetooth scanner? If yes, the native scanner path (step 7) should move up, because today it needs a tap per scan on native.
+1. **Divers default margin.** You asked for an owner-set margin. What should it start at? Default: 20% (a placeholder, editable in Settings; reports label the cost "estimated" either way).
+2. **Divers note.** Free text up to 60 characters, or a short list of choices (for example "Recharge", "Pain", "Autre") plus free text? Default: free text only.
+3. **Where Divers lives.** On Favoris by default, or on every tab? Default: Favoris only; you can add it to other tabs in edit mode.
+4. **Tablet camera.** The design shows the camera as a panel beside the cart on the tablet instead of a full-screen window. Is that acceptable, or do you prefer the full-screen camera? Default: panel.
+5. **Divers and voids.** Voiding a sale that contains a Divers line restores no stock (there is none) and keeps the activity-log row. Is that right, or should the void also be logged as its own entry? Default: the void is recorded on the sale, as today, plus a second `divers_void` log row.
