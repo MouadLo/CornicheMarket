@@ -35,3 +35,27 @@ export function entryToQuantity(entry: string): number | null {
   const quantity = parseQuantity(entry);
   return quantity !== null && quantity > 0 ? quantity : null;
 }
+
+// Physical keyboard on web. Digits, "." or "," for the decimal point,
+// Backspace, Enter (add) and Escape (cancel). Anything else is left alone.
+export type PadKeyboardKey = WeightKey | "enter" | "escape";
+
+export function keyFromKeyboardEvent(key: string): PadKeyboardKey | null {
+  if (key.length === 1 && key >= "0" && key <= "9") return key as WeightKey;
+  if (key === "." || key === ",") return ".";
+  if (key === "Backspace") return "back";
+  if (key === "Enter") return "enter";
+  if (key === "Escape") return "escape";
+  return null;
+}
+
+// A USB/Bluetooth scanner "types" its barcode a few milliseconds per key and
+// ends with Enter. No person types two keys that close together, so keys that
+// arrive faster than this are a scanner, not the cashier. Without this, a
+// barcode scanned while the pad is open would fill the pad and its Enter
+// would add a garbage weight.
+const SCANNER_GAP_MS = 35;
+
+export function isScannerBurst(previousAt: number | null, now: number): boolean {
+  return previousAt !== null && now - previousAt < SCANNER_GAP_MS;
+}

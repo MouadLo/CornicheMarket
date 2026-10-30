@@ -1,4 +1,10 @@
-import { entryToQuantity, pressKey, type WeightKey } from "../../src/lib/sales/weightEntry";
+import {
+  entryToQuantity,
+  isScannerBurst,
+  keyFromKeyboardEvent,
+  pressKey,
+  type WeightKey,
+} from "../../src/lib/sales/weightEntry";
 
 function type(keys: WeightKey[], start = ""): string {
   return keys.reduce((entry, key) => pressKey(entry, key), start);
@@ -48,5 +54,35 @@ describe("entryToQuantity", () => {
     expect(entryToQuantity("0")).toBeNull();
     expect(entryToQuantity("0.")).toBeNull();
     expect(entryToQuantity("0.000")).toBeNull();
+  });
+});
+
+describe("keyFromKeyboardEvent: physical keyboard on web", () => {
+  it("maps digits, both decimal separators, Backspace, Enter and Escape", () => {
+    expect(keyFromKeyboardEvent("7")).toBe("7");
+    expect(keyFromKeyboardEvent(".")).toBe(".");
+    expect(keyFromKeyboardEvent(",")).toBe(".");
+    expect(keyFromKeyboardEvent("Backspace")).toBe("back");
+    expect(keyFromKeyboardEvent("Enter")).toBe("enter");
+    expect(keyFromKeyboardEvent("Escape")).toBe("escape");
+  });
+
+  it("ignores everything else", () => {
+    for (const key of ["a", "-", " ", "Tab", "ArrowLeft", "Shift", "10"]) {
+      expect(keyFromKeyboardEvent(key)).toBeNull();
+    }
+  });
+});
+
+describe("isScannerBurst: a scanner types far faster than a person", () => {
+  it("is false for the first key and for human typing speed", () => {
+    expect(isScannerBurst(null, 1000)).toBe(false);
+    expect(isScannerBurst(1000, 1090)).toBe(false);
+  });
+
+  it("is true for keys arriving a few milliseconds apart", () => {
+    expect(isScannerBurst(1000, 1005)).toBe(true);
+    expect(isScannerBurst(1000, 1034)).toBe(true);
+    expect(isScannerBurst(1000, 1035)).toBe(false);
   });
 });
