@@ -52,6 +52,13 @@ export function saleProfit(lines: CartLine[], saleDiscountCents: number): number
   return saleTotal(lines, saleDiscountCents) - cogs;
 }
 
+// record_sale rejects any line with quantity <= 0 (sale_items CHECK), and a
+// sale rejected there lands in the offline queue's quarantine. An emptied or
+// zero kg field must therefore stop the sale at the counter, not later.
+export function hasInvalidQuantity(lines: CartLine[]): boolean {
+  return lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0);
+}
+
 export function totalItemCount(lines: CartLine[]): number {
   return lines.reduce((sum, line) => sum + line.quantity, 0);
 }

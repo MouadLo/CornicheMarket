@@ -120,4 +120,34 @@ describe("parseQuantity", () => {
   it("rejects junk", () => {
     expect(parseQuantity("x")).toBeNull();
   });
+
+  // stock_quantity and sale_items.quantity are numeric(12,3): grams.
+  // Parsing through cents rounded these to 2 decimals (0.125 -> 0.13).
+  it("keeps three decimals: 0.125 kg stays 0.125", () => {
+    expect(parseQuantity("0.125")).toBe(0.125);
+    expect(parseQuantity("0,125")).toBe(0.125);
+    expect(parseQuantity("2.375")).toBe(2.375);
+    expect(parseQuantity(".5")).toBe(0.5);
+  });
+
+  it("rounds to the column's scale (3 decimals), not to cents", () => {
+    expect(parseQuantity("12.3456")).toBe(12.346);
+    expect(parseQuantity("0.0004")).toBe(0);
+  });
+
+  it("rejects negative quantities and empty input", () => {
+    expect(parseQuantity("-1")).toBeNull();
+    expect(parseQuantity("")).toBeNull();
+  });
+
+  it("ignores spaces and non-breaking spaces used as thousands separators", () => {
+    expect(parseQuantity("1\u00a0234,5")).toBe(1234.5);
+    expect(parseQuantity("1 234,5")).toBe(1234.5);
+    expect(parseMoneyToCents("1\u00a0234,56")).toBe(123456);
+  });
+
+  it("does not change money parsing: 0.125 DH is still rounded to centimes", () => {
+    expect(parseMoneyToCents("0.125")).toBe(13);
+    expect(parseMoneyToCents("12,50")).toBe(1250);
+  });
 });

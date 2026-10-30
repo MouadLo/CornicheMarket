@@ -1,7 +1,9 @@
+import { parseQuantity } from "../../src/lib/money";
 import {
   cartSubtotal,
   changeDue,
   costOfGoods,
+  hasInvalidQuantity,
   isLineDiscountValid,
   isSaleDiscountValid,
   isShortPayment,
@@ -237,5 +239,48 @@ describe("validateSaleDiscounts: the gate before enqueueSale", () => {
   it("passes a sale whose line and basket discounts are both within bounds", () => {
     const lines = [line({ quantity: 2, unit_price_cents: 700, discount_cents: 100 })]; // 14.00 - 1.00 = 13.00
     expect(validateSaleDiscounts(lines, 500)).toBeNull();
+  });
+});
+
+describe("weighed lines: what the customer is charged", () => {
+  it("0.5 kg charges exactly half the per-kg price", () => {
+    const weighed = line({
+      unit: "kg",
+      quantity: parseQuantity("0.5") as number,
+      unit_price_cents: 900,
+    });
+    expect(lineTotal(weighed)).toBe(450);
+  });
+
+  it("0.125 kg at 20.00 DH/kg is 2.50 DH (was 2.60 when parsed to 0.13)", () => {
+    const weighed = line({
+      unit: "kg",
+      quantity: parseQuantity("0.125") as number,
+      unit_price_cents: 2000,
+    });
+    expect(lineTotal(weighed)).toBe(250);
+  });
+
+  it("1.250 kg at 18.00 DH/kg is 22.50 DH", () => {
+    const weighed = line({
+      unit: "kg",
+      quantity: parseQuantity("1,25") as number,
+      unit_price_cents: 1800,
+    });
+    expect(lineTotal(weighed)).toBe(2250);
+  });
+});
+
+describe("hasInvalidQuantity: record_sale rejects quantity <= 0", () => {
+  it("is false for ordinary and fractional quantities", () => {
+    expect(hasInvalidQuantity([line({ quantity: 1 }), line({ quantity: 0.125 })])).toBe(false);
+  });
+
+  it("is true for a zero line (an emptied kg field)", () => {
+    expect(hasInvalidQuantity([line({ quantity: 1 }), line({ quantity: 0 })])).toBe(true);
+  });
+
+  it("is true for a non-finite quantity", () => {
+    expect(hasInvalidQuantity([line({ quantity: Number.NaN })])).toBe(true);
   });
 });

@@ -99,6 +99,7 @@ const fr = {
     lineDiscountTooHigh: "La remise dépasse le prix de cet article.",
     saleDiscountTooHigh: "La remise dépasse le total du panier.",
     remove: "Retirer",
+    weightRequired: "Indiquez le poids.",
     stuck: {
       title: "Ventes bloquées",
       empty: "Aucune vente bloquée.",
