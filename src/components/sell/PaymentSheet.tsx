@@ -36,6 +36,23 @@ export function PaymentSheet({
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [newCustomer, setNewCustomer] = useState("");
 
+  // The sheet stays mounted between sales, so its state would otherwise carry
+  // over: after a credit sale the next customer's sheet opened on "Pay later"
+  // with the previous customer selected, one tap from putting a stranger's
+  // basket on their credit. Every opening starts from cash, no customer, no
+  // amount. Done while rendering (not in an effect) so a stale choice is never
+  // painted, even for one frame.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setMethod("cash");
+      setTendered("");
+      setCustomerId(null);
+      setNewCustomer("");
+    }
+  }
+
   const tenderedCents = parseMoneyToCents(tendered) ?? 0;
   const short = method === "cash" && tendered !== "" && isShortPayment(tenderedCents, totalCents);
   const change = changeDue(tenderedCents, totalCents);
@@ -64,7 +81,7 @@ export function PaymentSheet({
                 onPress={() => setMethod(value)}
               >
                 <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
-                  {value === "credit" ? t('sell.payLater') : value}
+                  {value === "credit" ? t("sell.payLater") : value}
                 </Text>
               </Pressable>
             ))}
@@ -93,9 +110,7 @@ export function PaymentSheet({
               </View>
 
               {short ? (
-                <Text style={styles.short}>
-                  Short by {formatMAD(totalCents - tenderedCents)}
-                </Text>
+                <Text style={styles.short}>Short by {formatMAD(totalCents - tenderedCents)}</Text>
               ) : (
                 <View style={styles.changeBox}>
                   <Text style={styles.changeLabel}>Change</Text>
@@ -116,10 +131,7 @@ export function PaymentSheet({
                     onPress={() => setCustomerId(customer.id)}
                   >
                     <Text
-                      style={[
-                        styles.chipText,
-                        customerId === customer.id && styles.chipTextActive,
-                      ]}
+                      style={[styles.chipText, customerId === customer.id && styles.chipTextActive]}
                     >
                       {customer.name}
                     </Text>
@@ -144,11 +156,11 @@ export function PaymentSheet({
           {error && <Text style={styles.error}>{error}</Text>}
 
           <BigButton
-            label={saving ? t('common.saving') : t('sell.completeSale')}
+            label={saving ? t("common.saving") : t("sell.completeSale")}
             onPress={() => onConfirm(method, customerId)}
             disabled={saving || needsCustomer || short}
           />
-          <BigButton label={t('common.back')} variant="secondary" onPress={onClose} />
+          <BigButton label={t("common.back")} variant="secondary" onPress={onClose} />
         </ScrollView>
       </View>
     </Modal>
@@ -164,7 +176,12 @@ function quickAmounts(totalCents: number): number[] {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "92%" },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "92%",
+  },
   sheetContent: { padding: 20, gap: 14 },
   total: { fontSize: 34, fontWeight: "800", textAlign: "center" },
   methods: { flexDirection: "row", gap: 8 },
@@ -190,7 +207,12 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
   quickRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  quick: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, backgroundColor: "#eef3ef" },
+  quick: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#eef3ef",
+  },
   quickText: { fontSize: 15, fontWeight: "600", color: "#1d7a46" },
   changeBox: {
     flexDirection: "row",
