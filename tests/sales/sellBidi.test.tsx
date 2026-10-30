@@ -105,7 +105,8 @@ describe("product names are bidi-isolated in the Sell flow", () => {
     });
     let feed: string | null = null;
     await act(async () => {
-      feed = await tree.root.findByType(ContinuousScanner).props.onScanned("6111234567890");
+      feed = (await tree.root.findByType(ContinuousScanner).props.onScanned("6111234567890"))
+        .message;
     });
 
     expect(feed).toContain(isolateBidi(NAME));

@@ -8,6 +8,7 @@ import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker"
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { applyStockCount } from "@/src/lib/inventory/queries";
 import { parseQuantity } from "@/src/lib/money";
+import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import { fetchProductByBarcode, type Product } from "@/src/lib/products/queries";
 
 type CountLine = {
@@ -32,13 +33,13 @@ export default function StockCountScreen() {
     );
   };
 
-  const handleScanned = async (barcode: string): Promise<string | null> => {
+  const handleScanned = async (barcode: string): Promise<ScanOutcome> => {
     // Exact barcode only: a partial code must never pick a product to count.
     const match = await fetchProductByBarcode(barcode, true).catch(() => null);
 
-    if (!match) return t("stockIn.countUnknown", { barcode });
+    if (!match) return { status: "unknown", message: t("stockIn.countUnknown", { barcode }) };
     addProduct(match);
-    return t("stockIn.countAdded", { name: match.name });
+    return { status: "added", message: t("stockIn.countAdded", { name: match.name }) };
   };
 
   const apply = async () => {

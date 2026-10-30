@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/products/offlineCache";
 import { fetchProductByBarcode, fetchProducts, type Product } from "@/src/lib/products/queries";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
+import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
   createCustomer,
   fetchCustomers,
@@ -157,7 +158,7 @@ export default function SellScreen() {
   );
 
   const addByBarcode = useCallback(
-    async (barcode: string): Promise<string | null> => {
+    async (barcode: string): Promise<ScanOutcome> => {
       try {
         let match: Product | CachedProduct | undefined;
 
@@ -169,7 +170,7 @@ export default function SellScreen() {
 
         if (!match) {
           setFlash(t("sell.notFound", { barcode }));
-          return t("sell.notFound", { barcode });
+          return { status: "unknown", message: t("sell.notFound", { barcode }) };
         }
         if (addProduct(match as Product)) {
           setFlash(t("sell.added", { name: isolateBidi(match.name) }));
@@ -178,10 +179,13 @@ export default function SellScreen() {
           // rather than stack two modals.
           setScannerOpen(false);
         }
-        return `${isolateBidi(match.name)} · ${centsToDisplay(match.selling_price_cents)} DH`;
+        return {
+          status: "added",
+          message: `${isolateBidi(match.name)} · ${centsToDisplay(match.selling_price_cents)} DH`,
+        };
       } catch {
         setFlash(t("sell.lookupFailed"));
-        return null;
+        return { status: "error", message: null };
       }
     },
     [addProduct, isOwner, sync.online, t]
