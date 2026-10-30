@@ -107,12 +107,13 @@ These replace the open questions in the first version of this doc. Where a decis
 | 5 | **Category tabs auto-fill** with the category's active products. The owner can hide, pin to the top and reorder products per tab. **Favoris is the only fully hand-picked tab.** | 2.4 and 2.5: `auto_fill` is the default for category tabs; tile rows are overrides (`hidden`, `pinned`, `position`). |
 | 6 | **One grid per store**, the same on every device. Tile size and last open tab stay per device. | As already designed (2.5). |
 | 7 | **The credit customer picker gets a search field**, regardless of how many customers there are. | New build step 0e. |
-| 8 | **Hardware: an Android tablet (primary: grid and cart side by side) and a phone (secondary: grid dominant, collapsible cart). Camera scanning only, no USB or Bluetooth scanner.** The camera must stay open between scans, use the rear camera, beep and vibrate on each scan, and ignore the same code twice within 1 second. | 2.7 (tablet is the primary layout), new 2.7.1 scanner requirements, new build step S. The native HID scanner path is dropped from the plan. |
+| 8 | **Hardware: an Android tablet (primary: grid and cart side by side) and a phone (secondary: grid dominant, collapsible cart). Camera scanning only on these two devices, no USB or Bluetooth scanner on them.** (The touch-only web laptop in decision 18 is a separate device and keeps its USB keyboard-wedge scanner.) The camera must stay open between scans, use the rear camera, beep and vibrate on each scan, and ignore the same code twice within 1 second. | 2.7 (tablet is the primary layout), new 2.7.1 scanner requirements, new build step S. The native HID scanner path is dropped from the plan. |
 | 13 | **Divers margin starts at 20%, owner-editable** (Settings). | 2.5: `owner_settings.divers_margin_percent` default 20. |
 | 14 | **Divers note is free text, 60 characters maximum.** | 2.3 and 2.5 (`sale_items.note`, CHECK length 60). No preset list. |
 | 15 | **Divers is always the first tile in every tab.** | 2.4 and 2.6: `resolveGrid` puts it first on every tab; not editable. |
 | 16 | **On the tablet the camera is a panel beside the cart, not full screen.** | 2.7.1: confirmed as designed. |
 | 17 | **Voiding a sale that has a Divers line writes its own activity-log entry.** | 2.5 and 2.6: new `divers_void` action. |
+| 18 | **The web app must be fully usable on a touch-only laptop** (no keyboard, no mouse) at the counter: tap-only actions, search without a physical keyboard, touch long-press/swipe/keypads, installable full-screen PWA, no accidental zoom/selection/context menu on Sell, USB keyboard-wedge scanner still supported, and the tablet layout as the reference. | New section 2.7.2, test plan 2.11, build steps T1-T4. |
 | 9-12 | Remaining questions: **keep the recommendations** (tile colors per tile from the 8-color palette; tile size S/M/L per device; no product photos for now; only the owner edits the grid). | No change. |
 
 ### 2.1 Principles
@@ -407,6 +408,31 @@ There is no USB or Bluetooth scanner, so the camera is the only scanner and has 
 
 **Compact cart lines.** Each line becomes a single 56 dp row (name, quantity control, total). Discount and remove move behind a tap on the line. This alone roughly doubles how many lines fit on a phone.
 
+#### 2.7.2 Touch-only laptop (web) requirements (decision 18)
+
+A touch-screen laptop at the counter, used with no keyboard and no mouse, is a first-class device. Its screen is tablet-sized, so **the tablet layout (grid and cart side by side) is the reference** and the web build uses it from 900 dp wide upward. Today's state, from reading the code: there are no hover handlers in the app (good), no PWA manifest or service worker, and `app/+html.tsx` sets a viewport meta that doesn't stop pinch-zoom.
+
+| # | Requirement | How |
+|---|---|---|
+| 1 | **No hover-only actions** anywhere in the Sell flow (Sell, credit, history, stuck sales, payment sheet, pads). Every action is reachable by a tap. | A rule for the build: no `onHoverIn`/`:hover`-revealed controls, no `title`-attribute-only tooltips, no right-click menus. Hover styling may exist as decoration only. The existing screens already comply; a test keeps it that way (T1). The grid's "edit mode" controls are always-visible buttons, never revealed on hover. |
+| 2 | **Search works with no physical keyboard.** | See the recommendation below. |
+| 3 | **Long-press, swipe and the keypads work with touch in the browser.** | Long-press (400 ms) and tab swipe are built on pointer events (`onPointerDown`/`Up`/`Move` or the Pressable `onLongPress` that React Native Web maps to them), not mouse events; tab swipe has a visible tab strip as well, so a swipe is never the only way to change tab. Long-press always has a visible alternative (the × Qté key, the cart line tap). The keypads are on-screen buttons, so they need nothing else. |
+| 4 | **Installable as a full-screen PWA.** | A web manifest (`display: "fullscreen"` with `standalone` fallback, name, theme color, 192/512 icons incl. maskable, `start_url` `/sell`, `orientation: "landscape"` hint), a minimal service worker so Chrome offers install, and the offline behavior the app already has (the product cache, grid cache and sale queue live in storage, so the shell loads offline). Chrome/Edge show the install prompt; on a managed laptop the owner can also install it from the browser menu. |
+| 5 | **No accidental pinch-zoom, text selection or context menu on Sell.** | Viewport meta `maximum-scale=1, user-scalable=no` (also `viewport-fit=cover`), CSS `touch-action: manipulation` on the app root (kills double-tap zoom and the 300 ms delay) and `touch-action: none` only on the swipe strip's own gesture, `user-select: none` and `-webkit-touch-callout: none` on the Sell screen (inputs and the note field keep selection), `overscroll-behavior: none` so a pull doesn't reload the page, and a `contextmenu` handler that calls `preventDefault()` on Sell (long-press on touch screens raises the context menu in Chrome, which would collide with the long-press gesture). Browser-level pinch zoom can't be disabled on every device, so the layout must also stay usable if it happens. |
+| 6 | **USB barcode scanner (keyboard wedge) is supported on this laptop, as today.** | `useKeyboardWedge` stays as is (web only, document keydown, 50 ms burst rule). Two interactions to protect: (a) the in-app search keyboard below must not dispatch real key events, or the wedge would read it; (b) the wedge must keep working while the search field is focused, and a scan must not leave text in the search box. This is the one place a USB scanner is supported (see decision 8). |
+| 7 | **Tablet layout is the reference** for this screen size. | 2.7: grid about 65% and cart about 35%, 5-6 tile columns, tiles 120 dp, touch targets at least 48 dp (64 dp for tiles and keypad keys, as already required). |
+
+**Search without a keyboard: recommendation.** Build a small **in-app keyboard** for the Sell search field and the credit-customer search (and the Divers note), and do not rely on the operating system's touch keyboard. Reasons:
+
+- On Windows the system touch keyboard appears automatically only in tablet mode or when the "show the touch keyboard when there's no keyboard attached" setting is on, and that setting is off by default on a laptop. Whether it opens is outside our control, and it differs by Windows version, browser and PWA window.
+- When it does open, it covers up to half of a short laptop screen and the browser may or may not resize the page, so the cart and Charge button can end up hidden behind it.
+- Its language layout comes from the OS, not from the app's FR/EN/AR setting; an Arabic cashier would get the wrong keys unless the OS is configured.
+- An in-app keyboard is part of the layout (it can sit below the grid and push nothing under it), follows the app language, uses 64 dp keys, and is testable.
+
+Scope to keep it small: a text keyboard with three layouts that follow the app language (AZERTY for French, QWERTY for English, Arabic), a digits row, space, backspace, a language-layout key and a close key. The search field uses `inputMode="none"` while the in-app keyboard is on so the system keyboard stays away. It is shown only when the device is in touch-only mode, so a laptop with a keyboard keeps typing normally. **Touch-only mode detection:** `matchMedia("(pointer: coarse)")` and `(hover: none)` are true, no `keydown` has been seen from a physical key other than the scanner's burst, and the owner can force it on or off in Settings (a per-device setting), because detection on hybrid laptops is unreliable. The system touch keyboard stays available as a fallback when the owner turns the in-app one off.
+
+Because search is the slow path on a touch device, the grid is the primary way to sell; the keyboard only has to be good enough for the occasional lookup.
+
 ### 2.8 Tap counts: today vs. with the grid
 
 Same rules as 1.2. "+1" is a tab switch when the item isn't on the open tab. The after column assumes the C1–C4 fixes.
@@ -444,7 +470,36 @@ Each step is one PR off `main` that's independently shippable and keeps `npm run
 | **6** | Divers in Settings and Reports (owner only): maximum amount and default margin settings, the Reports "Divers" line marked estimated, Divers excluded from the per-product rankings, and an activity-log screen (or a filtered view) showing Divers lines with the cashier. | Reports math tests (Divers excluded from rankings and shown separately, cost marked estimated). Settings validation tests (max above 0, margin 0-95, default 20). Live test: `report_product_performance` never returns the Divers product. |
 | **7** | Polish: haptics, empty states, a11y labels, RTL pass on the tablet and phone, the tablet camera panel, and a collapsible web sidebar below 900 dp. (The native HID scanner path is dropped: decision 8.) | Manual RTL and device checklist, attached to the PR. |
 
+| **T1** | Touch-only rules for web: viewport meta, `touch-action`, `user-select`, `overscroll-behavior`, `contextmenu` prevention scoped to Sell, no hover-only controls. | Unit tests for the pure CSS/viewport config; a test that fails if a Sell-flow component uses `onHoverIn`/`onHoverOut`; manual checklist 2.11 items A and C. |
+| **T2** | PWA: manifest, icons, minimal service worker, install check. | Lighthouse "installable" check in CI or by hand; manual checklist item B. |
+| **T3** | In-app keyboard with FR/EN/AR layouts, touch-only mode detection and the Settings override; used by Sell search, credit-customer search and the Divers note. | Pure layout tests (each language's rows, shift/digits), detection-logic tests with mocked `matchMedia`, component test that it never dispatches `keydown` events and that `useKeyboardWedge` still receives a USB-style burst while it is shown. |
+| **T4** | Touch gestures on web: long-press and tab swipe via pointer events, with visible alternatives. | Pure gesture-recognizer tests (long-press timing, swipe distance/velocity thresholds, cancel on scroll); manual item D. T1-T4 can ship before or alongside the grid steps they serve (T3 and T4 need grid steps 3 and 4). |
+
 Each PR is reviewed and merged before the next one starts, so `main` never holds half a grid. Steps 3–5 can sit behind a simple "grid configured?" check: with no tabs in the database, Sell renders exactly as today.
+
+### 2.11 How to test the touch-only laptop
+
+**Chrome DevTools device mode with touch emulation (everyday check).**
+
+1. Open the web app in Chrome, press F12, then Ctrl+Shift+M (device toolbar).
+2. Pick **Responsive** and set about 1366 x 768 (a typical touch laptop). Set the device type/"Add device type" to **Mobile** or use the **"Touch"** emulation so the pointer is coarse and hover is off. (In the toolbar's three-dot menu: "Add device type..." then choose Mobile, which turns on touch events, `pointer: coarse` and `hover: none`.)
+3. In Rendering (More tools > Rendering), set **Emulate CSS media feature `pointer`** to coarse and **`hover`** to none, so touch-only mode detection can be exercised without a touch screen.
+4. Click-drag in the page now acts as a finger; Shift+drag simulates a pinch. Use these to try long-press (hold 400 ms), swipe between tabs, and pinch-zoom.
+5. Unplug nothing: to test "no keyboard", don't type. For the scanner, use the console to dispatch a burst of `keydown` events less than 50 ms apart ending in Enter (the same technique used to check the wedge today).
+6. Install check: Application tab > Manifest (shows errors and the installability result) and Service Workers; Lighthouse > PWA.
+7. Throttle to **Offline** in the Network tab after loading, and sell something: the shell, product cache, grid and sale queue must still work.
+
+**Manual checklist on a real touch laptop** (run before each release that touches Sell; tick every line). Keyboard and mouse unplugged or disabled, Chrome or Edge, app installed as a PWA.
+
+- **A. No hover, everything reachable.** Open every Sell-flow screen (Sell, Credit, History, Stuck, payment sheet, each pad, grid edit mode as the owner). Every button and action can be done with a tap. Nothing appears only when hovering.
+- **B. Install and full screen.** The browser offers Install; after installing, the app opens full screen with no address bar, in landscape, with the right name and icon. Launch with Wi-Fi off: the Sell screen opens and a sale can be recorded and queued.
+- **C. No accidental browser behavior.** On Sell: double-tap on a tile does not zoom; two-finger pinch does not zoom the page; touching and holding a product name does not select text or open a context menu; dragging down at the top does not reload; the page doesn't scroll sideways. In the search field and the Divers note, text can still be selected.
+- **D. Gestures.** Long-press a tile opens the quantity pad; tap adds 1; swipe left/right changes tab and the visible tab strip also works; long-press on a kg tile opens the weight pad; scrolling the grid doesn't trigger a long-press or a swipe.
+- **E. Keypads.** Weight (kg and Montant), quantity and Divers amount pads: every key is 64 dp and registers on first touch; decimal point and backspace work; presets add immediately; Add is disabled until the value is valid.
+- **F. Search without a keyboard.** Tap the search field: the in-app keyboard opens in the app language (check French, English and Arabic); type a product name; results appear; tap a result; close the keyboard. The system keyboard does not also appear. The cart and Charge stay visible with the keyboard open. Repeat for the credit-customer search and the Divers note.
+- **G. USB scanner.** Plug a USB barcode scanner: scan a barcode, the product is added; scan with the in-app keyboard open, still added and no digits left in the search field; scan while a pad is open, nothing is added to the pad.
+- **H. Layout.** At the laptop's native resolution the tablet layout shows (grid and cart side by side); rotate/resize the window narrower than 900 dp and the phone layout appears with the cart collapsible; Arabic mirrors correctly in both.
+- **I. Long shift.** Leave the PWA open for an hour, then sell: no stale session or frozen UI; a deliberately interrupted sale (disconnect Wi-Fi mid-sale) queues and syncs when back online.
 
 ### 2.10 Decisions recorded, and what is still open
 
