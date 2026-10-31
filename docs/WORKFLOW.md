@@ -205,3 +205,14 @@ Before the pipelines work end-to-end, complete these steps once:
 - [ ] Create a production Supabase project.
 - [ ] Add all secrets to GitHub as listed above.
 - [ ] In GitHub → Settings → Branches → Add rule for `main`: enable **Require status checks to pass** and select the `check` job from the CI workflow.
+
+## Go-live TODO: cashier invites
+
+Open signup is disabled on production (and `enable_signup = false` locally), so the only way to add a cashier from the app is the `invite-cashier` edge function. It is **not deployed yet** because there is no web deploy. Once the website is live:
+
+- [ ] `npx supabase functions deploy invite-cashier --project-ref <production-ref>`
+- [ ] `npx supabase secrets set APP_URL=https://<production-web-url> --project-ref <production-ref>`
+- [ ] Supabase dashboard → Authentication → URL Configuration: set **Site URL** to the production web URL and add `https://<production-web-url>/accept-invite` to the redirect allow-list.
+- [ ] From Settings in the app, invite a test cashier, accept the invite, and confirm the cashier cannot see cost or profit. Then remove the test cashier.
+
+Until then, create cashiers by hand: dashboard → Authentication → Users → Add user (auto-confirm). New users get the `cashier` role by default.
