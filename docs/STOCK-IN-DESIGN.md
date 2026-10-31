@@ -1,6 +1,6 @@
 # Stock In: assessment and purchase-history design
 
-Status: design only, no app code. Written 2026-10-31 against `main` at `83beaaa`
+Status: design only, no app code. Decisions recorded 2026-10-31 (see Decisions). Written 2026-10-31 against `main` at `83beaaa`
 (migrations 1–21). `count.tsx` is out of scope: Codex T02 owns it.
 
 Reproductions were run live against the **local** Supabase stack, never
@@ -41,9 +41,11 @@ Severity scale used throughout:
 - `purchase_items` has insert and select policies only: no update, no delete.
 - The owner can delete a `purchases` row. Its items cascade away, but **no trigger reverses stock or WAC** (see 2.1).
 
-### 1.3 Code vs CLAUDE.md mismatch
+### 1.3 Code vs CLAUDE.md mismatch (resolved)
 
-CLAUDE.md says the cashier does "sales and stock receiving". The code blocks the cashier from the whole Stock In tab: the tab is visible, but `index.tsx` returns the "blocked" text before rendering the tool links. That makes adjust, expiring and low-stock unreachable for cashiers too, even though their queries are cashier-safe. Question Q1 asks which is intended.
+CLAUDE.md used to say the cashier does "sales and stock receiving". The code blocks the cashier from the whole Stock In tab: the tab is visible, but `index.tsx` returns the "blocked" text before rendering the tool links.
+
+**Decision (Q1):** only the owner receives deliveries. CLAUDE.md is corrected in the same commit as this update. Expiring and Low stock stay owner-only for now as well: they live behind the blocked screen, and opening them to cashiers is a separate, later change.
 
 ### 1.4 Audit findings: status on `main`
 
@@ -72,10 +74,59 @@ Each entry: today's behaviour → severity → smallest fix. "Receive RPC" means
   - So today the only "fix" is an adjustment (−100, reason count correction). That fixes stock but **leaves WAC permanently wrong**, and leaves the delivery and expense in history at the wrong value.
 - **Severity:** **Blocker.** Typos in quantity or cost will happen in week one.
 - **Smallest fix:** owner-only `void_purchase(purchase_id, reason)` RPC, mirroring `void_sale`.
-  - Marks the purchase `voided_at/by/reason` and writes reversing stock movements.
-  - Recomputes WAC by removing the voided lines: `(qty·wac − line_qty·line_cost) / (qty − line_qty)`, falling back to the last remaining cost when stock would hit ≤ 0. It writes a `cost_history` row (source `purchase_void`).
   - Revoke `DELETE` on purchases from `authenticated` so the silent path is closed.
-  - Correction = void + re-enter, with "Duplicate as new delivery" prefilled from the voided one. No in-place edit: edits make the stock/WAC audit trail unreadable.
+  - **Decision (Q2):** correction = void + re-enter, with "Duplicate as new delivery" prefilled from the voided one. Never edit in place: edits make the stock/WAC audit trail unreadable.
+
+#### 2.1.1 What voiding does, exactly
+
+Voiding a delivery is one transaction, applied line by line in the order the lines were received.
+
+1. **Past sales are not touched.** Every `sale_items` row keeps the `unit_cost_cents` stamped at the moment of sale. Profit already reported for those days stays as it was. Voiding corrects the future, not the past.
+2. **Stock** goes down by the voided quantity, even if some of those units were already sold: `S' = S − q`. If that goes below zero, the product appears on the negative-stock screen until the correct delivery is re-entered.
+3. **Average cost going forward** is recomputed by taking the voided line's money out of the stock value:
+
+   ```
+   S  = stock now (before the void)        W  = average cost now
+   q  = voided line quantity                c  = voided line unit cost
+   S' = S − q
+
+   if S' > 0 and S·W − q·c > 0:
+       W' = round( (S·W − q·c) / S' )
+   else:
+       W' = W_before   -- the average cost recorded in cost_history just before
+                       -- the voided line was received
+   ```
+
+   A `cost_history` row with source `purchase_void` records `W'`.
+
+4. **The purchase row stays**, marked `voided_at / voided_by / void_reason`. It drops out of purchase totals, supplier balances and the expiring list, and shows struck-through in history.
+5. **The void is idempotent.** Voiding an already-voided delivery returns without doing anything.
+
+**Why this formula.** It keeps *money paid = cost of goods already sold + value of stock left*, up to rounding. If some units were sold at an inflated average, the stock left ends up slightly cheaper by the same total, so the month's profit evens out over the next sales. The fallback applies when the formula can't produce a sensible number: no stock left, or the sold units carried less of the wrong cost than the formula removes. There it restores the pre-delivery cost. That breaks the money identity, by at most the units sold in between × the cost error. The void confirmation dialog shows the before → after stock and average cost so the owner sees it.
+
+**Worked example A: cost typo, some units sold (formula path)**
+
+| Step | Stock | Avg cost | Note |
+|---|---|---|---|
+| Start | 20 | 5.00 | |
+| Delivery: 24 @ **6.00** (should be 5.00) | 44 | 5.55 | (20·500 + 24·600) / 44 = 554.5 → 555 |
+| Sell 4 | 40 | 5.55 | each sale stamped 5.55; these 4 sales **keep** 5.55 |
+| Void the delivery | 16 | 4.88 | (40·555 − 24·600) / 16 = 7800 / 16 = 487.5 → 488 |
+| Re-enter 24 @ 5.00 | 40 | 4.95 | (16·488 + 24·500) / 40 = 495.2 → 495 |
+
+Check: money actually paid 20·5.00 + 24·5.00 = 220.00 DH. Cost of the 4 sales 4·5.55 = 22.20, plus stock left 40·4.95 = 198.00, makes 220.20 DH. The 0.20 difference is rounding. The 0.55/unit overcost on the 4 past sales is offset by the remaining 40 units being valued 0.05 lower.
+
+**Worked example B: quantity typo, stock goes negative (fallback path)**
+
+| Step | Stock | Avg cost | Note |
+|---|---|---|---|
+| Start | 10 | 6.00 | |
+| Delivery: **100** @ 7.00 (should be 10) | 110 | 6.91 | (10·600 + 100·700) / 110 = 690.9 → 691 |
+| Sell 15 | 95 | 6.91 | sales keep 6.91 |
+| Void the delivery | **−5** | 6.00 | S' = −5 ≤ 0 → fallback to the cost before the delivery |
+| Re-enter 10 @ 7.00 | 5 | 7.00 | stock was ≤ 0, so the existing trigger takes the new cost |
+
+The 5 units on the shelf match physical stock: 10 + 10 − 15. Their value of 7.00 against a "true" average of 6.50 is the fallback's error: 2.50 DH in total, shown in the confirmation dialog.
 
 ### 2.2 Returns to supplier (damaged / expired)
 - **Today:** only an adjustment with reason `damaged` or `expired`. Stock goes down, the loss is valued at WAC, and the supplier is never credited. Nothing records that the supplier owes a refund or replacement.
@@ -94,7 +145,8 @@ Each entry: today's behaviour → severity → smallest fix. "Receive RPC" means
   - The price-change alert fires as a 100 % drop.
   - The suggested selling price collapses.
 - **Severity:** Important.
-- **Smallest fix:** a `free_quantity` column on the line, alongside the paid quantity. Stock += qty + free; WAC uses paid cost spread over all units. Last-price and price-alert use the paid unit cost. The line total shows the paid amount only.
+- **Smallest fix:** a `free_quantity` column on the line, alongside the paid quantity. Stock += qty + free; WAC uses paid cost spread over all units. The line total shows the paid amount only.
+- **Decision:** free units are **excluded from "last price paid"** and from the price-change alert. Both use the paid unit cost (`line_total_cents / paid quantity`) of the most recent non-voided line with a paid quantity above 0. Until R6 adds `free_quantity`, lines entered at cost 0 are skipped for the same reason.
 
 ### 2.5 Cartons vs units (buy 24, sell 1)
 - **Today:** no packaging concept. The owner must type 24 and the per-unit cost.
@@ -116,7 +168,10 @@ Each entry: today's behaviour → severity → smallest fix. "Receive RPC" means
 ### 2.8 Cost 0, very large quantities, carton rounding
 - **Cost 0:** allowed by `check (unit_cost_cents >= 0)` and needed for bonus units. Severity Minor once 2.4 exists. Until then, show a warning "Coût 0 : unités gratuites ?" on the line.
 - **Very large quantity:** `numeric(12,3)` caps at 999 999 999.999. Live: 1e9 → raw `numeric field overflow` shown to the owner. Severity Minor. Fix: client-side cap with a readable message, plus a sanity confirm above e.g. 10 000 units per line ("vous avez tapé 24000 — confirmer ?").
-- **Carton rounding:** 100 DH / 24 → 4.1667 → stored **417** centimes → line total **100.08 DH** (live: 10008). That's 8 centimes over the invoice on one line, and it compounds across a month. Severity Important (supplier balance won't match the invoice). Fix: with 2.5, store the **line total as entered** (`line_total_cents`, the source of truth for money). Keep unit cost as derived, at numeric precision for WAC (`unit_cost_exact numeric(14,4)`). Totals and balances sum `line_total_cents`. WAC uses the exact value.
+- **Carton rounding:** 100 DH / 24 → 4.1667 → stored **417** centimes → line total **100.08 DH** (live: 10008). That's 8 centimes over the invoice on one line, and it compounds across a month. Severity Important (supplier balance won't match the invoice).
+  - **Decision:** the line total the owner types is the source of truth. **100.00 DH stays 100.00 DH**: delivery totals, monthly totals, supplier balances and exports all sum `line_total_cents` exactly as entered.
+  - The unit cost is derived (`unit_cost_exact = line_total / units`, `numeric(14,4)`) and only used for WAC and for display ("≈ 4.17 / unit").
+  - When the owner types a unit cost instead of a total, the line total is `lineTotalCents(qty, unit cost)` and *that* is stored. Either way, exactly one number is typed and stored, and the other is derived.
 - **Rounding mismatch (Minor):** `purchase_summaries` totals `round(sum(qty·cost))` per purchase, while the screen rounds per line (`lineTotalCents`). They can differ by a centime on fractional kg lines. Using a stored `line_total_cents` everywhere removes the mismatch.
 
 ### 2.9 Delivery date vs entry date
@@ -129,12 +184,12 @@ Each entry: today's behaviour → severity → smallest fix. "Receive RPC" means
   - The UI is owner-only.
   - RLS lets a cashier **insert an empty purchase header** (live: accepted when no row is returned), but not items: the items policy's `exists(select … from purchases)` runs under the cashier's RLS and can't see the header.
   - So stock and cost are safe from cashiers, but a cashier can create empty "deliveries" that pollute purchase counts. That part is Minor.
-- **The real question (Q1):** the person who unloads the van is often the cashier. They can count units but must not see or set cost.
-- **Recommended design:** two-step receiving.
+- **Decision (Q1): only the owner receives deliveries for now.** R1 enforces it in the database: the new `receive_delivery` RPC refuses non-owners, and the direct-insert policies on `purchases` / `purchase_items` become owner-only, which closes the empty-header hole. The two-step design below stays on file for later.
+- **Later option:** two-step receiving.
   1. **Cashier** records a *pending delivery*: supplier, products, quantities, expiry and invoice photo. **No cost fields at all**, and stock increases immediately so it can be sold. It's a `purchases` row with `status = 'pending_cost'`, and its lines have `unit_cost_cents null`.
   2. **Owner** opens "À valoriser" (to price), enters the costs, and confirms. WAC is computed then.
 - **WAC between the two steps:** units received while cost is pending are valued at the current WAC for sales in between (`sale_items.unit_cost_cents` stamped as today). On confirm, the WAC formula uses stock-on-hand at confirm time. It's the same approximation the app already makes for negative stock. It's documented, and acceptable for a corner store.
-- **Q1 decides whether to build step 1 at all.** Default: owner-only receiving now, pending deliveries later.
+- Not scheduled. Revisit only if the owner is regularly away when deliveries arrive.
 
 ### 2.11 Receiving while offline
 - **Today:** Save fails with a network error. The draft lives only in React state, so leaving the screen loses it.
@@ -232,10 +287,11 @@ alter table purchases add column operation_id uuid unique;   -- client-generated
 --   one transaction: header + items (+ selling prices) ; triggers unchanged
 --   on conflict (operation_id): return the existing purchase id if the payload hash matches,
 --   raise 'operation reused with different payload' otherwise
---   validates: lines non-empty, qty > 0 and < 1e6, cost >= 0, expiry a real date, delivery date
---   not in the future and <= 60 days back
+--   validates: caller is owner, lines non-empty, qty > 0 and < 1e6, cost >= 0, expiry a real date,
+--   delivery date not in the future and <= 60 days back
 alter table purchases add column payload_hash text;
-revoke insert on purchases, purchase_items from authenticated;  -- the RPC is the only writer
+-- direct-insert policies become owner-only (Q1); a full revoke waits for R4,
+-- because the CSV import still inserts directly until import_opening_stock exists
 ```
 - Selling-price updates move **inside** the same transaction, so "price failed after stock committed" can no longer happen.
 - The CSV import (C10) gets its own `import_opening_stock(p_operation_id, p_rows jsonb)` built on the same RPC: per-row result, nothing half-applied, safe to re-run.
@@ -312,23 +368,24 @@ Every PR: `npm run check`, a new `tests/stock/*` unit test for any math (the WAC
 
 ---
 
-## Business questions (with recommended defaults)
+## Decisions (2026-10-31)
 
-1. **Who receives deliveries?** Owner only, or can a cashier record quantities (no costs) for you to price later? *Default: owner only now; build pending deliveries (R12) only if you're regularly not there when the van comes.* Also: should cashiers get Adjust / Expiring / Low stock, which are cost-free and safe? *Default: yes for Expiring and Low stock, no for Adjust.*
-2. **Correcting a wrong delivery:** void and re-enter (full audit trail), or allow editing? *Default: void + "duplicate as new", no editing.*
-3. **How far back may a delivery be dated?** *Default: 60 days, never in the future.*
-4. **Supplier credit:** do you buy on credit, and do you pay against specific invoices or just "on account"? *Default: on account, payments applied oldest-invoice-first for the paid/unpaid badge.*
-5. **Returns to supplier:** refunded in cash, replaced with goods, or credited against the next invoice? *Default: credit on the supplier balance; replacement goods are entered as a normal delivery at cost 0 (free units).*
-6. **Bonus units ("12 + 2 gratuits"):** spread the cost over all units (lowers your average cost) or keep them as a separate gain? *Default: spread. It's the true cost per unit and keeps profit per sale honest.*
-7. **Cartons:** should each product carry a carton size, so you enter "3 cartons" and a carton price? *Default: yes, `pack_size` on the product, editable on the line.*
-8. **Invoice discount:** spread across lines by value (lowers each product's cost) or record separately? *Default: spread, same as sale discounts.*
-9. **Invoice number:** required, optional, or required only for chosen suppliers? *Default: optional, with a duplicate warning when it's given.*
-10. **Invoice photo:** keep forever or delete after N months? *Default: keep 24 months, then delete automatically, stating the storage cost.*
-11. **Expiry:** is "≈ remaining, assuming oldest sold first" good enough, or do you need exact per-batch counts? *Default: the FIFO estimate.*
-12. **Offline receiving:** do you ever receive with no internet? *Default: save the draft offline, but saving the delivery needs a connection (R2), with a full offline queue later only if needed.*
-13. **Large quantities:** above what quantity per line should the app ask "are you sure?" *Default: 1 000 units or 100 kg.*
-
----
+| # | Question | Decision |
+|---|---|---|
+| 1 | Who receives deliveries? | **Owner only** for now. Enforced in the database by R1. Cashier pending-deliveries are not scheduled. Expiring and Low stock stay owner-only for now. |
+| 2 | Correcting a wrong delivery | **Void and re-enter, never edit in place.** Exact void semantics in 2.1.1. |
+| 3 | How far back may a delivery be dated? | 60 days, never in the future. |
+| 4 | Supplier credit: invoice by invoice, on account, or always paid on delivery? | **Open.** The decision came back unanswered. The design keeps the default (on account, payments applied oldest invoice first for the paid/unpaid badge) until answered. Only R8 depends on it. |
+| 5 | Returns to supplier | Credit on the supplier balance; replacement goods entered as a normal delivery with free units. |
+| 6 | Bonus units | Spread the cost over all units. Free units are **excluded from "last price paid"** and the price alert. |
+| 7 | Cartons | `pack_size` on the product, editable on the line. |
+| 8 | Invoice discount | Spread across lines by value (largest remainder), as for sale discounts. |
+| 9 | Invoice number | Optional, with a duplicate warning when given. |
+| 10 | Invoice photo | Keep 24 months, then delete automatically. |
+| 11 | Expiry | FIFO "≈ remaining" estimate. |
+| 12 | Offline receiving | Draft saved on the device (R2). Saving the delivery needs a connection, with a full offline queue later only if needed. |
+| 13 | Large-quantity confirm | Above 1 000 units or 100 kg per line. |
+| — | Money source of truth | **The line total the owner enters.** 100.00 DH stays 100.00 DH; the unit cost is derived (2.8). |
 
 ## Appendix A: raw reproduction output (local Supabase, 2026-10-31)
 

@@ -1,6 +1,6 @@
 # Corniche Market — Agent & Developer Guide
 
-Corniche Market is a point-of-sale app for a Moroccan convenience store, built with Expo (React Native + TypeScript) and Supabase (Postgres + Auth). It tracks every product's buying price and selling price, records sales, and shows profit per product, per day, and per month. Two roles exist: **Owner** (full access, sees costs and profit) and **Cashier** (sales and stock receiving only, never sees costs). The app runs on Android, iOS, and web from one codebase, works offline on mobile, and syncs sales when connectivity returns.
+Corniche Market is a point-of-sale app for a Moroccan convenience store, built with Expo (React Native + TypeScript) and Supabase (Postgres + Auth). It tracks every product's buying price and selling price, records sales, and shows profit per product, per day, and per month. Two roles exist: **Owner** (full access, sees costs and profit) and **Cashier** (sales only, never sees costs; only the owner receives stock). The app runs on Android, iOS, and web from one codebase, works offline on mobile, and syncs sales when connectivity returns.
 
 See [AGENTS.md](AGENTS.md) for Expo/React Native API conventions and EAS build commands.
 
