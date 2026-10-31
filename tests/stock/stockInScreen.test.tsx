@@ -64,6 +64,8 @@ const milk = {
   active: true,
 };
 
+const bread = { ...milk, id: "bread", name: "Bread", barcode: "6110000000001" };
+
 let tree: ReactTestRenderer;
 
 beforeEach(async () => {
@@ -76,9 +78,17 @@ beforeEach(async () => {
 });
 afterEach(() => act(() => tree.unmount()));
 
-async function addLine(fields: { quantity: string; unitCost: string; expiryDate?: string; newSellingPriceCents?: number | null }) {
+async function addLine(
+  fields: {
+    quantity: string;
+    unitCost: string;
+    expiryDate?: string;
+    newSellingPriceCents?: number | null;
+  },
+  product: typeof milk = milk
+) {
   await act(async () => {
-    await tree.root.findByType(ProductSearchPicker).props.onPick(milk);
+    await tree.root.findByType(ProductSearchPicker).props.onPick(product);
   });
   const lines = tree.root.findAllByType(StockInLine);
   const last = lines[lines.length - 1];
@@ -94,7 +104,9 @@ async function addLine(fields: { quantity: string; unitCost: string; expiryDate?
 }
 
 const saveButton = () =>
-  tree.root.findAllByType(BigButton).find((button) => button.props.label === "stockIn.recordDelivery")!;
+  tree.root
+    .findAllByType(BigButton)
+    .find((button) => button.props.label === "stockIn.recordDelivery")!;
 
 async function pressSave() {
   await act(async () => {
@@ -107,7 +119,12 @@ const texts = () => tree.root.findAllByType(Text).map((node) => node.props.child
 describe("Stock In save", () => {
   it("sends the whole delivery, price changes included, in one receiveDelivery call", async () => {
     mockReceiveDelivery.mockResolvedValue("purchase-1");
-    await addLine({ quantity: "10", unitCost: "6", expiryDate: "31/03/2026", newSellingPriceCents: 1200 });
+    await addLine({
+      quantity: "10",
+      unitCost: "6",
+      expiryDate: "31/03/2026",
+      newSellingPriceCents: 1200,
+    });
 
     await pressSave();
 
@@ -115,7 +132,9 @@ describe("Stock In save", () => {
     expect(mockReceiveDelivery).toHaveBeenCalledWith("op-1", {
       supplierId: null,
       notes: null,
-      lines: [{ product_id: "milk", quantity: 10, unit_cost_cents: 600, expiry_date: "2026-03-31" }],
+      lines: [
+        { product_id: "milk", quantity: 10, unit_cost_cents: 600, expiry_date: "2026-03-31" },
+      ],
       priceUpdates: [{ product_id: "milk", selling_price_cents: 1200 }],
     });
     expect(mockBatchUpdateSellingPrices).not.toHaveBeenCalled();
@@ -140,7 +159,7 @@ describe("Stock In save", () => {
     await addLine({ quantity: "10", unitCost: "6" });
     await pressSave();
 
-    await addLine({ quantity: "2", unitCost: "3" });
+    await addLine({ quantity: "2", unitCost: "3" }, bread);
     await pressSave();
 
     expect(mockReceiveDelivery.mock.calls[1][0]).toBe("op-1");
@@ -160,7 +179,9 @@ describe("Stock In save", () => {
 
   it("a second tap while the first save is in flight sends nothing", async () => {
     let finish: (id: string) => void = () => {};
-    mockReceiveDelivery.mockImplementation(() => new Promise<string>((resolve) => (finish = resolve)));
+    mockReceiveDelivery.mockImplementation(
+      () => new Promise<string>((resolve) => (finish = resolve))
+    );
     await addLine({ quantity: "10", unitCost: "6" });
 
     const onPress = saveButton().props.onPress;

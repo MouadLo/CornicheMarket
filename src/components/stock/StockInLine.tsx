@@ -1,8 +1,16 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { centsToDisplay, formatMAD, formatMargin, marginPercent, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
+import {
+  centsToDisplay,
+  formatMAD,
+  formatMargin,
+  marginPercent,
+  parseMoneyToCents,
+  parseQuantity,
+} from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
+import { normalizeExpiryDate } from "@/src/lib/stock/receive";
 import {
   isSignificantPriceChange,
   priceChangePercent,
@@ -34,9 +42,13 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
     costCents !== null && quantity !== null ? Math.round(costCents * quantity) : null;
 
   const flagged =
-    costCents !== null && lastCostCents !== null && isSignificantPriceChange(lastCostCents, costCents);
+    costCents !== null &&
+    lastCostCents !== null &&
+    isSignificantPriceChange(lastCostCents, costCents);
   const change =
-    costCents !== null && lastCostCents !== null ? priceChangePercent(lastCostCents, costCents) : null;
+    costCents !== null && lastCostCents !== null
+      ? priceChangePercent(lastCostCents, costCents)
+      : null;
 
   const suggested =
     costCents !== null && lastCostCents !== null
@@ -46,6 +58,7 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
     flagged && suggested !== null && suggested !== product.selling_price_cents;
 
   const effectiveSellingPrice = line.newSellingPriceCents ?? product.selling_price_cents;
+  const expiryInvalid = !normalizeExpiryDate(line.expiryDate).ok;
 
   return (
     <View style={styles.card}>
@@ -90,17 +103,18 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Expiry date (optional)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, expiryInvalid && styles.inputInvalid]}
           value={line.expiryDate}
           onChangeText={(value) => onChange({ ...line, expiryDate: value })}
           placeholder="YYYY-MM-DD"
           autoCapitalize="none"
         />
+        {expiryInvalid && <Text style={styles.invalid}>{t("stockIn.expiryInvalid")}</Text>}
       </View>
 
       <Text style={styles.lastPrice}>
         {lastCostCents === null
-          ? t('stockIn.firstTimeBuying')
+          ? t("stockIn.firstTimeBuying")
           : `Last paid ${formatMAD(lastCostCents)}`}
         {lineTotal !== null ? ` · line total ${formatMAD(lineTotal)}` : ""}
       </Text>
@@ -117,7 +131,8 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
               <Text style={styles.alertBody}>
                 Selling at {formatMAD(product.selling_price_cents)} would now give{" "}
                 {formatMargin(marginPercent(product.selling_price_cents, costCents as number))}{" "}
-                instead of {formatMargin(marginPercent(product.selling_price_cents, lastCostCents as number))}.
+                instead of{" "}
+                {formatMargin(marginPercent(product.selling_price_cents, lastCostCents as number))}.
               </Text>
               <View style={styles.suggestionRow}>
                 <Text style={styles.alertBody}>
@@ -158,7 +173,12 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: "#fff",
   },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
   name: { fontSize: 16, fontWeight: "700", flex: 1 },
   remove: { color: "#b3261e", fontSize: 14, fontWeight: "600" },
   meta: { fontSize: 13, color: "#666" },
@@ -173,6 +193,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  inputInvalid: { borderColor: "#b3261e" },
+  invalid: { color: "#b3261e", fontSize: 13 },
   lastPrice: { fontSize: 13, color: "#555" },
   alert: { backgroundColor: "#fff6e5", borderRadius: 10, padding: 12, gap: 6 },
   alertTitle: { fontWeight: "700", color: "#8a5a00" },

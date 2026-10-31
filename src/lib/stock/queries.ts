@@ -32,18 +32,36 @@ export type PricePoint = {
   unit_cost_cents: number;
 };
 
-export type DraftLine = {
+export type ReceiveLine = {
   product_id: string;
   quantity: number;
   unit_cost_cents: number;
-  expiry_date?: string | null;
+  expiry_date: string | null;
 };
 
+export type PriceUpdate = { product_id: string; selling_price_cents: number };
+
+export type DeliveryDraft = {
+  supplierId: string | null;
+  notes: string | null;
+  lines: ReceiveLine[];
+  priceUpdates: PriceUpdate[];
+};
+
+export class ReceiveDeliveryError extends Error {
+  constructor(
+    message: string,
+    // already_saved: this operation id already recorded a delivery with
+    // different details, so the first attempt landed even if the app never
+    // heard back. Anything else the server refused is "rejected".
+    public readonly kind: "already_saved" | "rejected"
+  ) {
+    super(message);
+  }
+}
+
 export async function fetchSuppliers(): Promise<Supplier[]> {
-  const { data, error } = await supabase
-    .from("suppliers")
-    .select("id, name, phone")
-    .order("name");
+  const { data, error } = await supabase.from("suppliers").select("id, name, phone").order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Supplier[];
 }
@@ -71,29 +89,27 @@ export async function fetchLastPurchasePrice(productId: string): Promise<number 
   return data ? (data as { unit_cost_cents: number }).unit_cost_cents : null;
 }
 
-// Stock and weighted-average cost are never written here: inserting the
-// purchase lines fires apply_purchase_item, which owns both plus cost_history.
-export async function createPurchase(
-  supplierId: string | null,
-  lines: DraftLine[],
-  ownerId: string,
-  notes: string | null
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("purchases")
-    .insert({ supplier_id: supplierId, created_by: ownerId, notes })
-    .select("id")
-    .single();
+// One transaction for header, lines and selling-price changes. The caller
+// generates operationId once per delivery and must send the same id on every
+// retry until a purchase id comes back: that is what stops a retry from
+// receiving the stock twice. Stock and weighted-average cost are never
+// written here: the line inserts fire apply_purchase_item, which owns both.
+export async function receiveDelivery(operationId: string, draft: DeliveryDraft): Promise<string> {
+  const { data, error } = await supabase.rpc("receive_delivery", {
+    p_operation_id: operationId,
+    p_supplier_id: draft.supplierId,
+    p_notes: draft.notes,
+    p_lines: draft.lines,
+    p_price_updates: draft.priceUpdates,
+  });
 
-  if (error) throw new Error(error.message);
-  const purchaseId = (data as { id: string }).id;
-
-  const { error: itemsError } = await supabase
-    .from("purchase_items")
-    .insert(lines.map((line) => ({ ...line, purchase_id: purchaseId })));
-
-  if (itemsError) throw new Error(itemsError.message);
-  return purchaseId;
+  if (error) {
+    throw new ReceiveDeliveryError(
+      error.message,
+      error.code === "CM409" ? "already_saved" : "rejected"
+    );
+  }
+  return data as string;
 }
 
 export async function fetchPurchases(page: number, pageSize = 25): Promise<PurchaseSummary[]> {

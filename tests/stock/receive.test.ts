@@ -46,8 +46,20 @@ const product = (id: string) => ({ id });
 describe("buildReceivePayload", () => {
   it("builds lines in centimes and integer-safe quantities", () => {
     const { lines, invalidCount } = buildReceivePayload([
-      { product: product("a"), quantity: "24", unitCost: "4.17", expiryDate: "", newSellingPriceCents: null },
-      { product: product("b"), quantity: "1,250", unitCost: "60", expiryDate: "31/03/2026", newSellingPriceCents: null },
+      {
+        product: product("a"),
+        quantity: "24",
+        unitCost: "4.17",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+      {
+        product: product("b"),
+        quantity: "1,250",
+        unitCost: "60",
+        expiryDate: "31/03/2026",
+        newSellingPriceCents: null,
+      },
     ]);
     expect(invalidCount).toBe(0);
     expect(lines).toEqual([
@@ -58,7 +70,13 @@ describe("buildReceivePayload", () => {
 
   it("a line with an impossible expiry date is invalid, not saved without its date", () => {
     const { lines, invalidCount } = buildReceivePayload([
-      { product: product("a"), quantity: "5", unitCost: "5", expiryDate: "2026-02-31", newSellingPriceCents: null },
+      {
+        product: product("a"),
+        quantity: "5",
+        unitCost: "5",
+        expiryDate: "2026-02-31",
+        newSellingPriceCents: null,
+      },
     ]);
     expect(lines).toEqual([]);
     expect(invalidCount).toBe(1);
@@ -66,18 +84,54 @@ describe("buildReceivePayload", () => {
 
   it("lines without quantity or cost are invalid", () => {
     const { invalidCount } = buildReceivePayload([
-      { product: product("a"), quantity: "", unitCost: "5", expiryDate: "", newSellingPriceCents: null },
-      { product: product("b"), quantity: "0", unitCost: "5", expiryDate: "", newSellingPriceCents: null },
-      { product: product("c"), quantity: "2", unitCost: "", expiryDate: "", newSellingPriceCents: null },
+      {
+        product: product("a"),
+        quantity: "",
+        unitCost: "5",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+      {
+        product: product("b"),
+        quantity: "0",
+        unitCost: "5",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+      {
+        product: product("c"),
+        quantity: "2",
+        unitCost: "",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
     ]);
     expect(invalidCount).toBe(3);
   });
 
   it("collects selling-price changes from valid lines only, so they travel with the delivery", () => {
     const { priceUpdates } = buildReceivePayload([
-      { product: product("a"), quantity: "5", unitCost: "5", expiryDate: "", newSellingPriceCents: 800 },
-      { product: product("b"), quantity: "", unitCost: "5", expiryDate: "", newSellingPriceCents: 900 },
-      { product: product("c"), quantity: "5", unitCost: "5", expiryDate: "", newSellingPriceCents: null },
+      {
+        product: product("a"),
+        quantity: "5",
+        unitCost: "5",
+        expiryDate: "",
+        newSellingPriceCents: 800,
+      },
+      {
+        product: product("b"),
+        quantity: "",
+        unitCost: "5",
+        expiryDate: "",
+        newSellingPriceCents: 900,
+      },
+      {
+        product: product("c"),
+        quantity: "5",
+        unitCost: "5",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
     ]);
     expect(priceUpdates).toEqual([{ product_id: "a", selling_price_cents: 800 }]);
   });

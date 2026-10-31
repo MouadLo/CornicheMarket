@@ -224,7 +224,11 @@ const fr = {
     saveSupplier: "Enregistrer le fournisseur",
     productsReceived: "Produits reçus",
     deliveryTotal: "Total de la livraison",
-    incomplete: "Les lignes sans quantité ni prix d'achat ne seront pas enregistrées.",
+    incomplete:
+      "Les lignes sans quantité, sans prix d'achat ou avec une date invalide ne seront pas enregistrées.",
+    expiryInvalid: "Date invalide : JJ/MM/AAAA ou AAAA-MM-JJ",
+    alreadySaved:
+      "Cette livraison a déjà été enregistrée (la réponse s'était perdue). Vérifiez l'historique des achats avant de la ressaisir. Pour une nouvelle livraison, retirez toutes les lignes.",
     recordDelivery: "Enregistrer la livraison ({{count}})",
     saving: "Enregistrement...",
     stockNote: "Le stock et le coût moyen sont mis à jour automatiquement.",

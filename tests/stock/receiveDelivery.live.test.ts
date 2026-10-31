@@ -40,7 +40,12 @@ const configured = Boolean(url && anonKey && ownerEmail && ownerPassword);
 const suite = configured ? describe : describe.skip;
 const cashierIt = cashierEmail && cashierPassword ? it : it.skip;
 
-type Line = { product_id: string; quantity: number; unit_cost_cents: number; expiry_date: string | null };
+type Line = {
+  product_id: string;
+  quantity: number;
+  unit_cost_cents: number;
+  expiry_date: string | null;
+};
 
 async function signIn(email: string, password: string): Promise<SupabaseClient> {
   const client = createClient(url as string, anonKey as string, {
@@ -64,7 +69,11 @@ suite("receive_delivery (live)", () => {
   async function newProduct(): Promise<string> {
     const { data, error } = await owner
       .from("products")
-      .insert({ name: `ZZ-LIVE R1 ${randomUUID().slice(0, 8)}`, selling_price_cents: 1000, unit: "piece" })
+      .insert({
+        name: `ZZ-LIVE R1 ${randomUUID().slice(0, 8)}`,
+        selling_price_cents: 1000,
+        unit: "piece",
+      })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
@@ -78,7 +87,11 @@ suite("receive_delivery (live)", () => {
       .eq("id", id)
       .single();
     if (error) throw new Error(error.message);
-    const row = data as { stock_quantity: number; current_cost_cents: number; selling_price_cents: number };
+    const row = data as {
+      stock_quantity: number;
+      current_cost_cents: number;
+      selling_price_cents: number;
+    };
     return { ...row, stock_quantity: Number(row.stock_quantity) };
   }
 
@@ -112,13 +125,20 @@ suite("receive_delivery (live)", () => {
     const id = await newProduct();
     const op = randomUUID();
 
-    const { data, error } = await receive(owner, op, [
-      { product_id: id, quantity: 10, unit_cost_cents: 600, expiry_date: "2026-12-31" },
-    ], [{ product_id: id, selling_price_cents: 1200 }]);
+    const { data, error } = await receive(
+      owner,
+      op,
+      [{ product_id: id, quantity: 10, unit_cost_cents: 600, expiry_date: "2026-12-31" }],
+      [{ product_id: id, selling_price_cents: 1200 }]
+    );
 
     expect(error).toBeNull();
     expect(typeof data).toBe("string");
-    expect(await product(id)).toEqual({ stock_quantity: 10, current_cost_cents: 600, selling_price_cents: 1200 });
+    expect(await product(id)).toEqual({
+      stock_quantity: 10,
+      current_cost_cents: 600,
+      selling_price_cents: 1200,
+    });
     expect(await purchasesFor(op)).toBe(1);
   });
 
@@ -140,9 +160,13 @@ suite("receive_delivery (live)", () => {
   it("the same operation id with different details is refused and changes nothing", async () => {
     const id = await newProduct();
     const op = randomUUID();
-    await receive(owner, op, [{ product_id: id, quantity: 10, unit_cost_cents: 600, expiry_date: null }]);
+    await receive(owner, op, [
+      { product_id: id, quantity: 10, unit_cost_cents: 600, expiry_date: null },
+    ]);
 
-    const edited = await receive(owner, op, [{ product_id: id, quantity: 12, unit_cost_cents: 600, expiry_date: null }]);
+    const edited = await receive(owner, op, [
+      { product_id: id, quantity: 12, unit_cost_cents: 600, expiry_date: null },
+    ]);
 
     expect(edited.error?.code).toBe("CM409");
     expect((await product(id)).stock_quantity).toBe(10);
@@ -161,7 +185,11 @@ suite("receive_delivery (live)", () => {
     );
 
     expect(error).not.toBeNull();
-    expect(await product(id)).toEqual({ stock_quantity: 0, current_cost_cents: 0, selling_price_cents: 1000 });
+    expect(await product(id)).toEqual({
+      stock_quantity: 0,
+      current_cost_cents: 0,
+      selling_price_cents: 1000,
+    });
     expect(await purchasesFor(op)).toBe(0);
   });
 
@@ -182,7 +210,11 @@ suite("receive_delivery (live)", () => {
     const id = await newProduct();
     expect((await receive(owner, randomUUID(), [])).error).not.toBeNull();
     expect(
-      (await receive(owner, randomUUID(), [{ product_id: id, quantity: 0, unit_cost_cents: 500, expiry_date: null }])).error
+      (
+        await receive(owner, randomUUID(), [
+          { product_id: id, quantity: 0, unit_cost_cents: 500, expiry_date: null },
+        ])
+      ).error
     ).not.toBeNull();
   });
 
@@ -199,23 +231,52 @@ suite("receive_delivery (live)", () => {
     expect(error).not.toBeNull();
   });
 
-  cashierIt("a cashier cannot receive, through the RPC or by inserting a purchase directly", async () => {
+  it("a delivery dated 3 days ago lands on that day in the store's timezone", async () => {
     const id = await newProduct();
-    const cashier = await signIn(cashierEmail as string, cashierPassword as string);
-    try {
-      const viaRpc = await receive(cashier, randomUUID(), [
-        { product_id: id, quantity: 1, unit_cost_cents: 1, expiry_date: null },
-      ]);
-      expect(viaRpc.error?.code).toBe("42501");
+    const op = randomUUID();
+    const casablancaDay = (date: Date) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(date);
+    const threeDaysAgo = casablancaDay(new Date(Date.now() - 3 * 86_400_000));
 
-      const { data: userData } = await cashier.auth.getUser();
-      const direct = await cashier
-        .from("purchases")
-        .insert({ id: randomUUID(), created_by: userData.user?.id, notes: "ZZ-LIVE R1 cashier" });
-      expect(direct.error).not.toBeNull();
-      expect((await product(id)).stock_quantity).toBe(0);
-    } finally {
-      await cashier.auth.signOut();
-    }
+    const { error } = await receive(
+      owner,
+      op,
+      [{ product_id: id, quantity: 1, unit_cost_cents: 500, expiry_date: null }],
+      [],
+      { p_delivery_date: threeDaysAgo }
+    );
+
+    expect(error).toBeNull();
+    const { data } = await owner
+      .from("purchases")
+      .select("purchase_date")
+      .eq("operation_id", op)
+      .single();
+    expect(casablancaDay(new Date((data as { purchase_date: string }).purchase_date))).toBe(
+      threeDaysAgo
+    );
   });
+
+  cashierIt(
+    "a cashier cannot receive, through the RPC or by inserting a purchase directly",
+    async () => {
+      const id = await newProduct();
+      const cashier = await signIn(cashierEmail as string, cashierPassword as string);
+      try {
+        const viaRpc = await receive(cashier, randomUUID(), [
+          { product_id: id, quantity: 1, unit_cost_cents: 1, expiry_date: null },
+        ]);
+        expect(viaRpc.error?.code).toBe("42501");
+
+        const { data: userData } = await cashier.auth.getUser();
+        const direct = await cashier
+          .from("purchases")
+          .insert({ id: randomUUID(), created_by: userData.user?.id, notes: "ZZ-LIVE R1 cashier" });
+        expect(direct.error).not.toBeNull();
+        expect((await product(id)).stock_quantity).toBe(0);
+      } finally {
+        await cashier.auth.signOut();
+      }
+    }
+  );
 });
