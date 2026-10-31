@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import * as Crypto from "expo-crypto";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -8,22 +9,17 @@ import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker"
 import { StockInLine, type LineState } from "@/src/components/stock/StockInLine";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { fetchNegativeStockProducts } from "@/src/lib/inventory/queries";
+import { centsToDisplay, formatMAD, lineTotalCents } from "@/src/lib/money";
+import type { Product } from "@/src/lib/products/queries";
 import {
-  centsToDisplay,
-  formatMAD,
-  lineTotalCents,
-  parseMoneyToCents,
-  parseQuantity,
-} from "@/src/lib/money";
-import { batchUpdateSellingPrices, type Product } from "@/src/lib/products/queries";
-import {
-  createPurchase,
+  ReceiveDeliveryError,
   createSupplier,
   fetchLastPurchasePrice,
   fetchSuppliers,
-  type DraftLine,
+  receiveDelivery,
   type Supplier,
 } from "@/src/lib/stock/queries";
+import { buildReceivePayload } from "@/src/lib/stock/receive";
 
 export default function StockInScreen() {
   const { profile } = useAuth();
@@ -42,6 +38,11 @@ export default function StockInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [negativeStockCount, setNegativeStockCount] = useState(0);
+  // One id per delivery, kept across failed or unanswered saves so the
+  // server recognises a retry instead of receiving the stock again. Cleared
+  // only once the delivery is confirmed or the draft is emptied.
+  const operationId = useRef<string | null>(null);
+  const savingNow = useRef(false);
 
   useEffect(() => {
     fetchSuppliers()
@@ -96,50 +97,43 @@ export default function StockInScreen() {
     }
   };
 
-  const validLines: DraftLine[] = lines.flatMap((line) => {
-    const quantity = parseQuantity(line.quantity);
-    const cost = parseMoneyToCents(line.unitCost);
-    if (quantity === null || quantity <= 0 || cost === null) return [];
-    return [
-      {
-        product_id: line.product.id,
-        quantity,
-        unit_cost_cents: cost,
-        expiry_date: /^\d{4}-\d{2}-\d{2}$/.test(line.expiryDate.trim())
-          ? line.expiryDate.trim()
-          : null,
-      },
-    ];
-  });
+  const { lines: validLines, priceUpdates, invalidCount } = buildReceivePayload(lines);
 
   const total = validLines.reduce(
     (sum, line) => sum + lineTotalCents(line.quantity, line.unit_cost_cents),
     0
   );
-  const incomplete = lines.length > 0 && validLines.length !== lines.length;
+  const incomplete = invalidCount > 0;
 
   const handleSave = async () => {
-    if (!profile || validLines.length === 0) return;
+    if (!profile || validLines.length === 0 || savingNow.current) return;
 
+    savingNow.current = true;
+    operationId.current ??= Crypto.randomUUID();
     setSaving(true);
     setError(null);
     try {
-      await createPurchase(supplierId, validLines, profile.id, notes.trim() || null);
+      await receiveDelivery(operationId.current, {
+        supplierId,
+        notes: notes.trim() || null,
+        lines: validLines,
+        priceUpdates,
+      });
 
-      const priceUpdates = lines
-        .filter((l) => l.newSellingPriceCents !== null)
-        .map((l) => ({ product_id: l.product.id, selling_price_cents: l.newSellingPriceCents! }));
-
-      if (priceUpdates.length > 0) {
-        await batchUpdateSellingPrices(priceUpdates);
-      }
-
+      operationId.current = null;
       setDone(t("stockIn.recordDelivery", { count: validLines.length }) + ` · ${formatMAD(total)}`);
       setLines([]);
       setNotes("");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("common.error"));
+      setError(
+        saveError instanceof ReceiveDeliveryError && saveError.kind === "already_saved"
+          ? t("stockIn.alreadySaved")
+          : saveError instanceof Error
+            ? saveError.message
+            : t("common.error")
+      );
     } finally {
+      savingNow.current = false;
       setSaving(false);
     }
   };
@@ -226,7 +220,12 @@ export default function StockInScreen() {
           onChange={(next) =>
             setLines((current) => current.map((item, i) => (i === index ? next : item)))
           }
-          onRemove={() => setLines((current) => current.filter((_, i) => i !== index))}
+          onRemove={() => {
+            const next = lines.filter((_, i) => i !== index);
+            // An emptied draft is abandoned: the next one is a new delivery.
+            if (next.length === 0) operationId.current = null;
+            setLines(next);
+          }}
         />
       ))}
 
