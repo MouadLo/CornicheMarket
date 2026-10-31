@@ -42,6 +42,7 @@ jest.mock("../../src/lib/products/offlineCache", () => ({
 jest.mock("../../src/lib/products/queries", () => ({
   fetchProducts: async () => [mockProduct()],
   fetchProductByBarcode: async () => mockProduct(),
+  hasAnyProducts: async () => true,
 }));
 function mockProduct() {
   return {

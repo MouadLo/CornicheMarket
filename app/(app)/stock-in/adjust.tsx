@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { formatMAD, parseQuantity } from "@/src/lib/money";
 import {
   ADJUSTMENT_REASONS,
@@ -13,7 +14,7 @@ import {
   type AdjustmentReason,
   type AdjustmentRecord,
 } from "@/src/lib/inventory/queries";
-import { lossValueCents } from "@/src/lib/inventory/reorder";
+import { adjustmentPreviewMessage, lossValueCents } from "@/src/lib/inventory/reorder";
 import type { Product } from "@/src/lib/products/queries";
 
 export default function AdjustScreen() {
@@ -40,9 +41,28 @@ export default function AdjustScreen() {
   const isLoss = reason !== "count_correction";
   const parsed = parseQuantity(quantity);
   const delta = parsed === null ? null : isLoss ? -Math.abs(parsed) : parsed;
+  const preview =
+    product && delta !== null && delta !== 0
+      ? adjustmentPreviewMessage(
+          product.stock_quantity,
+          delta,
+          product.unit,
+          isOwner ? lossValueCents(delta, product.current_cost_cents) : null,
+          formatMAD,
+          t
+        )
+      : null;
 
   const handleSave = async () => {
     if (!profile || !product || delta === null || delta === 0) return;
+
+    const confirmed = await confirmDestructive(
+      t("stockIn.adjustConfirmTitle"),
+      preview ?? "",
+      t("common.confirm"),
+      t("common.cancel")
+    );
+    if (!confirmed) return;
 
     setSaving(true);
     setError(null);
@@ -53,7 +73,7 @@ export default function AdjustScreen() {
       setNote("");
       load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t('common.error'));
+      setError(saveError instanceof Error ? saveError.message : t("common.error"));
     } finally {
       setSaving(false);
     }
@@ -61,18 +81,18 @@ export default function AdjustScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.sectionLabel}>{t('stockIn.adjustTitle')}</Text>
+      <Text style={styles.sectionLabel}>{t("stockIn.adjustTitle")}</Text>
 
       {product ? (
         <View style={styles.selected}>
           <View style={styles.selectedMain}>
             <Text style={styles.name}>{product.name}</Text>
             <Text style={styles.meta}>
-              {product.stock_quantity} {product.unit} {t('stockIn.adjustOnRecord')}
+              {product.stock_quantity} {product.unit} {t("stockIn.adjustOnRecord")}
             </Text>
           </View>
           <Pressable onPress={() => setProduct(null)} hitSlop={8}>
-            <Text style={styles.change}>{t('stockIn.adjustChange')}</Text>
+            <Text style={styles.change}>{t("stockIn.adjustChange")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -81,7 +101,7 @@ export default function AdjustScreen() {
 
       {product && (
         <>
-          <Text style={styles.label}>{t('stockIn.adjustReason')}</Text>
+          <Text style={styles.label}>{t("stockIn.adjustReason")}</Text>
           <View style={styles.chips}>
             {ADJUSTMENT_REASONS.map((option) => (
               <Pressable
@@ -89,9 +109,7 @@ export default function AdjustScreen() {
                 style={[styles.chip, reason === option.value && styles.chipActive]}
                 onPress={() => setReason(option.value)}
               >
-                <Text
-                  style={[styles.chipText, reason === option.value && styles.chipTextActive]}
-                >
+                <Text style={[styles.chipText, reason === option.value && styles.chipTextActive]}>
                   {option.label}
                 </Text>
               </Pressable>
@@ -99,7 +117,7 @@ export default function AdjustScreen() {
           </View>
 
           <Text style={styles.label}>
-            {isLoss ? t('stockIn.adjustQuantityLost') : t('stockIn.adjustDifference')}
+            {isLoss ? t("stockIn.adjustQuantityLost") : t("stockIn.adjustDifference")}
           </Text>
           <TextInput
             style={styles.input}
@@ -113,32 +131,24 @@ export default function AdjustScreen() {
             style={styles.input}
             value={note}
             onChangeText={setNote}
-            placeholder={t('stockIn.adjustNote')}
+            placeholder={t("stockIn.adjustNote")}
           />
 
-          {delta !== null && delta !== 0 && (
-            <Text style={styles.preview}>
-              Stock {product.stock_quantity} → {Number((product.stock_quantity + delta).toFixed(3))}{" "}
-              {product.unit}
-              {isOwner && product.current_cost_cents
-                ? ` · ${formatMAD(lossValueCents(delta, product.current_cost_cents) ?? 0)}`
-                : ""}
-            </Text>
-          )}
+          {preview && <Text style={styles.preview}>{preview}</Text>}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
           <BigButton
-            label={saving ? t('stockIn.adjustSaving') : t('stockIn.adjustRecord')}
+            label={saving ? t("stockIn.adjustSaving") : t("stockIn.adjustRecord")}
             onPress={handleSave}
             disabled={saving || delta === null || delta === 0}
           />
         </>
       )}
 
-      <Text style={styles.sectionLabel}>{t('stockIn.adjustRecent')}</Text>
+      <Text style={styles.sectionLabel}>{t("stockIn.adjustRecent")}</Text>
       {history.length === 0 ? (
-        <Text style={styles.empty}>{t('stockIn.adjustNone')}</Text>
+        <Text style={styles.empty}>{t("stockIn.adjustNone")}</Text>
       ) : (
         history.map((record) => (
           <View key={record.id} style={styles.historyRow}>
@@ -170,7 +180,13 @@ export default function AdjustScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 48 },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase", marginTop: 8 },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#555",
+    textTransform: "uppercase",
+    marginTop: 8,
+  },
   selected: {
     flexDirection: "row",
     alignItems: "center",

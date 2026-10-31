@@ -30,6 +30,7 @@ jest.mock("../../src/lib/products/queries", () => ({
     selling_price_cents: 700,
     current_cost_cents: null,
   }),
+  hasAnyProducts: async () => true,
 }));
 jest.mock("../../src/lib/sales/queries", () => ({ fetchCustomers: async () => [] }));
 jest.mock("../../src/lib/sales/offlineQueue", () => ({ enqueueSale: jest.fn() }));

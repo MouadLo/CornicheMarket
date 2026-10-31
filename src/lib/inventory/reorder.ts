@@ -59,6 +59,31 @@ export function lossValueCents(quantityDelta: number, unitCostCents: number | nu
   return Math.round(-quantityDelta * unitCostCents);
 }
 
+// Same pattern as unitLabel.ts: a generic (t: Translate) param instead of
+// importing i18next's own TFunction type.
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+// What a stock adjustment is about to do, in one sentence: the quantity
+// change and, for the owner, its value. Shared by the inline preview on
+// the Adjust screen and the confirm dialog that gates saving it, so the
+// two never say something different.
+export function adjustmentPreviewMessage(
+  stockQuantity: number,
+  quantityDelta: number,
+  unit: string,
+  lossCents: number | null,
+  formatMAD: (cents: number) => string,
+  t: Translate
+): string {
+  const after = Number((stockQuantity + quantityDelta).toFixed(3));
+  const base = t("stockIn.adjustPreview", {
+    before: stockQuantity,
+    after,
+    unit,
+  });
+  return lossCents !== null && lossCents > 0 ? `${base} · ${formatMAD(lossCents)}` : base;
+}
+
 // How long a product has been in negative stock, for the owner's negative-
 // stock screen. stock_went_negative_at is cleared (null) the moment stock
 // returns to zero or above, so null here means "not currently negative."

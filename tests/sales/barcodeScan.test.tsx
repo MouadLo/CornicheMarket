@@ -53,6 +53,7 @@ jest.mock("../../src/lib/products/queries", () => ({
     catalog.filter((p) => p.name.includes(search) || p.barcode.startsWith(search)),
   // The exact lookup.
   fetchProductByBarcode: async (code: string) => catalog.find((p) => p.barcode === code) ?? null,
+  hasAnyProducts: async () => true,
 }));
 jest.mock("../../src/lib/sales/queries", () => ({ fetchCustomers: async () => [] }));
 jest.mock("../../src/lib/sales/offlineQueue", () => ({ enqueueSale: jest.fn() }));

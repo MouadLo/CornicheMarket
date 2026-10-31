@@ -42,6 +42,7 @@ jest.mock("../../src/lib/products/queries", () => ({
   // Scans use the exact-barcode lookup once it exists (see the barcode PR);
   // mocking both keeps this test independent of merge order.
   fetchProductByBarcode: async () => mockProducts[mockNext],
+  hasAnyProducts: async () => true,
 }));
 jest.mock("../../src/lib/sales/queries", () => ({ fetchCustomers: async () => [] }));
 jest.mock("../../src/lib/sales/offlineQueue", () => ({ enqueueSale: jest.fn() }));

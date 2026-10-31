@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
+import { EmptyStorePrompt } from "@/src/components/sell/EmptyStorePrompt";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -18,7 +19,12 @@ import {
   searchCachedProducts,
   type CachedProduct,
 } from "@/src/lib/products/offlineCache";
-import { fetchProductByBarcode, fetchProducts, type Product } from "@/src/lib/products/queries";
+import {
+  fetchProductByBarcode,
+  fetchProducts,
+  hasAnyProducts,
+  type Product,
+} from "@/src/lib/products/queries";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
@@ -61,6 +67,10 @@ export default function SellScreen() {
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [offlineMeta, setOfflineMeta] = useState<{ refreshedAt: string } | null>(null);
+  // null = not checked yet (or the check failed) -- only an explicit `false`
+  // shows the empty-store prompt, so a load error never hides the normal
+  // screen behind a wrong "add your first product" message.
+  const [storeIsEmpty, setStoreIsEmpty] = useState<boolean | null>(null);
 
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
@@ -75,6 +85,15 @@ export default function SellScreen() {
       .then(setCustomers)
       .catch(() => setCustomers([]));
   }, []);
+
+  // Only the owner can act on the empty-store prompt (add/import products),
+  // and only once online -- never label a merely-offline cache as "empty".
+  useEffect(() => {
+    if (!isOwner || !sync.online) return;
+    hasAnyProducts()
+      .then((has) => setStoreIsEmpty(!has))
+      .catch(() => {});
+  }, [isOwner, sync.online]);
 
   // Refresh the local product cache whenever the device comes online.
   useEffect(() => {
@@ -335,7 +354,13 @@ export default function SellScreen() {
             onRemove={() => setLines((current) => current.filter((_, i) => i !== index))}
           />
         )}
-        ListEmptyComponent={<Text style={styles.empty}>{t("sell.empty")}</Text>}
+        ListEmptyComponent={
+          isOwner && storeIsEmpty ? (
+            <EmptyStorePrompt />
+          ) : (
+            <Text style={styles.empty}>{t("sell.empty")}</Text>
+          )
+        }
       />
 
       {lines.length > 0 && (
