@@ -32,8 +32,12 @@ jest.mock("expo-camera", () => ({
 jest.mock("expo-router", () => {
   const Stack = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
   Stack.Screen = () => null;
-  return { Stack, router: { push: jest.fn() } };
+  return { Stack, router: { push: jest.fn() }, useFocusEffect: jest.fn() };
 });
+jest.mock("expo-keep-awake", () => ({
+  activateKeepAwakeAsync: jest.fn(async () => {}),
+  deactivateKeepAwake: jest.fn(async () => {}),
+}));
 
 let tree: ReactTestRenderer;
 afterEach(() => act(() => tree?.unmount()));

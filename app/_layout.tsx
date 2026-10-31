@@ -9,6 +9,7 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthProvider";
+import { useOrientationLock } from "@/src/lib/device/orientation";
 import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
 
 SplashScreen.preventAutoHideAsync();
@@ -98,6 +99,8 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
   const [i18nReady, setI18nReady] = useState(false);
+
+  useOrientationLock();
 
   useEffect(() => {
     loadSavedLanguage()
