@@ -1,56 +1,72 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { useState } from "react";
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
-import { BigButton } from '@/src/components/BigButton';
-import { useAuth } from '@/src/lib/auth/AuthProvider';
+import { BigButton } from "@/src/components/BigButton";
+import { useAuth } from "@/src/lib/auth/AuthProvider";
 
 export default function SignIn() {
   const { signIn } = useAuth();
   const { t } = useTranslation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const canSubmit = !submitting && !!email && !!password;
+
   const handleSignIn = async () => {
+    if (!canSubmit) return;
     setError(null);
     setSubmitting(true);
     const { error: signInError } = await signIn(email.trim(), password);
     setSubmitting(false);
-    if (signInError) setError(signInError);
+    // Supabase's own message ("Invalid login credentials", a network
+    // TypeError, ...) is in English regardless of the app's language.
+    // Known cases get a translated message; anything else falls back to a
+    // generic one rather than showing raw English/technical text.
+    if (signInError) {
+      setError(
+        /invalid login credentials/i.test(signInError)
+          ? t("auth.invalidCredentials")
+          : t("auth.signInError")
+      );
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Text style={styles.title}>{t('auth.title')}</Text>
+      <Text style={styles.title}>{t("auth.title")}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder={t('auth.email')}
+        placeholder={t("auth.email")}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
+        returnKeyType="next"
       />
       <TextInput
         style={styles.input}
-        placeholder={t('auth.password')}
+        placeholder={t("auth.password")}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        returnKeyType="go"
+        onSubmitEditing={handleSignIn}
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.buttonWrap}>
         <BigButton
-          label={submitting ? t('auth.signingIn') : t('auth.signIn')}
+          label={submitting ? t("auth.signingIn") : t("auth.signIn")}
           onPress={handleSignIn}
-          disabled={submitting || !email || !password}
+          disabled={!canSubmit}
         />
       </View>
     </KeyboardAvoidingView>
@@ -58,16 +74,16 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 24 },
+  container: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
+  title: { fontSize: 28, fontWeight: "700", textAlign: "center", marginBottom: 24 },
   input: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  error: { color: '#b3261e', textAlign: 'center' },
+  error: { color: "#b3261e", textAlign: "center" },
   buttonWrap: { marginTop: 12 },
 });

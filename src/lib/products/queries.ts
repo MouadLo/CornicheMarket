@@ -198,3 +198,13 @@ export async function fetchAllProducts(isOwner: boolean): Promise<Product[]> {
 
   return all;
 }
+
+// Cheapest possible check for "has the owner added anything yet" -- one row,
+// no count. Used only to decide whether Sell shows its first-run prompt
+// (production starts with 0 products), so a failed check should never block
+// the Sell screen: callers treat an error the same as "has products."
+export async function hasAnyProducts(): Promise<boolean> {
+  const { data, error } = await supabase.from("products").select("id").limit(1);
+  if (error) throw new Error(error.message);
+  return (data?.length ?? 0) > 0;
+}

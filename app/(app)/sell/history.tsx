@@ -12,9 +12,11 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { formatMAD } from "@/src/lib/money";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { fetchRecentSales, voidSale, type SaleSummary } from "@/src/lib/sales/queries";
+import { voidSaleConfirmMessage } from "@/src/lib/sales/voidConfirm";
 
 export default function SalesHistory() {
   const { profile } = useAuth();
@@ -41,6 +43,16 @@ export default function SalesHistory() {
   useEffect(load, [load]);
 
   const handleVoid = async (saleId: string) => {
+    const sale = sales.find((s) => s.id === saleId);
+    if (!sale) return;
+    const confirmed = await confirmDestructive(
+      t("sell.voidConfirmTitle"),
+      voidSaleConfirmMessage(sale.total_cents, t),
+      t("sell.voidAndRestore"),
+      t("common.cancel")
+    );
+    if (!confirmed) return;
+
     setSaving(true);
     setError(null);
     try {

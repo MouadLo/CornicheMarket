@@ -1,4 +1,5 @@
 import {
+  adjustmentPreviewMessage,
   countDiscrepancy,
   COVER_DAYS,
   dailySalesRate,
@@ -9,6 +10,7 @@ import {
   stockAfterCount,
   suggestedReorder,
 } from "../../src/lib/inventory/reorder";
+import { formatMAD } from "../../src/lib/money";
 
 describe("stock count", () => {
   it("finds nothing when the shelf matches the system", () => {
@@ -157,5 +159,44 @@ describe("daysNegative", () => {
     const now = new Date("2026-01-10T00:00:00.000Z");
     const wentNegativeAt = "2026-01-10T00:00:01.000Z";
     expect(daysNegative(wentNegativeAt, now)).toBe(0);
+  });
+});
+
+// adjustmentPreviewMessage is what both the inline preview on the Adjust
+// screen and its confirm dialog show -- the one place that says what an
+// adjustment is about to do before it's written.
+describe("adjustmentPreviewMessage", () => {
+  const t = (key: string, options?: Record<string, unknown>) => `${key}:${JSON.stringify(options)}`;
+
+  it("states the stock change", () => {
+    const message = adjustmentPreviewMessage(20, -3, "piece", null, formatMAD, t);
+    expect(message).toBe('stockIn.adjustPreview:{"before":20,"after":17,"unit":"piece"}');
+  });
+
+  it("rounds a fractional kg change the same way the trigger does", () => {
+    const message = adjustmentPreviewMessage(5, -1.5, "kg", null, formatMAD, t);
+    expect(message).toContain('"before":5,"after":3.5,"unit":"kg"');
+  });
+
+  it("appends the loss value for a cashier-invisible, owner-visible loss", () => {
+    const message = adjustmentPreviewMessage(
+      20,
+      -3,
+      "piece",
+      lossValueCents(-3, 600),
+      formatMAD,
+      t
+    );
+    expect(message).toContain(formatMAD(1800));
+  });
+
+  it("does not append a loss value for a positive count correction", () => {
+    const message = adjustmentPreviewMessage(20, 3, "piece", lossValueCents(3, 600), formatMAD, t);
+    expect(message).not.toContain("DH");
+  });
+
+  it("does not append a loss value when the cashier has no cost to show", () => {
+    const message = adjustmentPreviewMessage(20, -3, "piece", null, formatMAD, t);
+    expect(message).not.toContain("DH");
   });
 });

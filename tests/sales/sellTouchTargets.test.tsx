@@ -24,6 +24,7 @@ jest.mock("../../src/lib/products/offlineCache", () => ({
 jest.mock("../../src/lib/products/queries", () => ({
   fetchProducts: async () => [],
   fetchProductByBarcode: async () => null,
+  hasAnyProducts: async () => true,
 }));
 jest.mock("../../src/lib/sales/queries", () => ({ fetchCustomers: async () => [] }));
 jest.mock("../../src/lib/sales/offlineQueue", () => ({ enqueueSale: jest.fn() }));

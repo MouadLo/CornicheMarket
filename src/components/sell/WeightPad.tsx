@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -73,7 +73,11 @@ export function WeightPad({ productName, unitPriceCents, onConfirm, onCancel }: 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <ScrollView
+          style={styles.sheet}
+          contentContainerStyle={styles.sheetContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.title} numberOfLines={1}>
             {isolateBidi(productName)}
           </Text>
@@ -118,7 +122,7 @@ export function WeightPad({ productName, unitPriceCents, onConfirm, onCancel }: 
               />
             </View>
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -130,13 +134,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    gap: 10,
+    // Capped and scrollable (same pattern as PaymentSheet) so the keypad
+    // and its Cancel/Add buttons are always reachable, even on a short
+    // 1280x800 counter viewport with real browser chrome eating into it --
+    // the modal used to clip the confirm button off-screen there.
+    maxHeight: "92%",
     // Keeps the keypad a reasonable size on tablets/web instead of full width.
     width: "100%",
     maxWidth: 480,
     alignSelf: "center",
   },
+  sheetContent: { padding: 20, gap: 10 },
   title: { fontSize: 18, fontWeight: "700", textAlign: "center" },
   price: { fontSize: 14, color: "#666", textAlign: "center" },
   display: { flexDirection: "row", justifyContent: "center", alignItems: "baseline", gap: 8 },
