@@ -17,7 +17,7 @@ const mockCalls: { method: string; args: unknown[] }[] = [];
 let mockResult: { data: unknown; error: { message: string } | null } = { data: null, error: null };
 
 // A chainable builder that records every call and resolves to mockResult.
-function builder() {
+function mockBuilder() {
   const proxy: unknown = new Proxy(
     {},
     {
@@ -38,7 +38,7 @@ jest.mock("../../src/lib/supabase/client", () => ({
     rpc: (fn: string, payload: unknown) => mockRpc(fn, payload),
     from: (table: string) => {
       mockCalls.push({ method: "from", args: [table] });
-      return builder();
+      return mockBuilder();
     },
   },
 }));

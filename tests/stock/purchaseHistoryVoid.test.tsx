@@ -6,7 +6,7 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import PurchaseHistory from "../../app/(app)/stock-in/history";
-import { pressableByText, textOf } from "../sales/sellTestUtils";
+import { textOf } from "../sales/sellTestUtils";
 
 const mockPush = jest.fn();
 const mockT = (key: string, options?: Record<string, unknown>) =>

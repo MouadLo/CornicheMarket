@@ -311,6 +311,23 @@ const en: Translations = {
     historyDelivery: "delivery",
     historyDeliveries: "deliveries",
     historyLoadError: "Could not load history.",
+    deliveryTitle: "Delivery",
+    historyVoidedTag: "VOIDED",
+    deliveryLoadError: "Could not load the delivery.",
+    deliveryOwnerOnly: "Only the owner can view and void a delivery.",
+    deliveryExpiry: "expires {{date}}",
+    deliveryVoidReason: "Reason for voiding (required)",
+    deliveryVoidButton: "Void delivery",
+    deliveryVoiding: "Voiding...",
+    deliveryVoidedBanner: "Delivery voided on {{date}} by {{name}}",
+    deliveryVoidConfirmTitle: "Void this delivery?",
+    deliveryVoidConfirmLine:
+      "{{product}}: stock {{before}} → {{after}} {{unit}}, average cost {{costBefore}} → {{costAfter}}",
+    deliveryVoidConfirmMore: "… and {{count}} more product(s)",
+    deliveryVoidConfirmNotice:
+      "Sales already made keep their cost. Only the remaining stock and the average cost going forward are corrected. A void is final.",
+    deliveryVoidConfirmNegative:
+      "Warning: some products go below zero (they have been sold since). Re-enter the correct delivery to fix the stock.",
     firstTimeBuying: "First time buying this product",
     searchProduct: "Search a product to add",
     barcodeError: "Could not look up that barcode.",

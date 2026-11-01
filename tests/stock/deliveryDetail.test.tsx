@@ -9,7 +9,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import DeliveryDetail from "../../app/(app)/stock-in/delivery/[id]";
 import { BigButton } from "../../src/components/BigButton";
-import { pressableByText, textOf } from "../sales/sellTestUtils";
+import { textOf } from "../sales/sellTestUtils";
 
 let mockRole = "owner";
 const mockFetchPurchase = jest.fn();
@@ -20,7 +20,8 @@ const mockConfirm = jest.fn(async (..._args: unknown[]) => true);
 // Stable t: the screen memoizes its load on it.
 const mockT = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}:${JSON.stringify(options)}` : key;
-jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT }) }));
+const mockI18n = { language: "fr" };
+jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT, i18n: mockI18n }) }));
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "p1" }),
   router: { push: jest.fn(), back: jest.fn() },
@@ -173,6 +174,8 @@ describe("voiding", () => {
     await pressVoid();
     expect(mockFetchPurchase).toHaveBeenCalledTimes(2);
 
+    // The reason is cleared after a successful void; a second attempt needs a new one.
+    await typeReason("typo");
     mockVoid.mockRejectedValueOnce(new Error("Only the owner can void a delivery"));
     await pressVoid();
     expect(textOf(tree.root)).toContain("Only the owner can void a delivery");

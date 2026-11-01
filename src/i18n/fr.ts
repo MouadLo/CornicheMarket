@@ -310,6 +310,23 @@ const fr = {
     historyDelivery: "livraison",
     historyDeliveries: "livraisons",
     historyLoadError: "Impossible de charger l'historique.",
+    deliveryTitle: "Livraison",
+    historyVoidedTag: "ANNULÉE",
+    deliveryLoadError: "Impossible de charger la livraison.",
+    deliveryOwnerOnly: "Seul le propriétaire peut voir et annuler une livraison.",
+    deliveryExpiry: "expire le {{date}}",
+    deliveryVoidReason: "Raison de l'annulation (obligatoire)",
+    deliveryVoidButton: "Annuler la livraison",
+    deliveryVoiding: "Annulation...",
+    deliveryVoidedBanner: "Livraison annulée le {{date}} par {{name}}",
+    deliveryVoidConfirmTitle: "Annuler cette livraison ?",
+    deliveryVoidConfirmLine:
+      "{{product}} : stock {{before}} → {{after}} {{unit}}, coût moyen {{costBefore}} → {{costAfter}}",
+    deliveryVoidConfirmMore: "… et {{count}} autre(s) produit(s)",
+    deliveryVoidConfirmNotice:
+      "Les ventes déjà faites gardent leur coût. Seuls le stock restant et le coût moyen à venir sont corrigés. L'annulation est définitive.",
+    deliveryVoidConfirmNegative:
+      "Attention : certains produits passent sous zéro (ils ont été vendus depuis). Ressaisissez la bonne livraison pour corriger le stock.",
     firstTimeBuying: "Première fois pour ce produit",
     searchProduct: "Rechercher un produit",
     barcodeError: "Impossible de lire ce code-barres.",

@@ -255,6 +255,21 @@ suite("a cashier token cannot reach cost, WAC or profit", () => {
     expect((error as { message: string }).message.toLowerCase()).toContain("owner");
   });
 
+  it("cannot void a delivery, nor preview what voiding one would do to cost", async () => {
+    const none = "00000000-0000-0000-0000-000000000000";
+
+    const voided = await client.rpc("void_purchase", {
+      p_purchase_id: none,
+      p_reason: "rls probe",
+    });
+    const preview = await client.rpc("preview_void_purchase", { p_purchase_id: none });
+
+    for (const { error } of [voided, preview]) {
+      expect(error).toBeTruthy();
+      expect((error as { message: string }).message.toLowerCase()).toContain("owner");
+    }
+  });
+
   it("cannot delete a product", async () => {
     const { data: products } = await client.from("products_cashier_view").select("id").limit(1);
 

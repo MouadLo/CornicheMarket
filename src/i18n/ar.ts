@@ -310,6 +310,23 @@ const ar: Translations = {
     historyDelivery: "تسليم",
     historyDeliveries: "تسليمات",
     historyLoadError: "تعذر تحميل السجل.",
+    deliveryTitle: "التسليم",
+    historyVoidedTag: "ملغاة",
+    deliveryLoadError: "تعذر تحميل التسليم.",
+    deliveryOwnerOnly: "المالك فقط يمكنه عرض التسليم وإلغاؤه.",
+    deliveryExpiry: "تنتهي في {{date}}",
+    deliveryVoidReason: "سبب الإلغاء (إجباري)",
+    deliveryVoidButton: "إلغاء التسليم",
+    deliveryVoiding: "جاري الإلغاء...",
+    deliveryVoidedBanner: "أُلغي التسليم في {{date}} بواسطة {{name}}",
+    deliveryVoidConfirmTitle: "إلغاء هذا التسليم؟",
+    deliveryVoidConfirmLine:
+      "{{product}}: المخزون {{before}} ← {{after}} {{unit}}، متوسط التكلفة {{costBefore}} ← {{costAfter}}",
+    deliveryVoidConfirmMore: "… و{{count}} منتج(ات) أخرى",
+    deliveryVoidConfirmNotice:
+      "المبيعات التي تمت تحتفظ بتكلفتها. يتم تصحيح المخزون المتبقي ومتوسط التكلفة مستقبلاً فقط. الإلغاء نهائي.",
+    deliveryVoidConfirmNegative:
+      "تنبيه: بعض المنتجات ستصبح تحت الصفر (بيعت منذ ذلك). أعد إدخال التسليم الصحيح لتصحيح المخزون.",
     firstTimeBuying: "أول مرة لشراء هذا المنتج",
     searchProduct: "ابحث عن منتج للإضافة",
     barcodeError: "تعذر البحث عن هذا الرمز الشريطي.",
