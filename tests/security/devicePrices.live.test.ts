@@ -150,12 +150,12 @@ suite("device prices are flagged, never rejected (live)", () => {
     it("a discounted line at the right price is not a mismatch (discounts are separate fields)", async () => {
       const p = await newProduct(1000);
       const { id, error } = await sell(
-        [{ product_id: p, quantity: 2, unit_price_cents: 1000, discount_cents: 300 }],
+        [{ product_id: p, quantity: 2, unit_price_cents: 1000, discount_cents: 150 }],
         { discountCents: 100 }
       );
       expect(error).toBeNull();
       const row = await saleRow(id);
-      expect(row?.total_cents).toBe(1600);
+      expect(row?.total_cents).toBe(1750);
       expect(row?.needs_price_review).toBe(false);
       expect(await logFor(id)).toHaveLength(0);
     });

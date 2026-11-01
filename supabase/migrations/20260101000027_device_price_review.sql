@@ -11,9 +11,13 @@
 --     price, and whether the device price equals the PREVIOUS price, which
 --     tells a stale offline cache apart from a typo or tampering).
 --
--- Discounts are not part of the comparison: a line's discount_cents and the
--- sale discount are separate, already-validated fields, so a discounted line at
--- the right unit price is not a mismatch.
+-- Discounts are not part of the price comparison: a line's discount_cents and
+-- the sale discount are separate, already-validated fields, so a discounted
+-- line at the right unit price is not a price mismatch. They get their own,
+-- equally non-blocking review: a line discount above X % of that line's amount,
+-- or a sale discount above X % of the basket (after line discounts), sets
+-- sales.needs_discount_review and logs a discount_over_threshold row. X is the
+-- owner's setting (default 10) in owner_settings, which cashiers cannot read.
 --
 -- Needs two things that did not exist: a selling-price history (the old price
 -- was overwritten in place) and an activity log. activity_log has exactly the
@@ -103,7 +107,18 @@ create index idx_activity_log_entity on public.activity_log (entity_id);
 create index idx_activity_log_action on public.activity_log (action, occurred_at desc);
 
 alter table public.sales
-  add column needs_price_review boolean not null default false;
+  add column needs_price_review boolean not null default false,
+  add column needs_discount_review boolean not null default false;
+
+-- Owner-only settings singleton (same shape as planned in SELL-GRID-DESIGN 2.5;
+-- the grid migration adds its own columns to this table instead of creating
+-- it). Not store_settings: that table is readable by every signed-in user.
+create table public.owner_settings (
+  singleton               boolean primary key default true check (singleton),
+  discount_review_percent numeric(5,2) not null default 10
+    check (discount_review_percent between 0 and 100)
+);
+insert into public.owner_settings (singleton) values (true);
 
 -------------------------------------------------------------------------------
 -- 3. record_sale: same behaviour as 026, plus the price check. The check runs
@@ -130,6 +145,9 @@ declare
   v_line_subtotal bigint;
   v_line_discount bigint;
   v_mismatches jsonb;
+  v_pct numeric;
+  v_discount_lines jsonb;
+  v_sale_discount jsonb;
 begin
   if v_actor is null or not exists (
     select 1 from public.profiles where id = v_actor and role in ('owner', 'cashier')
@@ -262,6 +280,63 @@ begin
     raise warning 'price review skipped for sale %: %', p_sale_id, sqlerrm;
   end;
 
+  -- Discount review: same rules, own block, so neither check can skip the
+  -- other and neither can fail the sale. "Exceeds" is strict: a discount of
+  -- exactly the threshold is fine. Comparisons stay in integers/numerics.
+  begin
+    select discount_review_percent into v_pct from public.owner_settings where singleton;
+    v_pct := coalesce(v_pct, 10);
+
+    select jsonb_agg(
+             jsonb_build_object(
+               'product_id', l.product_id,
+               'product_name', pr.name,
+               'line_amount_cents', l.amount,
+               'discount_cents', l.discount,
+               'percent', round(l.discount * 100.0 / l.amount, 2)
+             )
+             order by l.ord
+           )
+      into v_discount_lines
+    from (
+      select ord,
+             (line ->> 'product_id')::uuid as product_id,
+             round((line ->> 'quantity')::numeric * (line ->> 'unit_price_cents')::bigint)::bigint as amount,
+             coalesce((line ->> 'discount_cents')::bigint, 0) as discount
+      from jsonb_array_elements(p_lines) with ordinality as t(line, ord)
+    ) l
+    join public.products pr on pr.id = l.product_id
+    where l.amount > 0 and l.discount * 100 > v_pct * l.amount;
+
+    if p_discount_cents > 0 and v_lines_total > 0
+       and p_discount_cents * 100 > v_pct * v_lines_total then
+      v_sale_discount := jsonb_build_object(
+        'discount_cents', p_discount_cents,
+        'basket_cents', v_lines_total,
+        'percent', round(p_discount_cents * 100.0 / v_lines_total, 2)
+      );
+    end if;
+
+    if v_discount_lines is not null or v_sale_discount is not null then
+      update public.sales set needs_discount_review = true where id = p_sale_id;
+      insert into public.activity_log (actor_id, action, entity_id, details)
+      values (
+        v_actor,
+        'discount_over_threshold',
+        p_sale_id,
+        jsonb_build_object(
+          'sale_id', p_sale_id,
+          'occurred_at', p_occurred_at,
+          'threshold_percent', v_pct,
+          'lines', coalesce(v_discount_lines, '[]'::jsonb),
+          'sale_discount', v_sale_discount
+        )
+      );
+    end if;
+  exception when others then
+    raise warning 'discount review skipped for sale %: %', p_sale_id, sqlerrm;
+  end;
+
   return p_sale_id;
 end;
 $$;
@@ -291,20 +366,51 @@ begin
 end;
 $$;
 
+create function public.dismiss_discount_review(p_sale_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner can review discounts' using errcode = '42501';
+  end if;
+
+  update public.sales set needs_discount_review = false
+  where id = p_sale_id and needs_discount_review;
+
+  if found then
+    insert into public.activity_log (actor_id, action, entity_id, details)
+    values (auth.uid(), 'discount_review_dismissed', p_sale_id, jsonb_build_object('sale_id', p_sale_id));
+  end if;
+end;
+$$;
+
 -------------------------------------------------------------------------------
 -- 5. Privileges (the pattern of migration 026: nothing for anon; clients read
 --    through RLS only; every write goes through a trusted function).
 -------------------------------------------------------------------------------
 alter table public.selling_price_history enable row level security;
 alter table public.activity_log enable row level security;
+alter table public.owner_settings enable row level security;
 
 create policy "owner reads price history" on public.selling_price_history
   for select using (public.is_owner());
 create policy "owner reads activity log" on public.activity_log
   for select using (public.is_owner());
+create policy "owner reads owner settings" on public.owner_settings
+  for select using (public.is_owner());
+create policy "owner updates owner settings" on public.owner_settings
+  for update using (public.is_owner()) with check (public.is_owner());
 
-revoke all on public.selling_price_history, public.activity_log from anon, authenticated;
+revoke all on public.selling_price_history, public.activity_log, public.owner_settings
+  from anon, authenticated;
 grant select on public.selling_price_history, public.activity_log to authenticated;
+-- The owner edits the setting directly (it is configuration, not money); there
+-- is no insert or delete: the singleton row always exists.
+grant select on public.owner_settings to authenticated;
+grant update (discount_review_percent) on public.owner_settings to authenticated;
 
 -- Trigger and helper functions are not callable by clients.
 revoke execute on function
@@ -312,5 +418,7 @@ revoke execute on function
   public.selling_price_at(uuid, timestamptz)
 from public, anon, authenticated;
 
-revoke execute on function public.dismiss_price_review(uuid) from public, anon;
-grant execute on function public.dismiss_price_review(uuid) to authenticated;
+revoke execute on function public.dismiss_price_review(uuid), public.dismiss_discount_review(uuid)
+  from public, anon;
+grant execute on function public.dismiss_price_review(uuid), public.dismiss_discount_review(uuid)
+  to authenticated;
