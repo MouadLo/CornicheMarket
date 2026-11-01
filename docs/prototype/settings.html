@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réglages · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="settings" data-section="settings" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="page-head"><h1 class="page-title" data-ar="الإعدادات">Réglages</h1></div>
+<div class="settings" style="border-top:1px solid var(--divider)">
+  <nav class="set-nav" data-tabs="set-panes">
+    <div class="sec owner-only" data-ar="المحل">MAGASIN</div>
+    <button data-tab="store" class="owner-only"><i data-icon="store"></i><span data-ar="المحل">Magasin</span></button>
+    <button data-tab="team" class="owner-only"><i data-icon="users"></i><span data-ar="الفريق والرموز السرية">Équipe et codes PIN</span></button>
+    <button data-tab="sales" class="owner-only"><i data-icon="cart"></i><span data-ar="البيع والمتفرقات">Vente et Divers</span></button>
+    <button data-tab="receipts" class="owner-only"><i data-icon="receipt"></i><span data-ar="التذاكر وواتساب">Tickets et WhatsApp</span></button>
+    <div class="sec" data-ar="هذا الجهاز">CET APPAREIL</div>
+    <button data-tab="device" class="owner-only"><i data-icon="monitor"></i><span data-ar="الشاشة والماسح والطابعة">Écran, scanner, imprimante</span></button>
+    <button data-tab="lang"><i data-icon="languages"></i><span data-ar="اللغة">Langue</span></button>
+    <div class="sec owner-only" data-ar="البيانات">DONNÉES</div>
+    <button data-tab="backup" class="owner-only"><i data-icon="shield"></i><span data-ar="النسخ الاحتياطي والتصدير">Sauvegarde et export</span></button>
+    <button data-tab="account"><i data-icon="user"></i><span data-ar="حسابي">Mon compte</span></button>
+  </nav>
+  <div id="set-panes" style="min-height:0;display:flex;flex-direction:column">
+    <section class="set-pane" data-pane="team">
+      <div style="display:flex;align-items:center;gap:12px"><h2 style="font-size:var(--fs-subtitle)" class="grow" data-ar="الفريق">Équipe</h2><button class="btn btn-primary"><i data-icon="userplus"></i><span data-ar="دعوة أمين صندوق">Inviter un caissier</span></button></div>
+      <div class="card" style="padding:0 16px">
+        <div class="set-row"><span class="avatar brand" style="width:44px;height:44px">M</span><div class="r-main"><b data-ar="مُعاذ">Mouad</b><div class="c-sub" data-ar="المالك · رمز من 6 أرقام · هذا الجهاز">Propriétaire · PIN à 6 chiffres · cet appareil</div></div><button class="btn btn-secondary btn-sm" data-ar="تغيير الرمز">Changer le PIN</button></div>
+        <div class="set-row"><span class="avatar purple" style="width:44px;height:44px">S</span><div class="r-main"><b data-ar="سلمى">Salma</b><div class="c-sub" data-ar="أمينة صندوق · نشطة منذ 08:02">Caissière · active depuis 08:02</div></div><span class="status ok"><i data-icon="check"></i><span data-ar="الرمز محدد">PIN défini</span></span><button class="btn btn-secondary btn-sm" data-ar="تغيير الرمز">Changer le PIN</button></div>
+        <div class="set-row"><span class="avatar teal" style="width:44px;height:44px">Y</span><div class="r-main"><b data-ar="يوسف">Youssef</b><div class="c-sub" data-ar="أمين صندوق · آخر نشاط أمس 21:40">Caissier · vu hier 21:40</div></div><span class="status ok"><i data-icon="check"></i><span data-ar="الرمز محدد">PIN défini</span></span><button class="btn btn-secondary btn-sm" data-ar="تغيير الرمز">Changer le PIN</button></div>
+      </div>
+      <h2 style="font-size:var(--fs-subtitle);margin-top:8px" data-ar="القفل والتبديل">Verrouillage et changement de caissier</h2>
+      <div class="card" style="padding:0 16px">
+        <div class="set-row"><div class="r-main"><b data-ar="قفل تلقائي بعد عدم النشاط">Verrouiller après inactivité</b><div class="c-sub" data-ar="السلة الجارية تبقى محفوظة">Le panier en cours est gardé</div></div><div class="chips" data-chips="one"><button class="chip">1 min</button><button class="chip on">3 min</button><button class="chip">10 min</button><button class="chip" data-ar="أبدًا">Jamais</button></div></div>
+        <div class="set-row"><div class="r-main"><b data-ar="طلب رمز المالك لـ">Demander le PIN du propriétaire pour</b><div class="c-sub" data-ar="إلغاء بيع · خصم فوق 10% · فتح الدرج بدون بيع">annuler une vente · remise de plus de 10 % · tiroir sans vente</div></div><span class="toggle on"></span></div>
+      </div>
+    </section>
+    <section class="set-pane" data-pane="device">
+      <h2 style="font-size:var(--fs-subtitle)" data-ar="هذا الجهاز: الصندوق 1 (حاسوب لمسي)">Cet appareil : Caisse 1 (PC tactile)</h2>
+      <div class="card" style="padding:0 16px">
+        <div class="set-row"><i data-icon="keyboard"></i><div class="r-main"><b data-ar="لوحة مفاتيح مدمجة (لمس فقط)">Clavier intégré (tactile seulement)</b><div class="c-sub" data-ar="مكتشف تلقائيًا: لا توجد لوحة مفاتيح">Détecté automatiquement : aucun clavier branché</div></div><span class="toggle on"></span></div>
+        <div class="set-row"><i data-icon="grid"></i><div class="r-main"><b data-ar="حجم المربعات">Taille des tuiles</b></div><div class="seg" style="width:200px"><button>S</button><button class="on">M</button><button>L</button></div></div>
+        <div class="set-row"><i data-icon="scan"></i><div class="r-main"><b data-ar="ماسح USB">Scanner USB</b><div class="c-sub" data-ar="جاهز · آخر مسح 14:31 · يستمع في كل الشاشات">Prêt · dernier scan 14:31 · écoute sur tous les écrans</div></div><button class="btn btn-secondary btn-sm" data-ar="اختبار">Tester</button></div>
+        <div class="set-row"><i data-icon="printer"></i><div class="r-main"><b data-ar="طابعة التذاكر">Imprimante de tickets</b><div class="c-sub" data-ar="لا شيء · USB 80 مم عبر المتصفح (لاحقًا)">Aucune · USB 80 mm via le navigateur (plus tard)</div></div><button class="btn btn-secondary btn-sm" data-ar="إضافة">Ajouter</button></div>
+        <div class="set-row"><i data-icon="monitor"></i><div class="r-main"><b data-ar="ملء الشاشة">Plein écran (kiosque)</b><div class="c-sub" data-ar="مثبت كتطبيق · يفتح على البيع">Installée comme application · s’ouvre sur Vente</div></div><span class="status ok"><i data-icon="check"></i>OK</span></div>
+        <div class="set-row"><i data-icon="sun"></i><div class="r-main"><b data-ar="المظهر">Thème</b><div class="c-sub" data-ar="فاتح. الوضع الليلي ليس مخططًا قبل الإطلاق.">Clair. Le mode soir n’est pas prévu avant le lancement.</div></div></div>
+      </div>
+    </section>
+    <section class="set-pane" data-pane="sales">
+      <h2 style="font-size:var(--fs-subtitle)" data-ar="البيع والمتفرقات">Vente et Divers</h2>
+      <div class="card" style="padding:0 16px">
+        <div class="set-row"><div class="r-main"><b data-ar="الحد الأقصى لسطر متفرقات">Montant maximum d’une ligne Divers</b></div><span class="cell-input" style="min-width:120px">200.00 DH</span></div>
+        <div class="set-row"><div class="r-main"><b data-ar="الهامش التقديري للمتفرقات">Marge estimée des Divers</b><div class="c-sub" data-ar="يستعمل لتقدير التكلفة في التقارير. لا يراه أمين الصندوق.">Sert à estimer le coût dans les rapports. Jamais visible par un caissier.</div></div><span class="cell-input">20 %</span></div>
+        <div class="set-row"><div class="r-main"><b data-ar="أزرار الأوراق النقدية السريعة">Billets rapides au paiement</b></div><span class="num muted">50 · 100 · 200</span></div>
+      </div>
+    </section>
+    <section class="set-pane" data-pane="store"><h2 style="font-size:var(--fs-subtitle)" data-ar="المحل">Magasin</h2><div class="card"><div class="form-row"><span class="lbl" data-ar="الاسم">Nom</span><div class="field"><span class="val">Corniche Market</span></div></div><div class="form-row"><span class="lbl" data-ar="العنوان (يظهر في التذاكر)">Adresse (sur les tickets)</span><div class="field"><span class="val">Bd de la Corniche, Aïn Diab</span></div></div><div class="form-2"><div><span class="lbl" data-ar="هاتف واتساب">Téléphone WhatsApp</span><div class="field"><span class="val num">0661 00 00 00</span></div></div><div><span class="lbl" data-ar="المنطقة الزمنية">Fuseau horaire</span><div class="field"><span class="val">Africa/Casablanca</span></div></div></div></div></section>
+    <section class="set-pane" data-pane="receipts"><h2 style="font-size:var(--fs-subtitle)" data-ar="التذاكر وواتساب">Tickets et WhatsApp</h2><div class="card"><div class="lbl" data-ar="معاينة الرسالة">Aperçu du message</div><pre style="font-family:var(--font);background:var(--sunken);border-radius:var(--r-control);padding:14px;margin:0;white-space:pre-wrap">Corniche Market · 01/11 14:32
+Ticket #0188
+4 × Pain rond ........ 4.80
+1 × Lait Centrale 1L . 7.00
+0.750 kg Tomates ..... 6.75
+2 × Coca-Cola 33cl .. 14.00
+TOTAL ............... 32.55 DH
+Merci ! شكرا</pre></div></section>
+    <section class="set-pane" data-pane="backup"><h2 style="font-size:var(--fs-subtitle)" data-ar="النسخ الاحتياطي والتصدير">Sauvegarde et export</h2><div class="banner warn"><i data-icon="alert"></i><span data-ar="آخر نسخة احتياطية منذ 3 أيام">Dernière sauvegarde il y a 3 jours</span><button class="btn btn-primary btn-sm"><i data-icon="download" class="ic-sm"></i><span data-ar="تصدير الكل">Tout exporter</span></button></div></section>
+    <section class="set-pane" data-pane="lang"><h2 style="font-size:var(--fs-subtitle)" data-ar="لغة هذا الجهاز">Langue de cet appareil</h2><div class="card"><div class="chips"><a class="chip" href="settings.html?pane=lang&amp;lang=fr" data-raw="1">Français</a><a class="chip" href="settings.html?pane=lang&amp;lang=ar" data-raw="1">العربية</a><span class="chip">English</span></div><p class="help" data-ar="يطبق فورًا، بدون إعادة تشغيل. الاتجاه من اليمين إلى اليسار للعربية.">Appliquée tout de suite, sans redémarrage. Droite à gauche pour l’arabe.</p></div></section>
+    <section class="set-pane" data-pane="account"><h2 style="font-size:var(--fs-subtitle)" data-ar="حسابي">Mon compte</h2><div class="card" style="padding:0 16px"><div class="set-row"><div class="r-main"><b>owner@corniche.ma</b><div class="c-sub" data-ar="البريد الإلكتروني للدخول">E-mail de connexion</div></div></div><div class="set-row owner-only"><div class="r-main"><b data-ar="تسجيل خروج هذا الجهاز">Déconnecter cet appareil</b><div class="c-sub" data-ar="سيطلب كلمة سر المالك لإعادة تفعيله">Le mot de passe du propriétaire sera demandé pour le réactiver</div></div><button class="btn btn-danger-soft btn-sm" data-ar="تسجيل الخروج">Déconnecter</button></div></div></section>
+  </div>
+</div>
+  </main>
+</div>
+
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  
+  bootShell(); settingsScreen();
+</script>
+</body>
+</html>

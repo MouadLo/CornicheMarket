@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Produits · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="products" data-section="products" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="cashier-only state" style="margin:auto">
+  <div class="state-ic"><i data-icon="lock" class="ic-lg"></i></div>
+  <h3 data-ar="خاص بالمالك">Réservé au propriétaire</h3>
+  <p data-ar="وضع البيع يعرض فقط البيع والزبائن. هذه الصفحة لا تظهر في قائمة أمين الصندوق.">Le mode caisse ne montre que Vente et Clients. Cette page n’apparaît pas dans le menu d’un caissier.</p>
+  <a class="btn btn-primary" href="sell.html"><i data-icon="cart"></i><span data-ar="العودة إلى البيع">Retour à la vente</span></a>
+</div>
+<div class="md owner-only">
+  <div class="md-list">
+    <div class="page-head"><h1 class="page-title" data-ar="المنتجات">Produits</h1><span class="page-sub"><span id="p-count"></span> <span data-ar="منتج نشط">actifs</span></span><span class="grow"></span>
+      <button class="btn btn-secondary" data-open="pop-pmore"><span data-ar="المزيد">Plus</span><i data-icon="down" class="ic-sm"></i></button>
+      <button class="btn btn-primary"><i data-icon="plus"></i><span data-ar="منتج جديد">Nouveau produit</span></button></div>
+    <div style="display:flex;gap:10px;padding:0 24px 10px;align-items:center">
+      <div class="field grow"><i data-icon="search"></i><span class="ph" data-ar="الاسم أو الباركود أو «coca»">Nom, code-barres ou « كوكا »</span></div>
+      <div class="seg" style="width:280px"><button class="on" data-ar="نشطة">Actifs</button><button data-ar="معطلة">Inactifs</button><button data-ar="الكل">Tous</button></div>
+      <button class="chip"><i data-icon="alert" class="ic-sm"></i><span data-ar="مخزون منخفض">Stock bas</span></button>
+    </div>
+    <div class="chips" id="p-cats" style="padding:0 24px 12px" data-chips="one"></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th data-ar="المنتج">Produit</th><th class="hide-narrow" data-ar="الفئة">Catégorie</th><th class="num" data-ar="المخزون">Stock</th><th class="num owner-only" data-ar="متوسط التكلفة">Coût moyen</th><th class="num" data-ar="ثمن البيع">Prix de vente</th><th class="num owner-only" data-ar="الهامش">Marge</th><th></th></tr></thead><tbody id="p-rows"></tbody></table></div>
+  </div>
+  <aside class="panel" id="p-panel"></aside>
+</div>
+<div class="popover" id="pop-pmore" style="top:64px;inset-inline-end:200px;width:300px">
+  <button class="pop-item"><i data-icon="upload"></i><span data-ar="استيراد CSV">Importer un fichier CSV</span></button>
+  <button class="pop-item"><i data-icon="download"></i><span data-ar="تصدير CSV">Exporter en CSV</span></button>
+  <button class="pop-item"><i data-icon="percent"></i><span data-ar="تغيير الأسعار دفعة واحدة">Changer les prix en masse</span></button>
+  <button class="pop-item"><i data-icon="printer"></i><span data-ar="طباعة ملصقات الباركود">Imprimer des étiquettes</span></button>
+</div>
+  </main>
+</div>
+
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  window.STATES = [['panel','Fiche produit ouverte']];
+  bootShell(); productsScreen();
+</script>
+</body>
+</html>

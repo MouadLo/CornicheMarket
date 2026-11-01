@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verrouillage · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="lock" data-section="lock" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+
+<div class="lock">
+  <div class="lock-body">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px" id="lock-brand"></div>
+    <div class="big-clock">14:32</div>
+    <div class="date" data-ar="الأحد 1 نونبر">dimanche 1 novembre</div>
+    <div class="held"><i data-icon="cart" class="ic-sm"></i><span data-ar="السلة الجارية محفوظة: 4 منتجات · 32.55 DH">Panier en cours gardé : 4 articles · 32.55 DH</span></div>
+    <p id="who-hint" style="margin-top:28px;font-size:var(--fs-subtitle);font-weight:600" data-ar="من يبيع؟">Qui encaisse ?</p>
+    <div class="who-grid">
+      <button class="who-card" data-who="salma"><span class="avatar purple">S</span><span data-ar="سلمى">Salma</span><small data-ar="أمينة صندوق">Caissière</small></button>
+      <button class="who-card" data-who="youssef"><span class="avatar teal">Y</span><span data-ar="يوسف">Youssef</span><small data-ar="أمين صندوق">Caissier</small></button>
+      <button class="who-card" data-who="mouad"><span class="avatar brand">M</span><span data-ar="مُعاذ">Mouad</span><small data-ar="المالك">Propriétaire</small></button>
+    </div>
+    <div class="pin-box" id="pin">
+      <div style="font-size:var(--fs-subtitle);font-weight:600"><span data-ar="الرمز السري لـ">Code PIN de</span> <span id="pin-name"></span></div>
+      <div class="pin-dots" id="pin-dots"></div>
+      <div class="keypad"><button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button><button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button><button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button><span></span><button class="key" data-k="0">0</button><button class="key fn" data-k="del"><i data-icon="backspace"></i></button></div>
+    </div>
+  </div>
+</div>
+
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  window.STATES = [['pin','Saisie du PIN'],['who','Choisir le caissier']];
+  bootShell(); document.getElementById('lock-brand').innerHTML = brandMark(44) + '<b style="font-size:22px">Corniche Market</b>'; lockScreen();
+</script>
+</body>
+</html>

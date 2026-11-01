@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapports · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="reports" data-section="reports" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="cashier-only state" style="margin:auto">
+  <div class="state-ic"><i data-icon="lock" class="ic-lg"></i></div>
+  <h3 data-ar="خاص بالمالك">Réservé au propriétaire</h3>
+  <p data-ar="وضع البيع يعرض فقط البيع والزبائن. هذه الصفحة لا تظهر في قائمة أمين الصندوق.">Le mode caisse ne montre que Vente et Clients. Cette page n’apparaît pas dans le menu d’un caissier.</p>
+  <a class="btn btn-primary" href="sell.html"><i data-icon="cart"></i><span data-ar="العودة إلى البيع">Retour à la vente</span></a>
+</div>
+<div class="owner-only" style="display:flex;flex-direction:column;flex:1;min-height:0">
+<div class="page-head"><h1 class="page-title" data-ar="التقارير">Rapports</h1>
+  <div class="chips" data-chips="one" style="margin-inline-start:12px"><button class="chip on" data-ar="اليوم">Aujourd’hui</button><button class="chip" data-ar="أمس">Hier</button><button class="chip" data-ar="7 أيام">7 jours</button><button class="chip" data-ar="هذا الشهر">Ce mois</button><button class="chip"><i data-icon="calendar" class="ic-sm"></i><span data-ar="فترة أخرى">Autre…</span></button></div>
+  <span class="grow"></span><button class="btn btn-secondary btn-sm"><i data-icon="download" class="ic-sm"></i><span data-ar="تصدير">Exporter</span></button><button class="btn btn-primary btn-sm" data-open="dlg-close"><i data-icon="receipt" class="ic-sm"></i><span data-ar="إغلاق اليوم">Clôture du jour</span></button></div>
+<div class="rep">
+  <div class="card kpi hero" id="k-profit"></div>
+  <div class="card kpi" id="k-rev"></div>
+  <div class="card kpi" id="k-tix"></div>
+  <div class="card kpi" id="k-margin"></div>
+  <div class="card span-8"><div style="display:flex;align-items:center;gap:12px"><div class="card-title" style="margin:0" data-ar="آخر 7 أيام">7 derniers jours</div><span class="grow"></span><div class="legend"><span><i style="background:var(--brand-100)"></i><span data-ar="رقم المعاملات">Chiffre d’affaires</span></span><span><i style="background:var(--brand-700)"></i><span data-ar="الربح">Bénéfice</span></span><span><i style="background:var(--success-600)"></i><span data-ar="اليوم">Aujourd’hui</span></span></div></div><div class="bars" id="bars"></div></div>
+  <div class="card span-4"><div class="card-title"><i data-icon="alert" class="ic-sm"></i><span data-ar="للقيام به">À faire</span></div><div class="todo">
+    <a href="stock.html"><span class="t-ic" style="background:var(--warning-100);color:var(--warning-700)"><i data-icon="cart" class="ic-sm"></i></span><span class="grow"><b class="num">5</b> <span data-ar="منتجات للطلب">produits à commander</span></span><i data-icon="chevron" class="ic-sm"></i></a>
+    <a href="stock.html"><span class="t-ic" style="background:var(--warning-100);color:var(--warning-700)"><i data-icon="hourglass" class="ic-sm"></i></span><span class="grow"><b class="num">2</b> <span data-ar="دفعات تنتهي خلال 7 أيام">lots expirent sous 7 jours</span></span><i data-icon="chevron" class="ic-sm"></i></a>
+    <a href="stock.html"><span class="t-ic" style="background:var(--danger-100);color:var(--danger-700)"><i data-icon="alert" class="ic-sm"></i></span><span class="grow"><bdi>Huile de table 1L</bdi> <span data-ar="مخزون سالب">en stock négatif</span> <b class="num">(−2)</b></span><i data-icon="chevron" class="ic-sm"></i></a>
+    <a href="settings.html?pane=backup"><span class="t-ic" style="background:var(--brand-100);color:var(--brand-700)"><i data-icon="shield" class="ic-sm"></i></span><span class="grow" data-ar="آخر نسخة احتياطية منذ 3 أيام">Dernière sauvegarde il y a 3 jours</span><i data-icon="chevron" class="ic-sm"></i></a>
+  </div></div>
+  <div class="card span-5"><div class="card-title" data-ar="أفضل الأرباح">Meilleurs bénéfices</div><table class="table" style="margin-inline:-16px;width:calc(100% + 32px)"><tbody id="top"></tbody></table></div>
+  <div class="card span-4"><div class="card-title" data-ar="حسب الفئة (حصة من رقم المعاملات)">Par catégorie (part du CA)</div><div id="cats"></div></div>
+  <div class="card span-3"><div class="card-title" data-ar="حسب الساعة">Par heure</div><div class="mini-hours" id="hours"></div><div class="c-sub" style="margin-top:8px"><span data-ar="الذروة">Pic</span> <span class="num">19:00–20:00</span></div><div class="c-sub"><span data-ar="متفرقات (تقديري):">Divers (estimé) :</span> <span class="num">9</span> · <span class="money">86.00 DH</span></div></div>
+</div>
+</div>
+  </main>
+</div>
+
+<div class="dialog-wrap" id="dlg-close"><div class="dialog" style="width:640px">
+  <h2><span class="d-icon info"><i data-icon="receipt"></i></span><span data-ar="إغلاق يوم الأحد 1 نونبر">Clôture du dimanche 1 novembre</span></h2>
+  <p class="muted" data-ar="من 08:00 إلى الآن · 187 تذكرة">De 08:00 à maintenant · 187 tickets</p>
+  <div class="consequence" style="margin-top:14px">
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span><i data-icon="banknote" class="ic-sm"></i> <span data-ar="مبيعات نقدًا">Ventes en espèces</span></span><b class="money">2 640.00 DH</b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span><i data-icon="book" class="ic-sm"></i> <span data-ar="دفعات الكريدي نقدًا">Remboursements de crédit (espèces)</span></span><b class="money up">+200.00 DH</b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span><i data-icon="undo" class="ic-sm"></i> <span data-ar="إلغاءات (1)">Annulations (1)</span></span><b class="money down">−2.40 DH</b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto;min-height:52px"><b data-ar="النقود المتوقعة في الصندوق">Espèces attendues dans la caisse</b><b class="money" style="font-size:var(--fs-subtitle)">2 837.60 DH</b></div>
+  </div>
+  <div class="consequence">
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span data-ar="بطاقة">Carte</span><span class="money">412.50 DH</span></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span data-ar="كريدي جديد">Nouveau crédit accordé</span><span class="money">430.00 DH</span></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span data-ar="سلمى · 68 تذكرة">Salma · 68 tickets</span><span class="money">1 284.50 DH</span></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span data-ar="يوسف · 94 تذكرة">Youssef · 94 tickets</span><span class="money">1 790.00 DH</span></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span data-ar="مُعاذ · 25 تذكرة">Mouad · 25 tickets</span><span class="money">408.00 DH</span></div>
+  </div>
+  <div class="actions"><button class="btn btn-secondary" data-close data-ar="إغلاق">Fermer</button><button class="btn btn-secondary"><i data-icon="message"></i>WhatsApp</button><button class="btn btn-primary"><i data-icon="printer"></i><span data-ar="طباعة">Imprimer</span></button></div>
+</div></div>
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  window.STATES = [['close','Clôture du jour']];
+  bootShell(); reportsScreen(); if (Q.get('open')==='close') openLayer('dlg-close');
+</script>
+</body>
+</html>
