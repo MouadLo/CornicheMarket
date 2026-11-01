@@ -1,0 +1,115 @@
+/* Corniche Market design tokens (docs/THEME-STRUCTURE.md, Part 2).
+   One source of truth. These names map one-to-one onto src/theme/tokens.ts
+   in build step D1. Every text/background pair used in the prototype is
+   contrast-checked in the doc (WCAG 2.1 relative luminance; all text pairs
+   pass AA, most pass AAA). */
+:root {
+  /* ---- Brand: "Atlantique" (the sea off the Corniche) and "Sable" (the beach). */
+  --brand-900: #072f3c;
+  --brand-800: #093f50;  /* top bar, pressed primary. white on it 11.4:1 */
+  --brand-700: #0b5266;  /* primary buttons, active nav, links. white on it 8.7:1 */
+  --brand-600: #0e6680;  /* hover / focus ring. white on it 6.5:1 */
+  --brand-100: #e3f0f3;  /* selected chip, active rail pill, info background */
+  --brand-50:  #f0f7f9;
+  --sand-500:  #e9a93a;  /* identity only (logo sun, awning, favourites star). Never a state colour. */
+  --sand-100:  #fbf1dc;
+
+  /* ---- Ink (blue-tinted neutrals) and surfaces. */
+  --ink-900: #15212b;    /* primary text: 16.4:1 on surface, 14.9:1 on bg */
+  --ink-700: #35434f;    /* strong secondary: 10.2:1 */
+  --ink-600: #52606c;    /* secondary text: 6.5:1 on surface, 5.9:1 on bg */
+  --ink-400: #8592a0;    /* input outlines (3.2:1, WCAG 1.4.11), placeholders. Never body text. */
+  --border:  #c9d1d8;    /* card and table borders (decorative) */
+  --divider: #e7ebee;
+  --bg:      #f6f4ef;    /* warm sand-white app background */
+  --surface: #ffffff;
+  --sunken:  #eef1f3;    /* wells: search field, segmented control track, keypad body */
+  --scrim:   rgba(7, 47, 60, 0.48);
+
+  /* ---- Semantic. Money in = success, money out / loss = danger.
+     Always paired with a sign, arrow or word: never colour alone. */
+  --success-700: #16653a;  /* text: 7.1:1 on surface, 6.1:1 on success-100 */
+  --success-600: #1d7a46;  /* the "money in" button (Encaisser). white on it 5.4:1 */
+  --success-100: #e2f2e8;
+  --danger-700:  #9a1f18;  /* text on danger-100: 6.8:1 */
+  --danger-600:  #b3261e;  /* destructive buttons, negative money. white 6.5:1, on surface 6.5:1 */
+  --danger-100:  #fbe6e4;
+  --warning-700: #7a4f00;  /* text: 6.4:1 on warning-100, 7.1:1 on surface */
+  --warning-500: #d99a1e;  /* icon / border only */
+  --warning-100: #fff2d3;
+  --info-700:    var(--brand-700);
+  --info-100:    var(--brand-100);
+  --disabled-bg: #e1e5e8;
+  --disabled-fg: #4f5b66;  /* 5.5:1 on disabled-bg: readable, not faded */
+
+  /* ---- Tile palette (SELL-GRID-DESIGN 2.2: 8 keys). Tint = tile background
+     (ink-900 text >= 13.5:1 on every tint), strip = 6px start-edge accent. */
+  --tile-green: #e3f1e6;  --strip-green: #2e8b57;
+  --tile-teal:  #ddf0ef;  --strip-teal:  #128c8c;
+  --tile-blue:  #e2ecfa;  --strip-blue:  #2f6fd0;
+  --tile-indigo:#e7e8fa;  --strip-indigo:#5560d6;
+  --tile-purple:#f0e6f7;  --strip-purple:#8a4fbf;
+  --tile-red:   #fbe5e2;  --strip-red:   #c8473d;
+  --tile-amber: #fbefd5;  --strip-amber: #c98a12;
+  --tile-grey:  #eceff2;  --strip-grey:  #7d8a96;
+
+  /* ---- Type: IBM Plex Sans + IBM Plex Sans Arabic (one superfamily, same
+     metrics and weights). Tabular figures everywhere a number is shown.
+     Scale sized for reading at arm's length on a counter (50-70 cm). */
+  --font: "IBM Plex Sans", "IBM Plex Sans Arabic", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-ar: "IBM Plex Sans Arabic", "IBM Plex Sans", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --fs-meta: 13px;     /* badges and timestamps; never the only carrier of meaning */
+  --fs-caption: 15px;  /* secondary lines, table meta, helper text */
+  --fs-body: 17px;     /* default text, buttons, table cells, tile names */
+  --fs-subtitle: 20px; /* section titles, tile prices, panel titles */
+  --fs-title: 24px;    /* page titles */
+  --fs-kpi: 32px;      /* report figures, change due */
+  --fs-total: 44px;    /* basket total, price check */
+  --lh-tight: 1.2;
+  --lh: 1.35;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
+  --fw-heavy: 700;
+
+  /* ---- Spacing (base 4) and the two radii. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --r-control: 10px;   /* buttons, inputs, chips, keys, tiles, badges (pills use 999px) */
+  --r-panel: 16px;     /* cards, panels, dialogs, sheets */
+
+  /* ---- Touch sizes. */
+  --touch: 48px;       /* minimum target, everywhere */
+  --touch-lg: 56px;    /* default button, input, list row */
+  --touch-key: 64px;   /* keypad keys, tile minimum */
+  --touch-pay: 72px;   /* the one Encaisser button */
+
+  /* ---- Shell. */
+  --topbar-h: 56px;
+  --awning-h: 8px;
+  --rail-w: 88px;
+  --cart-w: 420px;
+  --panel-w: 480px;
+
+  /* ---- Elevation: flat by default, two shadows only. */
+  --shadow-panel: 0 1px 2px rgba(21, 33, 43, 0.06), 0 2px 8px rgba(21, 33, 43, 0.06);
+  --shadow-dialog: 0 12px 40px rgba(21, 33, 43, 0.28);
+
+  /* ---- Motion: short, and none when the OS asks for reduced motion. */
+  --t-fast: 120ms;
+  --t-panel: 200ms;
+}
+
+/* Arabic glyphs sit smaller on the same body size: one step up for running
+   text, more line height. Numbers stay Latin (0-9), as in Moroccan print. */
+:root[lang="ar"] {
+  --fs-meta: 14px;
+  --fs-caption: 16px;
+  --fs-body: 18px;
+  --fs-subtitle: 21px;
+  --fs-title: 25px;
+  --lh: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-fast: 0ms; --t-panel: 0ms; }
+}

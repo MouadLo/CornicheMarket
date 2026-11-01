@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock · réception · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="stock" data-section="stock" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="cashier-only state" style="margin:auto">
+  <div class="state-ic"><i data-icon="lock" class="ic-lg"></i></div>
+  <h3 data-ar="خاص بالمالك">Réservé au propriétaire</h3>
+  <p data-ar="وضع البيع يعرض فقط البيع والزبائن. هذه الصفحة لا تظهر في قائمة أمين الصندوق.">Le mode caisse ne montre que Vente et Clients. Cette page n’apparaît pas dans le menu d’un caissier.</p>
+  <a class="btn btn-primary" href="sell.html"><i data-icon="cart"></i><span data-ar="العودة إلى البيع">Retour à la vente</span></a>
+</div>
+<div class="owner-only" style="display:flex;flex-direction:column;flex:1;min-height:0">
+<div class="page-head"><h1 class="page-title" data-ar="المخزون">Stock</h1><span class="grow"></span><button class="btn btn-secondary btn-sm"><i data-icon="copy" class="ic-sm"></i><span data-ar="نسخ آخر تسليم">Reprendre la dernière livraison</span></button></div>
+<nav class="tabs">
+  <a href="stock.html" class="on"><i data-icon="truck"></i><span data-ar="الاستلام">Réception</span></a>
+  <a href="stock-history.html" class=""><i data-icon="file"></i><span data-ar="المشتريات">Achats</span></a>
+  <a href="#"><i data-icon="cart"></i><span data-ar="للطلب">À commander</span><span class="badge warn">5</span></a>
+  <a href="#"><i data-icon="clipboard"></i><span data-ar="الجرد">Inventaire</span><span class="badge bad">1</span></a>
+  <a href="#"><i data-icon="hourglass"></i><span data-ar="الصلاحية">Péremption</span><span class="badge warn">2</span></a>
+</nav>
+<div class="recv">
+  <div class="recv-side">
+    <div class="card">
+      <span class="lbl" data-ar="المورد">Fournisseur</span>
+      <div class="chips" style="flex-wrap:wrap" data-chips="one"><button class="chip on"><bdi>Laiterie Atlas</bdi></button><button class="chip"><bdi>Grossiste Derb Omar</bdi></button><button class="chip"><i data-icon="search" class="ic-sm"></i><span data-ar="مورد آخر…">Autre…</span></button></div>
+    </div>
+    <div class="card">
+      <div class="form-row"><span class="lbl" data-ar="تاريخ التسليم">Date de livraison</span><div class="chips" data-chips="one"><button class="chip on" data-ar="اليوم">Aujourd’hui</button><button class="chip" data-ar="أمس">Hier</button><button class="chip"><i data-icon="calendar" class="ic-sm"></i><span data-ar="تاريخ آخر">Autre…</span></button></div></div>
+      <div class="form-row"><span class="lbl" data-ar="رقم الفاتورة (اختياري)">N° de facture (facultatif)</span><div class="field"><span class="val num">LA-88305</span></div></div>
+      <div class="photo-slot"><i data-icon="camera"></i><span data-ar="صورة الفاتورة">Photo de la facture</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span class="grow" style="font-weight:600" data-ar="مدفوعة عند التسليم">Payée à la livraison</span><span class="toggle on"></span></div>
+    </div>
+  </div>
+  <div class="recv-lines">
+    <div style="display:flex;align-items:center;padding:10px 16px;gap:12px;flex:none"><b style="font-size:var(--fs-subtitle)" data-ar="المنتجات المستلمة">Produits reçus</b><span class="muted"><span class="num">5</span> <span data-ar="أسطر">lignes</span></span><span class="grow"></span><span class="muted" style="font-size:var(--fs-caption)" data-ar="أدخل الكمية ومجموع السطر كما في الفاتورة">Saisissez la quantité et le total de la ligne comme sur la facture</span></div>
+    <div class="scroll" style="flex:1"><table class="table"><thead><tr><th data-ar="المنتج">Produit</th><th data-ar="الكمية">Quantité</th><th data-ar="مجموع السطر">Total ligne</th><th data-ar="ثمن البيع">Prix de vente</th><th data-ar="الصلاحية">Péremption</th><th></th></tr></thead><tbody id="r-rows"></tbody></table></div>
+    <div class="add-line"><div class="field"><i data-icon="scan"></i><span class="ph" data-ar="امسح أو ابحث لإضافة منتج">Scannez ou cherchez pour ajouter un produit</span></div><button class="btn btn-secondary"><i data-icon="plus"></i><span data-ar="إضافة">Ajouter</span></button></div>
+  </div>
+</div>
+<div class="sticky-foot">
+  <span class="status warn"><i data-icon="alert"></i><span data-ar="سطر واحد غير مكتمل لن يُحفظ">1 ligne incomplète, non enregistrée</span></span>
+  <span class="muted" style="font-size:var(--fs-caption)"><span data-ar="المسودة محفوظة في الجهاز">Brouillon gardé sur l’appareil</span> · <span class="num">14:30</span></span>
+  <span class="grow"></span>
+  <span class="muted" style="font-weight:600" data-ar="مجموع الفاتورة">Total facture</span><b class="total" style="font-size:var(--fs-kpi)">647.40 DH</b>
+  <button class="btn btn-primary"><i data-icon="check"></i><span data-ar="حفظ 4 أسطر">Enregistrer 4 lignes</span></button>
+</div>
+</div>
+  </main>
+</div>
+
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  
+  bootShell(); receiveScreen();
+</script>
+</body>
+</html>

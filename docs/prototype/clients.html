@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clients · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="clients" data-section="clients" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="md with-panel">
+  <div class="md-list">
+    <div class="page-head"><h1 class="page-title" data-ar="الزبائن">Clients</h1><span class="page-sub" data-ar="كارني الكريدي">Carnet de crédit</span><span class="grow"></span>
+      <div class="kpi-inline"><span class="c-sub" data-ar="المجموع المستحق للمحل">Total dû au magasin</span><b id="owed-total"></b></div>
+      <button class="btn btn-primary"><i data-icon="userplus"></i><span data-ar="زبون جديد">Nouveau client</span></button></div>
+    <div style="display:flex;gap:10px;padding:0 24px 12px;align-items:center">
+      <div class="field grow"><i data-icon="search"></i><span class="ph" data-ar="ابحث بالاسم أو الهاتف">Chercher un nom ou un téléphone</span></div>
+      <div class="chips" data-chips="one"><button class="chip on" data-filter="owing"><span data-ar="مدينون">Doivent</span> <span class="n" id="c-count-owing"></span></button><button class="chip" data-filter="settled"><span data-ar="مسوّون">Soldés</span> <span class="n" id="c-count-settled"></span></button><button class="chip" data-filter="all"><span data-ar="الكل">Tous</span> <span class="n" id="c-count-all"></span></button></div>
+    </div>
+    <div class="scroll" style="flex:1;border-top:1px solid var(--divider)" id="c-list"></div>
+  </div>
+  <aside class="panel" id="c-panel"></aside>
+</div>
+  </main>
+</div>
+
+<div class="dialog-wrap" id="dlg-cpay"><div class="dialog" style="width:760px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <h2><span class="d-icon ok"><i data-icon="banknote"></i></span><span><span data-ar="دفعة من">Paiement de</span> <span id="cpay-name"></span></span></h2>
+    <div class="readout"><span class="big">200.00 DH</span></div>
+    <div class="presets" style="flex-wrap:wrap"><button class="btn btn-secondary btn-sm" id="cpay-all"></button><button class="btn btn-secondary btn-sm">50</button><button class="btn btn-secondary btn-sm">100</button><button class="btn btn-secondary btn-sm">200</button></div>
+    <div class="seg"><button class="on" data-ar="نقدًا">Espèces</button><button data-ar="بطاقة">Carte</button></div>
+    <div class="readout" style="background:var(--surface);box-shadow:inset 0 0 0 1px var(--border)"><b style="font-size:var(--fs-body)" data-ar="الباقي بعد الدفع">Reste dû après paiement</b><span style="font-size:var(--fs-subtitle);font-weight:700" class="num">920.00 DH</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="keypad"><button class="key">7</button><button class="key">8</button><button class="key">9</button><button class="key">4</button><button class="key">5</button><button class="key">6</button><button class="key">1</button><button class="key">2</button><button class="key">3</button><button class="key fn">,</button><button class="key">0</button><button class="key fn"><i data-icon="backspace"></i></button></div>
+    <button class="btn btn-pay btn-block" id="cpay-ok"><i data-icon="check"></i><span data-ar="تسجيل 200.00 DH">Encaisser 200.00 DH</span></button>
+    <button class="btn btn-secondary btn-block" data-close data-ar="إلغاء">Annuler</button>
+  </div>
+</div></div>
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  window.STATES = [['pay','Encaisser un paiement'],['none','Sans panneau']];
+  bootShell(); clientsScreen();
+</script>
+</body>
+</html>

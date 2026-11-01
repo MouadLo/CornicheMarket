@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock · achats · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="stock-history" data-section="stock" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+
+<div class="cashier-only state" style="margin:auto">
+  <div class="state-ic"><i data-icon="lock" class="ic-lg"></i></div>
+  <h3 data-ar="خاص بالمالك">Réservé au propriétaire</h3>
+  <p data-ar="وضع البيع يعرض فقط البيع والزبائن. هذه الصفحة لا تظهر في قائمة أمين الصندوق.">Le mode caisse ne montre que Vente et Clients. Cette page n’apparaît pas dans le menu d’un caissier.</p>
+  <a class="btn btn-primary" href="sell.html"><i data-icon="cart"></i><span data-ar="العودة إلى البيع">Retour à la vente</span></a>
+</div>
+<div class="owner-only" style="display:flex;flex-direction:column;flex:1;min-height:0">
+<div class="page-head"><h1 class="page-title" data-ar="المخزون">Stock</h1><span class="grow"></span></div>
+<nav class="tabs">
+  <a href="stock.html" class=""><i data-icon="truck"></i><span data-ar="الاستلام">Réception</span></a>
+  <a href="stock-history.html" class="on"><i data-icon="file"></i><span data-ar="المشتريات">Achats</span></a>
+  <a href="#"><i data-icon="cart"></i><span data-ar="للطلب">À commander</span><span class="badge warn">5</span></a>
+  <a href="#"><i data-icon="clipboard"></i><span data-ar="الجرد">Inventaire</span><span class="badge bad">1</span></a>
+  <a href="#"><i data-icon="hourglass"></i><span data-ar="الصلاحية">Péremption</span><span class="badge warn">2</span></a>
+</nav>
+<div class="md with-panel" style="flex:1;min-height:0">
+  <div class="md-list">
+    <div style="display:flex;gap:10px;padding:12px 24px 10px;align-items:center">
+      <div class="seg" style="width:390px"><button class="on" data-ar="التسليمات">Livraisons</button><button data-ar="الموردون">Fournisseurs</button><button data-ar="حسب الشهر">Par mois</button></div>
+      <span class="grow"></span><button class="btn btn-secondary btn-sm"><i data-icon="download" class="ic-sm"></i><span data-ar="تصدير">Exporter</span></button>
+    </div>
+    <div class="chips" style="padding:0 24px 12px"><button class="chip on" data-ar="أكتوبر">Octobre</button><button class="chip" data-ar="شتنبر">Septembre</button><button class="chip"><i data-icon="calendar" class="ic-sm"></i><span data-ar="فترة أخرى">Autre…</span></button><button class="chip"><span data-ar="كل الموردين">Tous les fournisseurs</span><i data-icon="down" class="ic-sm"></i></button><button class="chip"><span data-ar="غير مدفوعة">Impayées</span> <span class="n">2</span></button></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th data-ar="التاريخ">Date</th><th data-ar="المورد">Fournisseur</th><th data-ar="الفاتورة">Facture</th><th class="num" data-ar="أسطر">Lignes</th><th class="num" data-ar="المجموع">Total</th><th data-ar="الحالة">Statut</th><th></th></tr></thead><tbody id="h-rows"></tbody></table></div>
+    <div class="table-foot" id="h-foot"></div>
+  </div>
+  <aside class="panel" id="d-panel"></aside>
+</div>
+</div>
+  </main>
+</div>
+
+<div class="dialog-wrap" id="dlg-dvoid" data-modal="1"><div class="dialog" style="width:580px" role="alertdialog">
+  <h2><span class="d-icon bad"><i data-icon="undo"></i></span><span data-ar="إلغاء التسليم BA-2026-1187؟">Annuler la livraison BA-2026-1187 ?</span></h2>
+  <p><bdi>Boissons Atlantique</bdi> · <span data-ar="30 أكتوبر">30 oct.</span> · <span class="money">2 460.00 DH</span></p>
+  <div class="consequence">
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) 90px 20px 110px"><b data-ar="المنتج">Produit</b><b class="muted" style="text-align:end" data-ar="الآن">Maintenant</b><span></span><b style="text-align:end" data-ar="بعد الإلغاء">Après</b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) 90px 20px 110px"><span><bdi>Coca-Cola 33cl</bdi><div class="c-sub" data-ar="متوسط التكلفة">coût moyen</div></span><span class="num" style="text-align:end">57<div class="c-sub">5.24</div></span><i data-icon="chevron" class="ic-sm arrow"></i><b class="num" style="text-align:end">9<div class="c-sub">5.45</div></b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) 90px 20px 110px"><span><bdi>Coca-Cola 1.5L</bdi><div class="c-sub" data-ar="متوسط التكلفة">coût moyen</div></span><span class="num" style="text-align:end">14<div class="c-sub">11.40</div></span><i data-icon="chevron" class="ic-sm arrow"></i><b class="num down" style="text-align:end">−10<div class="c-sub" style="color:var(--ink-600)">11.20</div></b></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) auto"><span class="muted" data-ar="+ 3 منتجات أخرى">+ 3 autres produits</span><span></span></div>
+    <div class="cr" style="grid-template-columns:minmax(0,1fr) 90px 20px 110px"><span data-ar="الباقي للمورد">Reste dû au fournisseur</span><span class="money" style="text-align:end">960.00</span><i data-icon="chevron" class="ic-sm arrow"></i><b class="money" style="text-align:end">0.00 DH</b></div>
+  </div>
+  <p class="help" data-ar="المبيعات السابقة تحتفظ بتكلفتها. المخزون السالب يظهر في الجرد حتى إعادة الإدخال.">Les ventes passées gardent leur coût. Le stock négatif apparaît dans Inventaire jusqu’à la nouvelle saisie.</p>
+  <div style="margin-top:14px"><span class="lbl" data-ar="السبب (إلزامي)">Raison (obligatoire)</span><div class="chips" data-chips="one"><button class="chip on" data-ar="خطأ في الإدخال">Erreur de saisie</button><button class="chip" data-ar="تسليم مرفوض">Livraison refusée</button><button class="chip" data-ar="سبب آخر">Autre…</button></div></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span class="toggle on"></span><span data-ar="نسخها كتسليم جديد بعد الإلغاء">La dupliquer en nouvelle livraison après l’annulation</span></div>
+  <div class="actions"><button class="btn btn-secondary" data-close data-ar="الاحتفاظ بالتسليم">Garder la livraison</button><button class="btn btn-danger" data-close data-ar="إلغاء التسليم">Annuler la livraison</button></div>
+</div></div>
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/screens.js"></script>
+<script>
+  window.STATES = [['none','Sans panneau'],['void','Confirmer l’annulation']];
+  bootShell(); purchasesScreen();
+</script>
+</body>
+</html>

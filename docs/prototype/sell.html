@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vente · Corniche Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="sell" data-section="sell" data-device="laptop">
+<div class="stage"><div class="device" data-device="laptop">
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+  <nav class="rail" id="rail"></nav>
+  <main class="main">
+    <div class="sell">
+      <section class="sell-area">
+        <div class="sell-top">
+          <div class="field" id="search" data-open="kbd"></div>
+          
+        </div>
+        <div class="chips cats" id="cats"></div>
+        <div class="tiles" id="tiles"></div>
+        <div class="sell-bottom">
+          <button class="btn btn-secondary" id="mult" data-open="dlg-qty"></button>
+          <button class="btn btn-secondary" data-open="dlg-price"><i data-icon="tag"></i><span data-ar="ثمن؟">Prix ?</span></button>
+          <span class="grow"></span>
+          <button class="btn btn-quiet owner-only"><i data-icon="grid"></i><span data-ar="تعديل الشبكة">Modifier la grille</span></button>
+        </div>
+        <div class="kbd" id="kbd"></div>
+      </section>
+      <aside class="cart" id="cart"></aside>
+    </div>
+    <div class="over-panel" id="tickets"></div>
+  </main>
+</div>
+
+<div class="dialog-wrap" id="dlg-pay"><div class="dialog pay-dialog"></div></div>
+<div class="dialog-wrap over-grid" id="dlg-weight"><div class="dialog" style="width:440px"></div></div>
+<div class="dialog-wrap over-grid" id="dlg-qty"><div class="dialog" style="width:420px"></div></div>
+<div class="dialog-wrap over-grid" id="dlg-divers"><div class="dialog" style="width:420px"></div></div>
+<div class="dialog-wrap over-grid" id="dlg-price">
+  <div class="dialog" style="width:520px">
+    <h2><i data-icon="tag"></i><span data-ar="التحقق من الثمن">Vérifier un prix</span></h2>
+    <p class="muted" data-ar="امسح أو ابحث. لا يضاف شيء إلى السلة.">Scannez ou cherchez. Rien n’est ajouté au panier.</p>
+    <div class="field focus" style="margin-top:12px"><i data-icon="scan"></i><span class="val">5449000000996</span></div>
+    <div style="margin-top:14px;border:1px solid var(--border);border-radius:var(--r-panel);padding:16px">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div><div style="font-size:var(--fs-subtitle);font-weight:700"><bdi>Coca-Cola 33cl</bdi></div><div class="muted"><span data-ar="مشروبات">Boissons</span> · <span class="num">5449000000996</span></div></div>
+        <span class="status warn"><span class="num">9</span>&nbsp;<span data-ar="في المخزون">en stock</span></span>
+      </div>
+      <div class="total" style="margin-top:12px">7.00 DH</div>
+    </div>
+    <div class="actions"><button class="btn btn-secondary" data-close><span data-ar="إغلاق">Fermer</span></button><button class="btn btn-primary" data-close><i data-icon="plus"></i><span data-ar="إضافة إلى السلة">Ajouter au panier</span></button></div>
+  </div>
+</div>
+<div class="dialog-wrap" id="dlg-void" data-modal="1">
+  <div class="dialog" style="width:520px" role="alertdialog" aria-labelledby="void-t">
+    <h2 id="void-t"><span class="d-icon bad"><i data-icon="undo"></i></span><span data-ar="إلغاء البيع رقم 0185؟">Annuler la vente n° 0185 ?</span></h2>
+    <p><span class="money">34.50 DH</span> · <span class="num">14:09</span> · <span data-ar="سلمى · كريدي">Salma · crédit</span> <bdi>Fatima Zahra B.</bdi></p>
+    <div class="consequence">
+      <div class="cr"><span data-ar="المخزون يعود إلى الرف">Stock remis en rayon</span><span></span><span></span><b><span class="num">10</span> <span data-ar="منتجات">articles</span></b></div>
+      <div class="cr"><span data-ar="كارني الزبونة">Carnet de la cliente</span><span class="money">245.50</span><i data-icon="chevron" class="ic-sm arrow"></i><b class="money">211.00 DH</b></div>
+      <div class="cr"><span data-ar="مبيعات اليوم">Ventes du jour</span><span class="money">3 482.50</span><i data-icon="chevron" class="ic-sm arrow"></i><b class="money">3 448.00 DH</b></div>
+    </div>
+    <div style="margin-top:16px"><span class="lbl" data-ar="السبب (إلزامي)">Raison (obligatoire)</span>
+      <div class="chips" data-chips="one" style="flex-wrap:wrap"><button class="chip on" data-ar="خطأ في الصندوق">Erreur de caisse</button><button class="chip" data-ar="الزبون أعاد البضاعة">Client a rendu</button><button class="chip" data-ar="سبب آخر">Autre…</button></div></div>
+    <p class="help" data-ar="لا يمكن التراجع. يبقى البيع ظاهرًا ومشطوبًا في التذاكر.">Impossible à défaire. La vente reste visible, barrée, dans les tickets.</p>
+    <div class="actions"><button class="btn btn-secondary" data-close><span data-ar="الاحتفاظ بالبيع">Garder la vente</span></button><button class="btn btn-danger"><span data-ar="إلغاء البيع">Annuler la vente</span></button></div>
+  </div>
+</div>
+</div></div>
+<script src="assets/icons.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/proto.js"></script>
+<script src="assets/sell.js"></script>
+<script>
+  window.STATES = [['line','Ligne sélectionnée'],['undo','Après un scan (annuler)'],['mult','× Qté armé'],['weight','Pavé poids'],['divers','Pavé Divers'],['qty','Pavé quantité'],['price','Vérifier un prix'],['kbd','Clavier intégré + recherche'],['pay','Paiement espèces'],['pay-credit','Paiement crédit'],['sold','Après la vente'],['tickets','Tickets du jour'],['ticket','Détail ticket'],['void','Confirmer annulation'],['account','Menu caissier'],['sync','État synchro']];
+  bootShell(); sellScreen();
+</script>
+</body>
+</html>
