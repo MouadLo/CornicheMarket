@@ -18,8 +18,10 @@ import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { EmptyStorePrompt } from "@/src/components/sell/EmptyStorePrompt";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
+import { PendingAttemptCard } from "@/src/components/sell/PendingAttemptCard";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { confirm } from "@/src/lib/dialog/store";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
   findCachedByBarcode,
@@ -50,6 +52,7 @@ import {
   type CartLine,
 } from "@/src/lib/sales/totals";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
+import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { ProductGrid } from "@/src/components/sell/ProductGrid";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
@@ -64,6 +67,8 @@ export default function SellScreen() {
   const accepting = useRef(false);
   // Retain the operation in memory across an ambiguous storage failure.
   const attemptedSale = useRef<PendingSale | null>(null);
+  // The same attempt, for display: shown whenever its outcome is not known.
+  const [unconfirmed, setUnconfirmed] = useState<PendingSale | null>(null);
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
@@ -198,7 +203,8 @@ export default function SellScreen() {
           quantity,
           unit_price_cents: product.selling_price_cents,
           discount_cents: 0,
-          unit_cost_cents: product.current_cost_cents,
+          // Products picked from the offline cache carry no cost field at all.
+          unit_cost_cents: product.current_cost_cents ?? null,
         },
       ];
     });
@@ -306,15 +312,20 @@ export default function SellScreen() {
         JSON.stringify({ ...sale, created_at: attemptedSale.current.created_at }) !==
           JSON.stringify(attemptedSale.current)
       ) {
-        throw new Error(
-          "The previous sale may already be saved. Restore the original basket and payment before retrying."
-        );
+        // The basket changed since an attempt whose result is unknown. Never
+        // reuse that attempt's id for a different basket, and never dead-end:
+        // show the attempt and let the cashier retry it, check the history, or
+        // discard it.
+        setPaymentOpen(false);
+        setUnconfirmed(attemptedSale.current);
+        return;
       }
       attemptedSale.current = attemptedSale.current ?? sale;
       // Queued first, then synced: if the request dies midway the sale is
       // still on the device, and the id makes a retry safe to repeat.
       await enqueueSale(attemptedSale.current);
       attemptedSale.current = null;
+      setUnconfirmed(null);
       // Local persistence is the acceptance boundary. Sync is best effort;
       // its failure must never leave this basket available to submit again.
 
@@ -325,8 +336,11 @@ export default function SellScreen() {
       void sync.sync().catch(() => {
         /* Hook reports sync errors; sale is already accepted. */
       });
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("sell.couldNotRecord"));
+    } catch {
+      // The technical reason stays out of the cashier's way; the attempt is
+      // kept (same id) so a retry is safe even if the write actually landed.
+      setUnconfirmed(attemptedSale.current);
+      setError(t("sell.couldNotRecord"));
     } finally {
       accepting.current = false;
       setSaving(false);
@@ -339,6 +353,54 @@ export default function SellScreen() {
       Object.fromEntries(lines.map((l) => [l.product_id, l.quantity])) as Record<string, number>,
     [lines]
   );
+
+  const retryAttempt = async () => {
+    const attempt = attemptedSale.current;
+    if (!attempt || accepting.current) return;
+    accepting.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await enqueueSale(attempt);
+      attemptedSale.current = null;
+      setUnconfirmed(null);
+      // The basket is cleared only if it is the very sale that was just saved.
+      if (JSON.stringify(lines) === JSON.stringify(attempt.lines)) {
+        setLines([]);
+        setSaleDiscount("");
+        setPaymentOpen(false);
+      }
+      setFlash(t("sell.recorded", { amount: formatMAD(attempt.total_cents) }));
+      void sync.sync().catch(() => {
+        /* Hook reports sync errors; sale is already accepted. */
+      });
+    } catch {
+      setError(t("sell.couldNotRecord"));
+    } finally {
+      accepting.current = false;
+      setSaving(false);
+    }
+  };
+
+  const discardAttempt = async () => {
+    if (!attemptedSale.current) return;
+    const ok = await confirm({
+      tone: "danger",
+      title: t("sell.attempt.discardTitle"),
+      message: t("sell.attempt.discardMessage"),
+      summary: t("sell.attempt.summary", {
+        amount: formatMAD(attemptedSale.current.total_cents),
+        method: t(paymentMethodKey(attemptedSale.current.payment_method)),
+      }),
+      confirmLabel: t("sell.attempt.discardConfirm"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    // Forgetting the attempt is what makes the next sale get a new id.
+    attemptedSale.current = null;
+    setUnconfirmed(null);
+    setError(null);
+  };
 
   const headerNode = (
     <View style={styles.header}>
@@ -378,6 +440,17 @@ export default function SellScreen() {
   );
   const cartNode = (
     <>
+      {unconfirmed && (
+        <PendingAttemptCard
+          sale={unconfirmed}
+          busy={saving}
+          error={paymentOpen ? null : error}
+          onRetry={retryAttempt}
+          onHistory={() => router.push("/(app)/sell/history")}
+          onDiscard={discardAttempt}
+        />
+      )}
+
       <FlatList
         data={lines}
         keyExtractor={(line) => line.product_id}

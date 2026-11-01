@@ -51,6 +51,10 @@ const ar: Translations = {
       "لا تُرسل أبدًا بحساب آخر. تُرسل عندما يعود صاحبها لتسجيل الدخول، أو يمكن للمالك استرجاعها.",
     othersCashierNotice:
       "{{count}} بيع/بيوع لمستخدم آخر في انتظار هذا الجهاز. ستُرسل عندما يعود هذا الشخص لتسجيل الدخول.",
+    unreadableTitle: "بيانات مبيعات غير مقروءة ({{count}})",
+    unreadableHint:
+      "تعذرت قراءة هذه البيانات في هذا الإصدار. هي محفوظة كما هي على الجهاز: صدّرها لاسترجاعها.",
+    unreadableExport: "تصدير",
     recoverUnknownCashier: "أمين صندوق غير معروف (بيع قديم)",
     recoverButton: "استرجاع كمالك",
     recoverTitle: "استرجاع هذا البيع؟",
@@ -151,6 +155,18 @@ const ar: Translations = {
     lookupFailed: "فشل البحث",
     recorded: "تم تسجيل البيع · {{amount}}",
     couldNotRecord: "تعذر تسجيل البيع.",
+    attempt: {
+      title: "لم يتم تأكيد عملية بيع",
+      summary: "{{amount}} · {{method}}",
+      hint: "قد تكون مسجلة بالفعل. تحقق من سجل المبيعات قبل إعادتها.",
+      retry: "إعادة محاولة هذا البيع",
+      history: "عرض سجل المبيعات",
+      discard: "تجاهل وبدء بيع جديد",
+      discardTitle: "تجاهل هذا البيع؟",
+      discardMessage:
+        "قد يكون مسجلاً بالفعل. تحقق من سجل المبيعات قبل المتابعة: إن وجدته هناك فإعادته ستحسبه مرتين.",
+      discardConfirm: "تجاهل وبيع جديد",
+    },
     syncOnline: "متصل",
     syncOffline: "غير متصل",
     syncOfflineQueued: "غير متصل · {{count}} في الانتظار",

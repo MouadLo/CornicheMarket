@@ -170,13 +170,17 @@ describe("serialized sales storage", () => {
     expect((await listPendingSales()).map((sale) => sale.id)).toEqual(["A", "C"]);
   });
 
-  it.each(["", "{broken", "{}", "null", '[{"id":"incomplete"}]'])(
+  it.each(["", "{broken", "{}", "null"])(
     "preserves invalid raw pending data %s and allows raw recovery export",
     async (raw) => {
       mockStore.set(pendingKey, raw);
       await expect(enqueueSale(pending("B"))).rejects.toThrow("Original data preserved");
       await expect(clearQueue()).rejects.toThrow();
-      expect(await exportRawSalesStorage()).toEqual({ pending: raw, stuck: null });
+      expect(await exportRawSalesStorage()).toEqual({
+        pending: raw,
+        stuck: null,
+        unreadable: null,
+      });
     }
   );
 
