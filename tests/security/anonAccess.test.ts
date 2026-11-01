@@ -22,8 +22,11 @@ const suite = url && anonKey ? describe : describe.skip;
 const NIL = "00000000-0000-0000-0000-000000000000";
 const RANGE = { p_from: "2026-01-01T00:00:00Z", p_to: "2027-01-01T00:00:00Z" };
 
-// Every table and view in the public schema (migrations 1-26).
+// Every table and view in the public schema (migrations 1-27).
 const READABLE = [
+  "activity_log",
+  "owner_settings",
+  "selling_price_history",
   "categories",
   "cost_history",
   "customer_balances",
@@ -92,6 +95,8 @@ const FUNCTIONS: [string, Record<string, unknown>][] = [
   ["report_inventory_value", {}],
   ["store_timezone", {}],
   ["is_owner", {}],
+  ["dismiss_price_review", { p_sale_id: NIL }],
+  ["dismiss_discount_review", { p_sale_id: NIL }],
 ];
 
 suite("the anon key alone reaches nothing (C06 / U01)", () => {
@@ -122,6 +127,8 @@ suite("the anon key alone reaches nothing (C06 / U01)", () => {
       { product_id: NIL, quantity_delta: 1, reason: "count_correction", created_by: NIL },
     ],
     ["products", { name: "ZZ anon probe", selling_price_cents: 1, unit: "piece" }],
+    ["activity_log", { actor_id: NIL, action: "probe" }],
+    ["owner_settings", { singleton: false, discount_review_percent: 100 }],
   ])("cannot insert into %s", async (table, row) => {
     const { error } = await anon.from(table).insert(row);
     expect(error?.message ?? "INSERTED").toMatch(/permission denied/);
