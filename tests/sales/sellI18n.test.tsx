@@ -131,7 +131,7 @@ describe("no hardcoded English in the Sell flow", () => {
     expect(hardcodedTexts(tree.root)).toEqual([]);
   });
 
-  it("stack titles for credit, history and stuck sales", () => {
+  it("stack title for the sales history (credit moved to Clients, stuck sales to the shell)", () => {
     act(() => {
       tree = create(<SellLayout />);
     });
@@ -139,8 +139,22 @@ describe("no hardcoded English in the Sell flow", () => {
       .findAll((node) => node.props.name && node.props.options)
       .map((node) => node.props.options.title)
       .filter(Boolean);
-    expect(titles).toHaveLength(3);
+    expect(titles).toHaveLength(1);
     for (const title of titles) expect(title).toContain("⟦");
+  });
+});
+
+describe("Clients section", () => {
+  it("has a translated stack title", () => {
+    const ClientsLayout = require("../../app/(app)/clients/_layout").default;
+    act(() => {
+      tree = create(<ClientsLayout />);
+    });
+    const titles = tree.root
+      .findAll((node) => node.props.name && node.props.options)
+      .map((node) => node.props.options.title)
+      .filter(Boolean);
+    expect(titles).toEqual(["⟦nav.clients⟧"]);
   });
 });
 

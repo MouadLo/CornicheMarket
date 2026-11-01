@@ -20,6 +20,10 @@ jest.mock("lucide-react-native", () => {
   const React = require("react");
   const names = [
     "AlertTriangle",
+    "Bell",
+    "Ellipsis",
+    "RefreshCw",
+    "ShoppingCart",
     "ArrowLeft",
     "Banknote",
     "BarChart3",
@@ -45,6 +49,7 @@ jest.mock("lucide-react-native", () => {
     "Search",
     "SlidersHorizontal",
     "Star",
+    "Tag",
     "Trash2",
     "Truck",
     "Undo2",

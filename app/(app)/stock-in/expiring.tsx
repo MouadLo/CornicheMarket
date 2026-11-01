@@ -18,7 +18,7 @@ export default function ExpiringScreen() {
     fetchExpiringBatches(withinDays)
       .then(setBatches)
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t('stockIn.expiringLoadError'))
+        setError(loadError instanceof Error ? loadError.message : t("stockIn.expiringLoadError"))
       )
       .finally(() => setLoading(false));
   }, [withinDays, t]);
@@ -35,7 +35,7 @@ export default function ExpiringScreen() {
             onPress={() => setWithinDays(range)}
           >
             <Text style={[styles.chipText, withinDays === range && styles.chipTextActive]}>
-              {t('stockIn.expiringNext', { days: range })}
+              {t("stockIn.expiringNext", { days: range })}
             </Text>
           </Pressable>
         ))}
@@ -45,9 +45,7 @@ export default function ExpiringScreen() {
       {loading ? (
         <ActivityIndicator style={{ marginTop: 24 }} />
       ) : batches.length === 0 ? (
-        <Text style={styles.empty}>
-          {t('stockIn.expiringNone', { days: withinDays })}
-        </Text>
+        <Text style={styles.empty}>{t("stockIn.expiringNone", { days: withinDays })}</Text>
       ) : (
         batches.map((batch) => {
           const expired = batch.days_left < 0;
@@ -58,15 +56,16 @@ export default function ExpiringScreen() {
               <View style={styles.rowMain}>
                 <Text style={styles.name}>{batch.product_name}</Text>
                 <Text style={styles.meta}>
-                  {t('stockIn.expiringDelivered')} {batch.delivered_quantity} {batch.unit} · {batch.stock_quantity} {t('stockIn.expiringInStock')}
+                  {t("stockIn.expiringDelivered")} {batch.delivered_quantity} {batch.unit} ·{" "}
+                  {batch.stock_quantity} {t("stockIn.expiringInStock")}
                 </Text>
               </View>
               <View style={styles.right}>
                 <Text style={[styles.days, expired && styles.expired, urgent && styles.urgent]}>
                   {expired
-                    ? t('stockIn.expiringDaysAgo', { days: Math.abs(batch.days_left) })
+                    ? t("stockIn.expiringDaysAgo", { days: Math.abs(batch.days_left) })
                     : batch.days_left === 0
-                      ? t('stockIn.expiringToday')
+                      ? t("stockIn.expiringToday")
                       : `${batch.days_left}d`}
                 </Text>
                 <Text style={styles.date}>{batch.expiry_date}</Text>
@@ -76,7 +75,7 @@ export default function ExpiringScreen() {
         })
       )}
 
-      <Text style={styles.note}>{t('stockIn.expiringNote')}</Text>
+      <Text style={styles.note}>{t("stockIn.expiringNote")}</Text>
     </ScrollView>
   );
 }

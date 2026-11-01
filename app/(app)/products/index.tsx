@@ -98,7 +98,7 @@ export default function ProductsScreen() {
   }, [filters, hasMore, isOwner, loading, loadingMore, page]);
 
   const handleExport = async () => {
-    setBusyMessage(t('products.preparingExport'));
+    setBusyMessage(t("products.preparingExport"));
     try {
       const all = await fetchAllProducts(isOwner);
       const csv = toCsv(all, categories, isOwner);
@@ -106,7 +106,7 @@ export default function ProductsScreen() {
       setBusyMessage(null);
     } catch (exportError) {
       setBusyMessage(null);
-      setError(exportError instanceof Error ? exportError.message : t('products.exportFailed'));
+      setError(exportError instanceof Error ? exportError.message : t("products.exportFailed"));
     }
   };
 
@@ -115,7 +115,7 @@ export default function ProductsScreen() {
       <View style={styles.header}>
         <TextInput
           style={styles.search}
-          placeholder={t('products.searchPlaceholder')}
+          placeholder={t("products.searchPlaceholder")}
           value={search}
           onChangeText={setSearch}
           autoCapitalize="none"
@@ -124,7 +124,7 @@ export default function ProductsScreen() {
 
         <View style={styles.filterRow}>
           <FilterChip
-            label={t('products.allCategories')}
+            label={t("products.allCategories")}
             selected={categoryId === null}
             onPress={() => setCategoryId(null)}
           />
@@ -140,29 +140,39 @@ export default function ProductsScreen() {
 
         <View style={styles.filterRow}>
           <FilterChip
-            label={t('products.lowStock')}
+            label={t("products.lowStock")}
             selected={lowStockOnly}
             onPress={() => setLowStockOnly((value) => !value)}
           />
           <FilterChip
-            label={t('products.statusActive')}
+            label={t("products.statusActive")}
             selected={status === "active"}
             onPress={() => setStatus("active")}
           />
           <FilterChip
-            label={t('products.statusInactive')}
+            label={t("products.statusInactive")}
             selected={status === "inactive"}
             onPress={() => setStatus("inactive")}
           />
-          <FilterChip label={t('products.statusAll')} selected={status === "all"} onPress={() => setStatus("all")} />
+          <FilterChip
+            label={t("products.statusAll")}
+            selected={status === "all"}
+            onPress={() => setStatus("all")}
+          />
         </View>
 
         {isOwner && (
           <View style={styles.actionRow}>
-            <ActionButton label={t('products.addNew')} onPress={() => router.push("/(app)/products/new")} />
-            <ActionButton label={t('products.importCsv')} onPress={() => router.push("/(app)/products/import")} />
-            <ActionButton label={t('products.exportCsv')} onPress={handleExport} />
-            <ActionButton label={t('products.bulkPrice')} onPress={() => setBulkOpen(true)} />
+            <ActionButton
+              label={t("products.addNew")}
+              onPress={() => router.push("/(app)/products/new")}
+            />
+            <ActionButton
+              label={t("products.importCsv")}
+              onPress={() => router.push("/(app)/products/import")}
+            />
+            <ActionButton label={t("products.exportCsv")} onPress={handleExport} />
+            <ActionButton label={t("products.bulkPrice")} onPress={() => setBulkOpen(true)} />
           </View>
         )}
       </View>
@@ -180,9 +190,7 @@ export default function ProductsScreen() {
             <ProductRow
               product={item}
               showCost={isOwner}
-              onPress={
-                isOwner ? () => router.push(`/(app)/products/${item.id}`) : undefined
-              }
+              onPress={isOwner ? () => router.push(`/(app)/products/${item.id}`) : undefined}
             />
           )}
           getItemLayout={(_, index) => ({
@@ -192,7 +200,7 @@ export default function ProductsScreen() {
           })}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          ListEmptyComponent={<Text style={styles.empty}>{t('products.empty')}</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{t("products.empty")}</Text>}
           ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loader} /> : null}
           windowSize={10}
           removeClippedSubviews

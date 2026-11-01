@@ -30,7 +30,9 @@ export default function ProductPriceHistory() {
         setPoints(loadedPoints);
       })
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t('products.priceHistoryLoadError'))
+        setError(
+          loadError instanceof Error ? loadError.message : t("products.priceHistoryLoadError")
+        )
       )
       .finally(() => setLoading(false));
   }, [id, isOwner, t]);
@@ -38,7 +40,7 @@ export default function ProductPriceHistory() {
   if (profile && !isOwner) return <Redirect href="/(app)/products" />;
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
   if (error) return <Text style={styles.error}>{error}</Text>;
-  if (!product) return <Text style={styles.error}>{t('products.formProductNotFound')}</Text>;
+  if (!product) return <Text style={styles.error}>{t("products.formProductNotFound")}</Text>;
 
   const first = points[0]?.unit_cost_cents ?? null;
   const latest = points[points.length - 1]?.unit_cost_cents ?? null;
@@ -48,14 +50,17 @@ export default function ProductPriceHistory() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{product.name}</Text>
-      <Text style={styles.subtitle}>{t('products.priceHistorySubtitle')}</Text>
+      <Text style={styles.subtitle}>{t("products.priceHistorySubtitle")}</Text>
 
       <PriceHistoryChart points={points} averageCostCents={product.current_cost_cents} />
 
       <View style={styles.stats}>
-        <Stat label={t('products.priceHistorySellsAt')} value={formatMAD(product.selling_price_cents)} />
         <Stat
-          label={t('products.priceHistoryAvgCost')}
+          label={t("products.priceHistorySellsAt")}
+          value={formatMAD(product.selling_price_cents)}
+        />
+        <Stat
+          label={t("products.priceHistoryAvgCost")}
           value={
             product.current_cost_cents && product.current_cost_cents > 0
               ? formatMAD(product.current_cost_cents)
@@ -63,14 +68,14 @@ export default function ProductPriceHistory() {
           }
         />
         <Stat
-          label={t('products.priceHistoryMarginNow')}
+          label={t("products.priceHistoryMarginNow")}
           value={formatMargin(
             marginPercent(product.selling_price_cents, product.current_cost_cents ?? 0)
           )}
         />
         {overallChange !== null && points.length > 1 && (
           <Stat
-            label={t('products.priceHistorySinceFirst')}
+            label={t("products.priceHistorySinceFirst")}
             value={`${overallChange >= 0 ? "+" : ""}${overallChange.toFixed(1)}%`}
             negative={overallChange > 0}
           />
@@ -79,12 +84,10 @@ export default function ProductPriceHistory() {
 
       {points.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>{t('products.priceHistoryDeliveries')}</Text>
+          <Text style={styles.sectionLabel}>{t("products.priceHistoryDeliveries")}</Text>
           {[...points].reverse().map((point) => (
             <View key={point.id} style={styles.row}>
-              <Text style={styles.rowDate}>
-                {new Date(point.created_at).toLocaleDateString()}
-              </Text>
+              <Text style={styles.rowDate}>{new Date(point.created_at).toLocaleDateString()}</Text>
               <Text style={styles.rowQty}>
                 {point.quantity} {product.unit}
               </Text>
@@ -94,20 +97,12 @@ export default function ProductPriceHistory() {
         </>
       )}
 
-      <Text style={styles.note}>{t('products.priceHistoryNote')}</Text>
+      <Text style={styles.note}>{t("products.priceHistoryNote")}</Text>
     </ScrollView>
   );
 }
 
-function Stat({
-  label,
-  value,
-  negative,
-}: {
-  label: string;
-  value: string;
-  negative?: boolean;
-}) {
+function Stat({ label, value, negative }: { label: string; value: string; negative?: boolean }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>

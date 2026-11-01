@@ -24,7 +24,7 @@ export default function NewProduct() {
   return (
     <ProductForm
       categories={categories}
-      submitLabel={t('products.formCreate')}
+      submitLabel={t("products.formCreate")}
       onSubmit={async (input) => {
         await createProduct(input);
         router.back();

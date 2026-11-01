@@ -41,14 +41,23 @@ let tree: ReactTestRenderer;
 afterEach(() => act(() => tree?.unmount()));
 
 describe("touch targets are at least 48dp", () => {
-  it("Sell header links: Crédit, Ventes and the stuck-sales banner", async () => {
+  it("Sell header link: Ventes", async () => {
     await act(async () => {
       tree = create(<SellScreen />);
     });
-    for (const label of ["sell.credit", "sell.history", "sell.stuckBanner"]) {
-      const size = sizeOf(pressableByText(tree.root, label));
-      expect({ label, minHeight: size.minHeight >= MIN }).toEqual({ label, minHeight: true });
-    }
+    const size = sizeOf(pressableByText(tree.root, "sell.history"));
+    expect(size.minHeight).toBeGreaterThanOrEqual(MIN);
+  });
+
+  it("Crédit and the stuck-sales banner left Sell: the shell owns them now", async () => {
+    await act(async () => {
+      tree = create(<SellScreen />);
+    });
+    const texts = tree.root
+      .findAll((n) => (n.type as unknown) === "Text")
+      .map((n) => n.children.join(""));
+    expect(texts).not.toContain("sell.credit");
+    expect(texts).not.toContain("sell.stuckBanner");
   });
 
   it("Retirer (remove line), for piece and weighed lines", () => {
