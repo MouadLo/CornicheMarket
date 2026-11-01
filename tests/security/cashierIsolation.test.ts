@@ -29,8 +29,9 @@
  * before launch, and again after any migration that touches a policy,
  * a view, or a column holding cost.
  *
- * These are read-only probes plus two writes that are expected to be
- * refused. It is safe against production, but a staging copy is preferable.
+ * These are read-only probes plus writes that are expected to be refused
+ * (the C06 block below aims them at ids that don't exist, so nothing is
+ * written even on a vulnerable database). It is safe against production, but a staging copy is preferable.
  * ---------------------------------------------------------------------------
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -300,6 +301,157 @@ suite("a cashier token cannot reach cost, WAC or profit", () => {
       .single();
 
     expect((after as { role: string }).role).toBe("cashier");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit C06 / U01 (migration 026): money and stock only change through the
+// trusted functions, and the anon key alone reaches nothing.
+//
+// Safe against production: every probe points at ids that do not exist, so
+// even a database that is still vulnerable writes nothing (the foreign key
+// rejects it). The test then fails because the error is a foreign-key error
+// instead of a permission error, which is exactly the signal wanted.
+// The full attack suite, with fixtures, is tests/security/writePaths.live.test.ts
+// (local only).
+// ---------------------------------------------------------------------------
+const NO_ROW = "00000000-0000-0000-0000-00000000c006";
+const DENIED = /permission denied/;
+
+suite("money and stock writes only go through trusted functions (C06)", () => {
+  let client: SupabaseClient;
+  let anon: SupabaseClient;
+  let cashierId: string;
+
+  beforeAll(async () => {
+    client = createClient(url as string, anonKey as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    anon = createClient(url as string, anonKey as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({
+      email: email as string,
+      password: password as string,
+    });
+    if (error) throw new Error(`Cashier sign-in failed: ${error.message}`);
+    cashierId = data.user.id;
+  });
+
+  afterAll(async () => {
+    await client?.auth.signOut();
+  });
+
+  it("a cashier cannot insert a sale header directly", async () => {
+    const { error } = await client.from("sales").insert({
+      id: NO_ROW,
+      cashier_id: cashierId,
+      customer_id: NO_ROW,
+      payment_method: "cash",
+      total_cents: 1,
+    });
+    expect(error?.message ?? "inserted").toMatch(DENIED);
+  });
+
+  it("a cashier cannot insert sale lines directly", async () => {
+    const { error } = await client.from("sale_items").insert({
+      sale_id: NO_ROW,
+      product_id: NO_ROW,
+      quantity: 1,
+      unit_price_cents: 1,
+    });
+    expect(error?.message ?? "inserted").toMatch(DENIED);
+  });
+
+  it("a cashier cannot insert a customer payment directly", async () => {
+    const { error } = await client.from("customer_payments").insert({
+      customer_id: NO_ROW,
+      amount_cents: 100,
+      method: "cash",
+      created_by: cashierId,
+    });
+    expect(error?.message ?? "inserted").toMatch(DENIED);
+  });
+
+  it("a cashier cannot insert a stock adjustment directly", async () => {
+    const { error } = await client.from("stock_adjustments").insert({
+      product_id: NO_ROW,
+      quantity_delta: 1,
+      reason: "count_correction",
+      created_by: cashierId,
+    });
+    // Refused by RLS (owner-only insert) rather than by a missing privilege.
+    expect(error?.message ?? "inserted").toMatch(/row-level security|permission denied/);
+  });
+
+  it.each(["sales", "sale_items", "customer_payments", "stock_adjustments"])(
+    "a cashier has no UPDATE or DELETE on %s",
+    async (table) => {
+      const column =
+        table === "customer_payments"
+          ? "amount_cents"
+          : table === "stock_adjustments"
+            ? "quantity_delta"
+            : table === "sales"
+              ? "total_cents"
+              : "unit_price_cents";
+      const upd = await client
+        .from(table)
+        .update({ [column]: 1 })
+        .eq("id", NO_ROW);
+      const del = await client.from(table).delete().eq("id", NO_ROW);
+      expect(upd.error?.message ?? "allowed").toMatch(DENIED);
+      expect(del.error?.message ?? "allowed").toMatch(DENIED);
+    }
+  );
+
+  it.each([
+    ["products_cashier_view", "selling_price_cents"],
+    ["sale_items_cashier_view", "quantity"],
+    ["stock_adjustments_cashier_view", "quantity_delta"],
+  ])("a cashier cannot write through %s (views skip RLS)", async (view, column) => {
+    const { error } = await client
+      .from(view)
+      .update({ [column]: 1 })
+      .eq("id", NO_ROW);
+    expect(error?.message ?? "allowed").toMatch(/permission denied|cannot update view/);
+  });
+
+  it.each([
+    [
+      "record_sale",
+      {
+        p_sale_id: NO_ROW,
+        p_customer_id: null,
+        p_payment_method: "cash",
+        p_discount_cents: 0,
+        p_lines: [],
+        p_occurred_at: "2026-01-01T00:00:00Z",
+      },
+    ],
+    [
+      "record_customer_payment",
+      { p_payment_id: NO_ROW, p_customer_id: NO_ROW, p_amount_cents: 1, p_method: "cash" },
+    ],
+    ["void_sale", { p_sale_id: NO_ROW, p_reason: "probe" }],
+    ["batch_update_selling_prices", { p_updates: [] }],
+    ["bulk_adjust_selling_price", { p_category_id: NO_ROW, p_percent: 0 }],
+    ["store_timezone", {}],
+    ["is_owner", {}],
+  ])("the anon key alone cannot execute %s", async (fn, args) => {
+    const { error } = await anon.rpc(fn, args);
+    expect(error?.message ?? "executed").toMatch(/permission denied for function/);
+  });
+
+  it.each([
+    "customer_balances",
+    "products_cashier_view",
+    "product_sales_30d",
+    "customers",
+    "sales",
+  ])("the anon key alone cannot read %s", async (table) => {
+    const { error } = await anon.from(table).select("*").limit(1);
+    expect(error?.message ?? "readable").toMatch(DENIED);
   });
 });
 
