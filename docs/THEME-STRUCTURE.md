@@ -1,6 +1,6 @@
 # Corniche Market: structure, theme and POS shell
 
-Status: design proposal. No app code changed. Written 2026-11-01 against `main` at `0d0ec70` (through PR #19).
+Status: design proposal, owner decisions recorded below. No app code changed. Written 2026-11-01 against `main` at `0d0ec70` (through PR #19).
 
 This builds on three earlier documents and does not repeat them:
 
@@ -26,6 +26,20 @@ This builds on three earlier documents and does not repeat them:
 8. **Light theme only for launch.** A dark/evening theme is not worth it yet (2.6).
 9. **Shared devices lock after 3 minutes idle**; the next person picks their name and types a PIN. The basket is kept.
 10. **Efficiency additions ranked** (3.6): undo last scan, faster startup, forgiving search and an end-of-day summary before launch; WhatsApp receipt, low-stock alerts, reorder via WhatsApp, own barcode labels and a receipt printer after; "recently sold" row: no.
+
+---
+
+## Decisions (2026-11-01)
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Redesign timing | **Everything before launch**: tokens, shell and all screens in Part 4 (V1 to V11) ship before launch. Only the "after launch" list at the end of 4.2 waits. |
+| 2 | Brand colour | **Atlantique blue**, green kept for money in. |
+| 3 | PIN model (3.5) | **Yes, as proposed**, but S5 is built **only after audit C05 is fixed**. Until then the lock screen and PIN are not started. |
+| 4 | Arabic counter words | **كريدي** (and الكارني) for credit; standard Arabic elsewhere. Prototype and fr/en/ar keys use it. |
+| 5 | All other questions (Part 5) | **The recommended defaults.** |
+
+Effect on the build plan: with everything before launch, V4 to V11 are no longer optional, and S5 waits on C05 (V1 to V10 do not depend on S5; only the lock screen and owner-PIN dialog do).
 
 ---
 
@@ -573,7 +587,7 @@ S2, S3 and S4 touch different files and can go in parallel. V4 to V8 can be reor
 
 ## Part 5: Questions for you
 
-Each has my recommended default. If you agree with all of them, nothing needs answering.
+Answered: see Decisions above (1 to 4 as chosen, everything else the recommended default).
 
 | # | Question | Recommended default |
 |---|---|---|
@@ -586,7 +600,7 @@ Each has my recommended default. If you agree with all of them, nothing needs an
 | 7 | "Owner PIN on the spot" for voids and discounts above 10 %? | **Yes.** Voids stay owner-only as today; this just avoids a full user switch. |
 | 8 | Fonts: IBM Plex Sans + IBM Plex Sans Arabic, bundled? | **Yes.** |
 | 9 | Show thousands with a narrow space ("3 482.50 DH"), keep the "." decimal? | **Yes.** It changes `formatMAD` and its tests in D2. |
-| 10 | Arabic store words: everyday counter words (كريدي, الكارني) or standard Arabic (آجل)? | **Everyday words for the 3 or 4 store terms** (credit, the carnet), standard Arabic elsewhere. Your call: you know your cashiers. |
+| 10 | Arabic store words: everyday counter words (كريدي, الكارني) or standard Arabic (آجل)? | **Everyday words for the 3 or 4 store terms** (credit, the carnet), standard Arabic elsewhere. Decided: كريدي: you know your cashiers. |
 | 11 | Arabic names for categories? | **Yes, optional** on categories (shown in Arabic). Products keep one name plus optional search aliases (3.6 #3). |
 | 12 | Windows scaling on the 1920×1080 laptop? | **125 %.** |
 | 13 | End-of-day: read-only before launch, drawer count after? | **Yes.** |
