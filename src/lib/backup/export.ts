@@ -1,10 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Papa from 'papaparse';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Papa from "papaparse";
 
-import { saveTextFile } from '@/src/lib/files';
-import { supabase } from '@/src/lib/supabase/client';
+import { saveTextFile } from "@/src/lib/files";
+import { supabase } from "@/src/lib/supabase/client";
 
-const LAST_BACKUP_KEY = '@corniche/lastBackupAt';
+const LAST_BACKUP_KEY = "@corniche/lastBackupAt";
 
 export async function getLastBackupTime(): Promise<Date | null> {
   try {
@@ -22,17 +22,17 @@ async function markBackupDone() {
 }
 
 function toCsvBlob<T extends Record<string, unknown>>(rows: T[]): string {
-  if (rows.length === 0) return '';
+  if (rows.length === 0) return "";
   return Papa.unparse(rows);
 }
 
 export async function exportProducts(): Promise<void> {
   const { data, error } = await supabase
-    .from('products')
+    .from("products")
     .select(
-      'id, name, barcode, unit, selling_price_cents, current_cost_cents, stock_quantity, low_stock_threshold, active, created_at'
+      "id, name, barcode, unit, selling_price_cents, current_cost_cents, stock_quantity, low_stock_threshold, active, created_at"
     )
-    .order('name');
+    .order("name");
 
   if (error) throw new Error(error.message);
 
@@ -42,11 +42,11 @@ export async function exportProducts(): Promise<void> {
 
 export async function exportSales(): Promise<void> {
   const { data, error } = await supabase
-    .from('sales')
+    .from("sales")
     .select(
-      'id, created_at, cashier_id, customer_id, payment_method, discount_cents, total_cents, voided_at'
+      "id, created_at, cashier_id, customer_id, payment_method, discount_cents, total_cents, voided_at"
     )
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(50000);
 
   if (error) throw new Error(error.message);
@@ -57,9 +57,9 @@ export async function exportSales(): Promise<void> {
 
 export async function exportPurchases(): Promise<void> {
   const { data, error } = await supabase
-    .from('purchases')
-    .select('id, created_at, supplier_id, notes')
-    .order('created_at', { ascending: false })
+    .from("purchases")
+    .select("id, created_at, supplier_id, notes, voided_at, void_reason")
+    .order("created_at", { ascending: false })
     .limit(50000);
 
   if (error) throw new Error(error.message);

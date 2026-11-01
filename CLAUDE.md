@@ -99,10 +99,11 @@ const display = (cents / 100).toFixed(2); // bypass formatMAD
 
 ### Stock and cost only change through DB triggers
 
-`products.stock_quantity` and `products.current_cost_cents` are **read-only from the app**. They are updated exclusively by three Postgres triggers:
+`products.stock_quantity` and `products.current_cost_cents` are **read-only from the app**. They are updated exclusively by four Postgres triggers:
 - `apply_purchase_item` — increases stock, recalculates weighted-average cost
 - `apply_sale_item_stock` — decreases stock
 - `apply_stock_adjustment` — corrects stock after a count or write-off
+- `apply_purchase_void` — when a delivery is voided, takes its lines back out of stock and recalculates the average cost (past sales keep their stamped cost)
 
 Also: `sale_items.unit_cost_cents` is stamped server-side by `trg_sale_items_before_insert`. The client **never** sets it.
 

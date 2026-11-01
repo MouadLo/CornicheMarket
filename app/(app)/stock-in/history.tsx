@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -31,7 +32,7 @@ export default function PurchaseHistory() {
         setBySupplier(loadedSuppliers);
       })
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t('stockIn.historyLoadError'))
+        setError(loadError instanceof Error ? loadError.message : t("stockIn.historyLoadError"))
       )
       .finally(() => setLoading(false));
   }, [t]);
@@ -42,33 +43,63 @@ export default function PurchaseHistory() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.tabs}>
-        <TabButton label={t('stockIn.historyTabDeliveries')} active={tab === "deliveries"} onPress={() => setTab("deliveries")} />
-        <TabButton label={t('stockIn.historyTabMonths')} active={tab === "months"} onPress={() => setTab("months")} />
-        <TabButton label={t('stockIn.historyTabSuppliers')} active={tab === "suppliers"} onPress={() => setTab("suppliers")} />
+        <TabButton
+          label={t("stockIn.historyTabDeliveries")}
+          active={tab === "deliveries"}
+          onPress={() => setTab("deliveries")}
+        />
+        <TabButton
+          label={t("stockIn.historyTabMonths")}
+          active={tab === "months"}
+          onPress={() => setTab("months")}
+        />
+        <TabButton
+          label={t("stockIn.historyTabSuppliers")}
+          active={tab === "suppliers"}
+          onPress={() => setTab("suppliers")}
+        />
       </View>
 
       {tab === "deliveries" &&
         (purchases.length === 0 ? (
-          <Text style={styles.empty}>{t('stockIn.historyEmpty')}</Text>
+          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
         ) : (
-          purchases.map((purchase) => (
-            <View key={purchase.id} style={styles.row}>
-              <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>{purchase.supplier_name ?? t('stockIn.historyNoSupplier')}</Text>
-                <Text style={styles.rowMeta}>
-                  {formatDate(purchase.purchase_date)} · {purchase.line_count}{" "}
-                  {purchase.line_count === 1 ? t('stockIn.historyLine') : t('stockIn.historyLines')}
-                  {purchase.notes ? ` · ${purchase.notes}` : ""}
+          purchases.map((purchase) => {
+            const voided = purchase.voided_at !== null;
+            return (
+              <Pressable
+                key={purchase.id}
+                style={[styles.row, voided && styles.rowVoided]}
+                onPress={() => router.push(`/(app)/stock-in/delivery/${purchase.id}` as never)}
+              >
+                <View style={styles.rowMain}>
+                  <Text style={[styles.rowTitle, voided && styles.voidedText]}>
+                    {purchase.supplier_name ?? t("stockIn.historyNoSupplier")}
+                  </Text>
+                  <Text style={styles.rowMeta}>
+                    {formatDate(purchase.purchase_date)} · {purchase.line_count}{" "}
+                    {purchase.line_count === 1
+                      ? t("stockIn.historyLine")
+                      : t("stockIn.historyLines")}
+                    {purchase.notes ? ` · ${purchase.notes}` : ""}
+                  </Text>
+                  {voided && (
+                    <Text style={styles.voidedTag}>
+                      {t("stockIn.historyVoidedTag")} · {purchase.void_reason}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.rowValue, voided && styles.voidedText]}>
+                  {formatMAD(purchase.total_cents)}
                 </Text>
-              </View>
-              <Text style={styles.rowValue}>{formatMAD(purchase.total_cents)}</Text>
-            </View>
-          ))
+              </Pressable>
+            );
+          })
         ))}
 
       {tab === "months" &&
         (months.length === 0 ? (
-          <Text style={styles.empty}>{t('stockIn.historyEmpty')}</Text>
+          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
         ) : (
           months.map((month) => (
             <View key={month.month} style={styles.row}>
@@ -76,7 +107,9 @@ export default function PurchaseHistory() {
                 <Text style={styles.rowTitle}>{formatMonth(month.month)}</Text>
                 <Text style={styles.rowMeta}>
                   {month.purchase_count}{" "}
-                  {month.purchase_count === 1 ? t('stockIn.historyDelivery') : t('stockIn.historyDeliveries')}
+                  {month.purchase_count === 1
+                    ? t("stockIn.historyDelivery")
+                    : t("stockIn.historyDeliveries")}
                 </Text>
               </View>
               <Text style={styles.rowValue}>{formatMAD(month.total_cents)}</Text>
@@ -86,7 +119,7 @@ export default function PurchaseHistory() {
 
       {tab === "suppliers" &&
         (bySupplier.length === 0 ? (
-          <Text style={styles.empty}>{t('stockIn.historyEmpty')}</Text>
+          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
         ) : (
           bySupplier.map((supplier) => (
             <View key={supplier.supplier_id ?? "none"} style={styles.row}>
@@ -94,7 +127,9 @@ export default function PurchaseHistory() {
                 <Text style={styles.rowTitle}>{supplier.supplier_name}</Text>
                 <Text style={styles.rowMeta}>
                   {supplier.purchase_count}{" "}
-                  {supplier.purchase_count === 1 ? t('stockIn.historyDelivery') : t('stockIn.historyDeliveries')}
+                  {supplier.purchase_count === 1
+                    ? t("stockIn.historyDelivery")
+                    : t("stockIn.historyDeliveries")}
                 </Text>
               </View>
               <Text style={styles.rowValue}>{formatMAD(supplier.total_cents)}</Text>
@@ -145,6 +180,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
     gap: 12,
   },
+  rowVoided: { opacity: 0.85 },
+  voidedText: { textDecorationLine: "line-through", color: "#777" },
+  voidedTag: { fontSize: 13, color: "#b3261e", fontWeight: "700" },
   rowMain: { flex: 1, gap: 3 },
   rowTitle: { fontSize: 16, fontWeight: "600" },
   rowMeta: { fontSize: 13, color: "#666" },
