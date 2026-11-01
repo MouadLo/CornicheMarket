@@ -111,8 +111,33 @@ suite("product-table CA nets discounts; voided sales are excluded", () => {
       if (ownerProductError) throw new Error(ownerProductError.message);
       product = ownerProduct as ProductRow;
 
-      const testStart = new Date(Date.now() - 2000);
-      from = testStart.toISOString();
+      // report_summary is store-wide (no product filter), and other live
+      // suites record sales at "now". A window around now made this test count
+      // their sales (transaction_count 5, expected 1). Instead the sales get
+      // their own occurred_at, a random moment 5 to 25 days back (inside
+      // record_sale's 30-day clock-review limit), and the report window is
+      // 20 s around it. The window is checked empty first, so even a leftover
+      // from an earlier run of this very test cannot leak in.
+      let saleTime = 0;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const dayMs = 24 * 60 * 60 * 1000;
+        saleTime = Date.now() - 5 * dayMs - Math.floor(Math.random() * 20 * dayMs);
+        const probeFrom = new Date(saleTime - 10_000).toISOString();
+        const probeTo = new Date(saleTime + 10_000).toISOString();
+        const { data: probe, error: probeError } = await client.rpc("report_summary", {
+          p_from: probeFrom,
+          p_to: probeTo,
+        });
+        if (probeError) throw new Error(probeError.message);
+        if (Number((probe as ReportSummaryRow[])[0].transaction_count) === 0) {
+          from = probeFrom;
+          to = probeTo;
+          break;
+        }
+        saleTime = 0;
+      }
+      if (!saleTime) throw new Error("Could not find an empty 20 s report window in 10 tries");
+      const occurredAt = new Date(saleTime).toISOString();
 
       // Kept sale: 3 units, with a flat 1.50 DH sale-level discount. With a
       // single line the entire discount allocates to it (ratio 1), so the
@@ -134,7 +159,7 @@ suite("product-table CA nets discounts; voided sales are excluded", () => {
             discount_cents: 0,
           },
         ],
-        p_occurred_at: new Date().toISOString(),
+        p_occurred_at: occurredAt,
       });
       if (keptError) throw new Error(`record_sale (kept) failed: ${keptError.message}`);
 
@@ -156,7 +181,7 @@ suite("product-table CA nets discounts; voided sales are excluded", () => {
             discount_cents: 0,
           },
         ],
-        p_occurred_at: new Date().toISOString(),
+        p_occurred_at: occurredAt,
       });
       if (voidedError) throw new Error(`record_sale (to-void) failed: ${voidedError.message}`);
 
@@ -165,8 +190,6 @@ suite("product-table CA nets discounts; voided sales are excluded", () => {
         p_reason: "test: must not count toward reports",
       });
       if (voidError) throw new Error(`void_sale failed: ${voidError.message}`);
-
-      to = new Date(Date.now() + 2000).toISOString();
     });
 
     it("report_product_performance's revenue_cents is net of the allocated discount, and excludes the voided sale's quantity", async () => {
