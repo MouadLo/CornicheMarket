@@ -405,6 +405,18 @@ suite("money and stock writes only go through trusted functions (C06)", () => {
     }
   );
 
+  // Migration 027: the owner's settings, the audit trail and the price history
+  // are owner-only. Reading is the production-safe probe: the rows exist, so a
+  // cashier who could see them would get data back.
+  it.each(["owner_settings", "activity_log", "selling_price_history"])(
+    "a cashier sees no rows of %s",
+    async (table) => {
+      const { data, error } = await client.from(table).select("*").limit(1);
+      if (error) expect(error.message).toMatch(/permission denied|row-level security/);
+      else expect(data).toEqual([]);
+    }
+  );
+
   it.each([
     ["products_cashier_view", "selling_price_cents"],
     ["sale_items_cashier_view", "quantity"],
