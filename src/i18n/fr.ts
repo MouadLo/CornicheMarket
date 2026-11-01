@@ -194,6 +194,13 @@ const fr = {
     saleDiscountTooHigh: "La remise dépasse le total du panier.",
     remove: "Retirer",
     weightRequired: "Indiquez le poids.",
+    grid: {
+      favorites: "Favoris",
+      tileLabel: "{{name}}, {{price}}, {{count}} dans le panier",
+      tileLabelEmpty: "{{name}}, {{price}}",
+      stockLabel: "stock {{count}}",
+      tabs: "Catégories",
+    },
     stuck: {
       title: "Ventes bloquées",
       empty: "Aucune vente bloquée.",

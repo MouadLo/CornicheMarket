@@ -446,6 +446,21 @@ suite("money and stock writes only go through trusted functions (C06)", () => {
     expect(error?.message ?? "allowed").toMatch(/another user/);
   });
 
+  // Migration 029: the Sell layout is readable by everyone signed in and
+  // writable only by the owner. These aim at ids that do not exist.
+  it("a cashier cannot write the Sell grid layout", async () => {
+    const tab = await client
+      .from("sell_grid_tabs")
+      .update({ visible: false })
+      .eq("id", NO_ROW)
+      .select("id");
+    const tile = await client
+      .from("sell_grid_tiles")
+      .insert({ tab_id: NO_ROW, product_id: NO_ROW, position: 1 });
+    expect(tab.error === null ? tab.data : []).toEqual([]);
+    expect(tile.error).not.toBeNull();
+  });
+
   it.each([
     ["products_cashier_view", "selling_price_cents"],
     ["sale_items_cashier_view", "quantity"],

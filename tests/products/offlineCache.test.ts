@@ -5,6 +5,8 @@
  */
 import {
   findCachedByBarcode,
+  getCachedGrid,
+  refreshProductCache,
   getProductCacheMeta,
   searchCachedProducts,
   type CachedProduct,
@@ -12,7 +14,10 @@ import {
 
 // offlineCache imports supabase/client for refreshProductCache only; mock it
 // so the module can be imported without real env vars.
-jest.mock("../../src/lib/supabase/client", () => ({ supabase: { from: jest.fn() } }));
+const mockFrom = jest.fn();
+jest.mock("../../src/lib/supabase/client", () => ({
+  supabase: { from: (...a: unknown[]) => mockFrom(...a) },
+}));
 
 const mockStore = new Map<string, string>();
 
@@ -144,5 +149,107 @@ describe("searchCachedProducts", () => {
     seedCache();
     const results = await searchCachedProducts("inactive");
     expect(results).toHaveLength(0);
+  });
+});
+
+describe("cache v2 (the Sell grid)", () => {
+  // A query builder that resolves to the rows given per table.
+  function rows(byTable: Record<string, unknown[] | Error>) {
+    mockFrom.mockImplementation((table: string) => {
+      const result = byTable[table];
+      const builder: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "order", "range"]) builder[m] = () => builder;
+      builder.then = (resolve: (v: unknown) => void) =>
+        resolve(
+          result instanceof Error
+            ? { data: null, error: { message: result.message } }
+            : { data: result ?? [], error: null }
+        );
+      return builder;
+    });
+  }
+  const grid = {
+    sell_grid_tabs: [
+      {
+        id: "t1",
+        kind: "favorites",
+        category_id: null,
+        label: null,
+        position: 0,
+        visible: true,
+        auto_fill: false,
+      },
+    ],
+    sell_grid_tiles: [],
+    categories: [{ id: "c1", name: "Boissons" }],
+  };
+
+  beforeEach(() => mockFrom.mockReset());
+
+  it("never stores a cost column", async () => {
+    rows({ products_cashier_view: SEED, ...grid });
+    await refreshProductCache(false);
+    const stored = mockStore.get("corniche.productCache.v2") ?? "";
+    expect(stored).not.toMatch(/cost/i);
+    expect(stored).toContain('"tabs"');
+  });
+
+  it("an owner's refresh asks for the grid fields only, never a cost column", async () => {
+    const selected: string[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = (cols: string) => (selected.push(`${table}:${cols}`), b);
+      for (const m of ["eq", "order", "range"]) b[m] = () => b;
+      b.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
+      return b;
+    });
+    await refreshProductCache(true);
+    expect(selected.filter((s) => /cost/i.test(s))).toEqual([]);
+    expect(selected.some((s) => s.startsWith("products:") && s.includes("stock_quantity"))).toBe(
+      true
+    );
+  });
+
+  it("writes v2 with products, categories and the layout, and drops v1", async () => {
+    seedCache();
+    rows({ products_cashier_view: SEED, ...grid });
+    await refreshProductCache(false);
+    expect(mockStore.has("corniche.productCache.v1")).toBe(false);
+    const g = await getCachedGrid();
+    expect(g?.products).toHaveLength(SEED.length);
+    expect(g?.categories).toEqual([{ id: "c1", name: "Boissons" }]);
+    expect(g?.tabs).toHaveLength(1);
+  });
+
+  it("still serves a device that has only the v1 cache (barcode and search keep working)", async () => {
+    seedCache();
+    expect((await findCachedByBarcode("6111234567890"))?.name).toBe("Lait Centrale 1L");
+    expect((await getCachedGrid())?.tabs).toEqual([]); // no layout yet: Sell looks as before
+  });
+
+  it("if the grid tables fail, products and prices still refresh and the last layout is kept", async () => {
+    mockStore.set(
+      "corniche.productCache.v2",
+      JSON.stringify({
+        products: [],
+        categories: [{ id: "old", name: "Old" }],
+        grid: { tabs: [{ id: "keep" }], tiles: [] },
+        refreshedAt: "2026-10-26T10:00:00.000Z",
+      })
+    );
+    rows({
+      products_cashier_view: SEED,
+      sell_grid_tabs: new Error("relation does not exist"),
+      sell_grid_tiles: [],
+      categories: [],
+    });
+    await refreshProductCache(false);
+    const g = await getCachedGrid();
+    expect(g?.products).toHaveLength(SEED.length); // refreshed
+    expect(g?.tabs).toEqual([{ id: "keep" }]); // layout kept
+  });
+
+  it("getCachedGrid is null when nothing is cached", async () => {
+    expect(await getCachedGrid()).toBeNull();
   });
 });

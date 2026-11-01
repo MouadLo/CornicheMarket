@@ -141,6 +141,8 @@ suite("the anon key alone reaches nothing (C06 / U01)", () => {
     ["products", { name: "ZZ anon probe", selling_price_cents: 1, unit: "piece" }],
     ["activity_log", { actor_id: NIL, action: "probe" }],
     ["owner_settings", { singleton: false, discount_review_percent: 100 }],
+    ["sell_grid_tabs", { kind: "favorites", position: 1 }],
+    ["sell_grid_tiles", { position: 1 }],
   ])("cannot insert into %s", async (table, row) => {
     const { error } = await anon.from(table).insert(row);
     expect(error?.message ?? "INSERTED").toMatch(/permission denied/);

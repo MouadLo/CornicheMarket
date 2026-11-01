@@ -1,7 +1,16 @@
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -14,6 +23,7 @@ import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
   findCachedByBarcode,
+  getCachedGrid,
   refreshProductCache,
   searchCachedProducts,
   type CachedProduct,
@@ -41,6 +51,8 @@ import {
 } from "@/src/lib/sales/totals";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
+import { ProductGrid } from "@/src/components/sell/ProductGrid";
+import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
@@ -70,6 +82,42 @@ export default function SellScreen() {
   // screen behind a wrong "add your first product" message.
   const [storeIsEmpty, setStoreIsEmpty] = useState<boolean | null>(null);
 
+  // The Sell grid: tabs of tiles resolved from the cached layout and products.
+  const { width } = useWindowDimensions();
+  const split = sellLayoutFor(width) === "split";
+  // Load the cached layout once (and again after each refresh); resolve it with
+  // useMemo so a changing translation function can never retrigger the load.
+  const [cachedGrid, setCachedGrid] = useState<Awaited<ReturnType<typeof getCachedGrid>>>(null);
+  const loadGrid = useCallback(async () => {
+    setCachedGrid(await getCachedGrid());
+  }, []);
+  useEffect(() => {
+    void loadGrid();
+  }, [loadGrid]);
+  const gridTabs: ResolvedTab[] = useMemo(
+    () =>
+      cachedGrid
+        ? resolveGrid({
+            tabs: cachedGrid.tabs,
+            tiles: cachedGrid.tiles,
+            categories: cachedGrid.categories,
+            favoritesLabel: t("sell.grid.favorites"),
+            products: cachedGrid.products.map((p) => ({
+              id: p.id,
+              name: p.name,
+              barcode: p.barcode,
+              category_id: p.category_id ?? null,
+              unit: p.unit,
+              selling_price_cents: p.selling_price_cents,
+              stock_quantity: p.stock_quantity ?? 0,
+              low_stock_threshold: p.low_stock_threshold ?? 0,
+              active: p.active,
+            })),
+          })
+        : [],
+    [cachedGrid, t]
+  );
+
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
   const total = useMemo(() => saleTotal(lines, discountCents), [lines, discountCents]);
@@ -96,9 +144,11 @@ export default function SellScreen() {
   // Refresh the local product cache whenever the device comes online.
   useEffect(() => {
     if (sync.online) {
-      refreshProductCache(isOwner).catch(() => {});
+      refreshProductCache(isOwner)
+        .then(loadGrid)
+        .catch(() => {});
     }
-  }, [sync.online, isOwner]);
+  }, [sync.online, isOwner, loadGrid]);
 
   useEffect(() => {
     if (!debounced.trim()) {
@@ -283,43 +333,51 @@ export default function SellScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLinks}>
-            <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
-              <Text style={styles.link}>{t("sell.history")}</Text>
-            </Pressable>
-          </View>
-        </View>
+  // Basket quantities by product, for the grid's ×N badges.
+  const inCart = useMemo(
+    () =>
+      Object.fromEntries(lines.map((l) => [l.product_id, l.quantity])) as Record<string, number>,
+    [lines]
+  );
 
-        <View style={styles.searchRow}>
-          <TextInput
-            style={[styles.search, styles.flex]}
-            placeholder={t("sell.searchPlaceholder")}
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {Platform.OS !== "web" && (
-            <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
-              <Text style={styles.scanButtonText}>{t("sell.scan")}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {flash && <Text style={styles.flash}>{flash}</Text>}
-
-        {results.map((product) => (
-          <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
-            <Text style={styles.resultName}>{isolateBidi(product.name)}</Text>
-            <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
+  const headerNode = (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <View style={styles.headerLinks}>
+          <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
+            <Text style={styles.link}>{t("sell.history")}</Text>
           </Pressable>
-        ))}
+        </View>
       </View>
 
+      <View style={styles.searchRow}>
+        <TextInput
+          style={[styles.search, styles.flex]}
+          placeholder={t("sell.searchPlaceholder")}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {Platform.OS !== "web" && (
+          <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
+            <Text style={styles.scanButtonText}>{t("sell.scan")}</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {flash && <Text style={styles.flash}>{flash}</Text>}
+
+      {results.map((product) => (
+        <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
+          <Text style={styles.resultName}>{isolateBidi(product.name)}</Text>
+          <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+  const cartNode = (
+    <>
       <FlatList
         data={lines}
         keyExtractor={(line) => line.product_id}
@@ -373,6 +431,32 @@ export default function SellScreen() {
           />
         </View>
       )}
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      {split ? (
+        <View style={styles.split}>
+          <View style={styles.gridPane}>
+            {headerNode}
+            {results.length === 0 && !search.trim() ? (
+              <ProductGrid
+                tabs={gridTabs}
+                inCart={inCart}
+                // The cache rows and live rows share the fields addProduct reads.
+                onAdd={(product) => addProduct(product as unknown as Product)}
+              />
+            ) : null}
+          </View>
+          <View style={styles.cartPane}>{cartNode}</View>
+        </View>
+      ) : (
+        <>
+          {headerNode}
+          {cartNode}
+        </>
+      )}
 
       <ContinuousScanner
         visible={scannerOpen}
@@ -417,6 +501,10 @@ export default function SellScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  // Tablet and laptop (>= 900 dp): grid and cart side by side, cart always visible.
+  split: { flex: 1, flexDirection: "row" },
+  gridPane: { flex: 1, minWidth: 0 },
+  cartPane: { width: 420, borderStartWidth: 1, borderStartColor: "#e7ebee" },
   header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 8 },

@@ -194,6 +194,13 @@ const ar: Translations = {
     saleDiscountTooHigh: "الخصم يتجاوز إجمالي السلة.",
     remove: "إزالة",
     weightRequired: "أدخل الوزن.",
+    grid: {
+      favorites: "المفضلة",
+      tileLabel: "{{name}}، {{price}}، {{count}} في السلة",
+      tileLabelEmpty: "{{name}}، {{price}}",
+      stockLabel: "المخزون {{count}}",
+      tabs: "الفئات",
+    },
     stuck: {
       title: "المبيعات العالقة",
       empty: "لا توجد مبيعات عالقة.",
