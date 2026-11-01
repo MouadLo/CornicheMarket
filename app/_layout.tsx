@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthProvider";
 import { useOrientationLock } from "@/src/lib/device/orientation";
+import { DialogHost } from "@/src/components/ui/DialogHost";
 import { bundledFonts } from "@/src/theme/fonts";
 import { colors } from "@/src/theme/tokens";
 import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
@@ -131,6 +132,7 @@ export default function RootLayout() {
               <Stack.Screen name="+not-found" />
             </Stack>
           </NavigationGuard>
+          <DialogHost />
         </AuthProvider>
       </ThemeProvider>
     </I18nextProvider>

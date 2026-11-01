@@ -13,13 +13,13 @@ export function formatMAD(cents: number): string {
   return `${centsToDisplay(cents)} DH`;
 }
 
-// "3 482.50 DH": thousands grouped with a narrow no-break space so long
+// "3 482.50 DH": thousands grouped with a no-break space so long
 // totals are readable at a glance. Used by <Money>; formatMAD stays as is
 // for exports, messages and screens that have not moved to <Money> yet.
 export function formatMADGrouped(cents: number): string {
   const negative = cents < 0;
   const [whole, fraction] = centsToDisplay(Math.abs(cents)).split(".");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
   return `${negative ? "\u2212" : ""}${grouped}.${fraction} DH`;
 }
 

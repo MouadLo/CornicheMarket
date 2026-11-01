@@ -331,7 +331,7 @@ Considered and not chosen: Noto Sans + Noto Sans Arabic (safe but generic, large
 - Western digits 0 to 9 in every language, as on Moroccan price tags and receipts.
 - Tabular figures (`font-variant-numeric: tabular-nums`) on every amount, quantity, time and count, so columns line up and totals don't shimmer as they change.
 - Amounts are LTR islands inside Arabic text: "32.55 DH" always reads the same. One `<Money>` component does `formatMAD` + isolation + tabular figures, so no screen can forget.
-- Keep "." as the decimal separator (the app's current format). Add a narrow no-break space for thousands: "3 482.50 DH" instead of "3482.50 DH" (Q9).
+- Keep "." as the decimal separator (the app's current format). Add a regular no-break space (U+00A0) for thousands: "3 482.50 DH" instead of "3482.50 DH" (Q9).
 
 **Scale** (for a 50 to 70 cm reading distance; Arabic is one step larger for running text, numbers unchanged):
 
@@ -599,7 +599,7 @@ Answered: see Decisions above (1 to 4 as chosen, everything else the recommended
 | 6 | When the till locks with a basket, who gets it? | **The next person who unlocks continues it**; the sale is recorded under whoever completes it. Per-cashier held baskets later. |
 | 7 | "Owner PIN on the spot" for voids and discounts above 10 %? | **Yes.** Voids stay owner-only as today; this just avoids a full user switch. |
 | 8 | Fonts: IBM Plex Sans + IBM Plex Sans Arabic, bundled? | **Yes.** |
-| 9 | Show thousands with a narrow space ("3 482.50 DH"), keep the "." decimal? | **Yes.** It changes `formatMAD` and its tests in D2. |
+| 9 | Show thousands with a no-break space ("3 482.50 DH"), keep the "." decimal? | **Yes.** It changes `formatMAD` and its tests in D2. |
 | 10 | Arabic store words: everyday counter words (كريدي, الكارني) or standard Arabic (آجل)? | **Everyday words for the 3 or 4 store terms** (credit, the carnet), standard Arabic elsewhere. Decided: كريدي: you know your cashiers. |
 | 11 | Arabic names for categories? | **Yes, optional** on categories (shown in Arabic). Products keep one name plus optional search aliases (3.6 #3). |
 | 12 | Windows scaling on the 1920×1080 laptop? | **125 %.** |

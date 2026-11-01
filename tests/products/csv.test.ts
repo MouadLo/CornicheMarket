@@ -63,7 +63,16 @@ describe("validateRows", () => {
 
   it("accepts a valid row and converts money to centimes", () => {
     const { rows, errors } = validateRows(
-      [{ name: "Coca-Cola 33cl", barcode: "611100001", category: "Boissons", price: "7,00", cost: "", qty: "" }],
+      [
+        {
+          name: "Coca-Cola 33cl",
+          barcode: "611100001",
+          category: "Boissons",
+          price: "7,00",
+          cost: "",
+          qty: "",
+        },
+      ],
       mapping,
       emptyContext
     );

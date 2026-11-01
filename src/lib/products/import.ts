@@ -9,10 +9,7 @@ export type ImportResult = {
   errors: RowError[];
 };
 
-export async function importProducts(
-  rows: ParsedRow[],
-  ownerId: string
-): Promise<ImportResult> {
+export async function importProducts(rows: ParsedRow[], ownerId: string): Promise<ImportResult> {
   const errors: RowError[] = [];
   const openingItems: { product_id: string; quantity: number; unit_cost_cents: number }[] = [];
   let inserted = 0;

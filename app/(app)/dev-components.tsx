@@ -5,7 +5,14 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { Badge } from "@/src/components/ui/Badge";
+import { Banner } from "@/src/components/ui/Banner";
 import { Card } from "@/src/components/ui/Card";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadQueryError } from "@/src/components/ui/LoadQueryError";
+import { OfflineBanner, OfflineRequired } from "@/src/components/ui/OfflineState";
+import { Panel } from "@/src/components/ui/Panel";
+import { Popover } from "@/src/components/ui/Popover";
+import { confirm, showToast } from "@/src/lib/dialog/store";
 import { Chip } from "@/src/components/ui/Chip";
 import { Field } from "@/src/components/ui/Field";
 import { ICONS, Icon, type IconName } from "@/src/components/ui/Icon";
@@ -30,6 +37,9 @@ export default function DevComponents() {
   const [mode, setMode] = useState<"weight" | "amount">("weight");
   const [price, setPrice] = useState("6.50");
   const [picked, setPicked] = useState("c1");
+  const [panel, setPanel] = useState(false);
+  const [pop, setPop] = useState(false);
+  const [answer, setAnswer] = useState("");
 
   if (profile && profile.role !== "owner") return <Redirect href="/(app)/sell" />;
 
@@ -166,6 +176,128 @@ export default function DevComponents() {
         </View>
       </Card>
 
+      <Card title="Dialog: confirm()">
+        <View style={styles.col}>
+          <BigButton
+            label={L("Annuler une vente (danger)", "إلغاء بيع (خطر)")}
+            variant="danger"
+            onPress={async () => {
+              const ok = await confirm({
+                tone: "danger",
+                title: L("Annuler la vente n° 0185 ?", "إلغاء البيع رقم 0185؟"),
+                summary: isolateLtr("34.50 DH · 14:09"),
+                consequences: [
+                  {
+                    label: L("Stock remis en rayon", "المخزون يعود إلى الرف"),
+                    after: L("10 articles", "10 منتجات"),
+                  },
+                  {
+                    label: L("Carnet de la cliente", "كارني الزبونة"),
+                    before: "245.50",
+                    after: "211.00 DH",
+                  },
+                ],
+                confirmLabel: L("Annuler la vente", "إلغاء البيع"),
+                cancelLabel: L("Garder la vente", "الاحتفاظ بالبيع"),
+              });
+              setAnswer(ok ? "true" : "false");
+            }}
+          />
+          <BigButton
+            label={L("Question simple", "سؤال بسيط")}
+            variant="secondary"
+            onPress={async () =>
+              setAnswer(
+                String(
+                  await confirm({
+                    title: L("Continuer ?", "المتابعة؟"),
+                    message: L("Votre brouillon est gardé.", "مسودتك محفوظة."),
+                  })
+                )
+              )
+            }
+          />
+          <Text>{`confirm() → ${answer || "…"}`}</Text>
+        </View>
+      </Card>
+
+      <Card title="Toast">
+        <View style={styles.row}>
+          <Chip
+            label={L("Vente enregistrée", "تم تسجيل البيع")}
+            onPress={() =>
+              showToast({
+                text: L("Vente enregistrée · 32.55 DH", "تم تسجيل البيع · 32.55 DH"),
+                action: { label: "WhatsApp", onPress: () => {} },
+              })
+            }
+          />
+          <Chip
+            label={L("Retiré (annuler)", "أزيل (تراجع)")}
+            onPress={() =>
+              showToast({
+                tone: "info",
+                text: L("Retiré : Pain rond", "أزيل: Pain rond"),
+                action: { label: L("Annuler", "تراجع"), onPress: () => {} },
+              })
+            }
+          />
+        </View>
+      </Card>
+
+      <Card title="Banners">
+        <View style={styles.col}>
+          <Banner tone="info" text={L("Prix mis à jour à 14:20", "الأسعار محدثة 14:20")} />
+          <Banner
+            tone="warn"
+            text={L("Dernière sauvegarde il y a 3 jours", "آخر نسخة احتياطية منذ 3 أيام")}
+            action={{ label: L("Exporter", "تصدير"), onPress: () => {} }}
+          />
+          <Banner tone="bad" text={L("1 vente refusée par le serveur", "بيع واحد رفضه الخادم")} />
+          <Banner tone="ok" text={L("Tout est synchronisé", "كل شيء متزامن")} />
+          <OfflineBanner priceTime="14:20" />
+        </View>
+      </Card>
+
+      <Card title="Side panel and popover">
+        <View style={styles.row}>
+          <Chip label={L("Ouvrir le panneau", "فتح اللوحة")} onPress={() => setPanel(true)} />
+          <Chip label={L("Ouvrir le menu", "فتح القائمة")} onPress={() => setPop(true)} />
+        </View>
+        <Panel
+          visible={panel}
+          title="Hassan El Idrissi"
+          onClose={() => setPanel(false)}
+          footer={
+            <>
+              <View style={styles.grow} />
+              <BigButton label={L("Enregistrer", "حفظ")} onPress={() => setPanel(false)} />
+            </>
+          }
+        >
+          <Money cents={112000} size="kpi" />
+        </Panel>
+        <Popover visible={pop} onClose={() => setPop(false)}>
+          <ListRow
+            title={L("Changer de caissier", "تغيير أمين الصندوق")}
+            onPress={() => setPop(false)}
+          />
+          <ListRow title={L("Verrouiller maintenant", "قفل الآن")} onPress={() => setPop(false)} />
+        </Popover>
+      </Card>
+
+      <Card title="Empty, error and offline states">
+        <View style={styles.col}>
+          <EmptyState
+            icon="users"
+            title={L("Personne ne doit d’argent", "لا أحد مدين")}
+            message={L("Les ventes à crédit apparaîtront ici.", "ستظهر المبيعات بالكريدي هنا.")}
+          />
+          <LoadQueryError what={L("les clients", "الزبائن")} onRetry={() => {}} />
+          <OfflineRequired action={L("enregistrer la livraison", "حفظ التسليم")} />
+        </View>
+      </Card>
+
       <Card title={`Icons (${Object.keys(ICONS).length})`}>
         <View style={styles.row}>
           {(Object.keys(ICONS) as IconName[]).map((name) => (
@@ -186,6 +318,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   col: { gap: 12 },
   gap: { marginTop: 12 },
+  grow: { flex: 1 },
   icon: { width: 84, alignItems: "center", gap: 4, paddingVertical: 6 },
   iconLabel: { fontSize: 12, color: colors.ink600 },
 });

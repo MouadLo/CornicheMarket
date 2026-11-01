@@ -11,10 +11,7 @@ export type ReportTable = {
   rows: (string | number)[][];
 };
 
-export async function exportTablesAsCsv(
-  filename: string,
-  tables: ReportTable[]
-): Promise<void> {
+export async function exportTablesAsCsv(filename: string, tables: ReportTable[]): Promise<void> {
   const blocks = tables.map((table) => {
     const body = Papa.unparse({ fields: table.columns, data: table.rows });
     return `${table.title}\n${body}`;
@@ -24,10 +21,7 @@ export async function exportTablesAsCsv(
 }
 
 function escapeHtml(value: string | number): string {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function tablesToHtml(heading: string, subtitle: string, tables: ReportTable[]): string {
@@ -39,10 +33,7 @@ function tablesToHtml(heading: string, subtitle: string, tables: ReportTable[]):
         <thead><tr>${table.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead>
         <tbody>
           ${table.rows
-            .map(
-              (row) =>
-                `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`
-            )
+            .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
             .join("")}
         </tbody>
       </table>`

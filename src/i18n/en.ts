@@ -21,6 +21,14 @@ const en: Translations = {
     applying: "Applying...",
     apply: "Apply",
   },
+  states: {
+    loadErrorTitle: "Couldn't load {{what}}",
+    loadErrorHint: "Check the connection, then try again.",
+    offlineTitle: "Offline",
+    offlineHint: "Sales are kept on this device and will be sent when the network is back.",
+    offlinePrices: "Offline · prices from {{time}}",
+    offlineNeeded: "A connection is needed to {{action}}. Your entry is kept on this device.",
+  },
   nav: {
     sell: "Sell",
     products: "Products",
