@@ -21,6 +21,14 @@ const ar: Translations = {
     applying: "جاري التطبيق...",
     apply: "تطبيق",
   },
+  states: {
+    loadErrorTitle: "تعذر تحميل {{what}}",
+    loadErrorHint: "تحقق من الاتصال ثم حاول مرة أخرى.",
+    offlineTitle: "غير متصل",
+    offlineHint: "المبيعات محفوظة في الجهاز وسترسل عند عودة الشبكة.",
+    offlinePrices: "غير متصل · الأسعار من {{time}}",
+    offlineNeeded: "الاتصال مطلوب من أجل {{action}}. إدخالك محفوظ في الجهاز.",
+  },
   nav: {
     sell: "بيع",
     products: "المنتجات",

@@ -1,30 +1,20 @@
-import { Alert, Platform } from "react-native";
+import { confirm } from "@/src/lib/dialog/store";
 
 // Void sale, void delivery and stock-adjustment all move stock or money
-// backward in one tap today, with nothing between the tap and the write.
-// This is the one gate they share: a message that states exactly what is
-// about to change, and a real yes/no the caller must await before writing.
+// backward in one tap, so each asks first. This is the one gate they share:
+// a message that states what is about to change, and a real yes/no the
+// caller must await before writing.
 //
-// react-native-web's Alert.alert is a no-op (it does nothing at all, not
-// even a browser dialog), so native and web need different mechanics here;
-// window.confirm is the standard, expected pattern for a blocking
-// yes/no on web and needs no extra UI work to read correctly in RTL.
+// It used to be window.confirm on web and Alert.alert on native. Both are
+// replaced by the same in-app dialog (src/components/ui/DialogHost), so web
+// and native look and behave alike, read correctly in RTL, and use the
+// caller's translated button labels. Resolves false when dismissed, and when
+// no host is mounted, so nothing is ever written without an explicit yes.
 export function confirmDestructive(
   title: string,
   message: string,
   confirmLabel: string,
   cancelLabel: string
 ): Promise<boolean> {
-  if (Platform.OS === "web") {
-    return Promise.resolve(
-      typeof window !== "undefined" ? window.confirm(`${title}\n\n${message}`) : false
-    );
-  }
-
-  return new Promise((resolve) => {
-    Alert.alert(title, message, [
-      { text: cancelLabel, style: "cancel", onPress: () => resolve(false) },
-      { text: confirmLabel, style: "destructive", onPress: () => resolve(true) },
-    ]);
-  });
+  return confirm({ tone: "danger", title, message, confirmLabel, cancelLabel });
 }

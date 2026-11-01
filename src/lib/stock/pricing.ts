@@ -1,18 +1,12 @@
 // Threshold at which a new buying price is worth the owner's attention.
 export const PRICE_CHANGE_THRESHOLD_PERCENT = 10;
 
-export function priceChangePercent(
-  previousCostCents: number,
-  newCostCents: number
-): number | null {
+export function priceChangePercent(previousCostCents: number, newCostCents: number): number | null {
   if (previousCostCents <= 0) return null;
   return ((newCostCents - previousCostCents) / previousCostCents) * 100;
 }
 
-export function isSignificantPriceChange(
-  previousCostCents: number,
-  newCostCents: number
-): boolean {
+export function isSignificantPriceChange(previousCostCents: number, newCostCents: number): boolean {
   const change = priceChangePercent(previousCostCents, newCostCents);
   return change !== null && Math.abs(change) > PRICE_CHANGE_THRESHOLD_PERCENT;
 }

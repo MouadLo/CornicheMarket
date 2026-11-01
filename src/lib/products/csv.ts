@@ -57,11 +57,7 @@ const HEADER_HINTS: Record<ImportFieldKey, string[]> = {
 };
 
 function normalizeHeader(header: string): string {
-  return header
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  return header.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 export function guessMapping(headers: string[]): ColumnMapping {
@@ -209,11 +205,7 @@ export function validateRows(
   return { rows: parsed, errors };
 }
 
-export function toCsv(
-  products: Product[],
-  categories: Category[],
-  includeCost: boolean
-): string {
+export function toCsv(products: Product[], categories: Category[], includeCost: boolean): string {
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
 
   const rows = products.map((product) => {

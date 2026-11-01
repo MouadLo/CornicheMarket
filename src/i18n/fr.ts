@@ -19,6 +19,14 @@ const fr = {
     applying: "Application...",
     apply: "Appliquer",
   },
+  states: {
+    loadErrorTitle: "Impossible de charger {{what}}",
+    loadErrorHint: "Vérifiez la connexion, puis réessayez.",
+    offlineTitle: "Hors ligne",
+    offlineHint: "Les ventes sont gardées sur l'appareil et partiront au retour du réseau.",
+    offlinePrices: "Hors ligne · prix du {{time}}",
+    offlineNeeded: "Connexion requise pour {{action}}. Votre saisie est gardée sur l'appareil.",
+  },
   nav: {
     sell: "Vente",
     products: "Produits",

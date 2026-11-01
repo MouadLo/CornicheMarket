@@ -1,15 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getLocales } from 'expo-localization';
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import { I18nManager, Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLocales } from "expo-localization";
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+import { I18nManager, Platform } from "react-native";
 
-import ar from './ar';
-import en from './en';
-import fr from './fr';
+import ar from "./ar";
+import en from "./en";
+import fr from "./fr";
 
-export type SupportedLang = 'fr' | 'en' | 'ar';
-const STORAGE_KEY = '@corniche/language';
+export type SupportedLang = "fr" | "en" | "ar";
+const STORAGE_KEY = "@corniche/language";
 
 export async function loadSavedLanguage(): Promise<SupportedLang | null> {
   try {
@@ -27,11 +27,11 @@ export async function changeLanguage(lang: SupportedLang): Promise<boolean> {
 
   await i18n.changeLanguage(lang);
 
-  const needsRTL = lang === 'ar';
+  const needsRTL = lang === "ar";
 
-  if (Platform.OS === 'web') {
-    document.documentElement.setAttribute('dir', needsRTL ? 'rtl' : 'ltr');
-    document.documentElement.setAttribute('lang', lang);
+  if (Platform.OS === "web") {
+    document.documentElement.setAttribute("dir", needsRTL ? "rtl" : "ltr");
+    document.documentElement.setAttribute("lang", lang);
     return false;
   }
 
@@ -44,10 +44,10 @@ export async function changeLanguage(lang: SupportedLang): Promise<boolean> {
 }
 
 function detectDeviceLanguage(): SupportedLang {
-  const code = getLocales()[0]?.languageCode ?? 'fr';
-  if (code === 'ar') return 'ar';
-  if (code === 'en') return 'en';
-  return 'fr';
+  const code = getLocales()[0]?.languageCode ?? "fr";
+  if (code === "ar") return "ar";
+  if (code === "en") return "en";
+  return "fr";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -58,7 +58,7 @@ i18n.use(initReactI18next).init({
     ar: { translation: ar },
   },
   lng: detectDeviceLanguage(),
-  fallbackLng: 'fr',
+  fallbackLng: "fr",
   interpolation: { escapeValue: false },
 });
 
