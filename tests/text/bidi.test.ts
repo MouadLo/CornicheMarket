@@ -1,4 +1,4 @@
-import { appDirection, isolateBidi } from "../../src/lib/text/bidi";
+import { appDirection, isolateBidi, isolateLtr } from "../../src/lib/text/bidi";
 
 describe("isolateBidi", () => {
   it("wraps text in the First Strong Isolate / Pop Directional Isolate pair", () => {
@@ -29,5 +29,14 @@ describe("appDirection", () => {
   it("defaults to ltr for any other/unknown language code", () => {
     expect(appDirection("es")).toBe("ltr");
     expect(appDirection("")).toBe("ltr");
+  });
+});
+
+describe("isolateLtr", () => {
+  it("wraps text in a left-to-right isolate and keeps it intact", () => {
+    const out = isolateLtr("0661 23 45 67");
+    expect(out.startsWith("\u2066")).toBe(true);
+    expect(out.endsWith("\u2069")).toBe(true);
+    expect(out.slice(1, -1)).toBe("0661 23 45 67");
   });
 });
