@@ -9,6 +9,7 @@ import { Popover } from "@/src/components/ui/Popover";
 import { useOwnerAlerts } from "@/src/lib/alerts/useOwnerAlerts";
 import { totalAlerts, type ReviewKind } from "@/src/lib/alerts/queries";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { useSignOut } from "@/src/lib/auth/useSignOut";
 import { showToast } from "@/src/lib/dialog/store";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
 import {
@@ -43,7 +44,8 @@ type Menu = null | "sync" | "alerts" | "user" | "more";
 // inside it unchanged (docs/THEME-STRUCTURE.md 1.3).
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
+  const signOut = useSignOut();
   const { width } = useWindowDimensions();
   const pathname = usePathname();
 
@@ -144,6 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onClose={close}
         state={sync}
         isOwner={isOwner}
+        userId={profile?.id ?? null}
         onSyncNow={syncNow}
         onChanged={() => void refreshPending()}
       />

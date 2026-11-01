@@ -41,6 +41,27 @@ const en: Translations = {
     stuckDismissTitle: "Delete this stuck sale?",
     stuckDismissMessage:
       "It disappears from this device for good. Export it first if you want to keep a record.",
+    signOutPendingTitle: "Some sales haven't been sent yet",
+    signOutPendingMessage:
+      "{{count}} sale(s) by {{name}} are waiting for the network. They stay on this device and will only be sent when you sign back in: nobody else can send them for you. The owner can recover them if needed. Sign out anyway?",
+    signOutPendingUnknown:
+      "Couldn't check whether sales are waiting to be sent. They are never deleted, but will only be sent when you sign back in. Sign out anyway?",
+    signOutStay: "Stay signed in",
+    othersTitle: "Sales from another user ({{count}})",
+    othersHint:
+      "They are never sent under another account. They go out when their user signs back in, or the owner can recover them.",
+    othersCashierNotice:
+      "{{count}} sale(s) from another user are waiting on this device. They will be sent when that person signs back in.",
+    recoverUnknownCashier: "Unknown cashier (older sale)",
+    recoverButton: "Recover as owner",
+    recoverTitle: "Recover this sale?",
+    recoverMessage:
+      'It will be recorded under your name, marked "recovered by owner". The original cashier ({{name}}) is kept in the log.',
+    recoverConfirm: "Recover",
+    recovered: "Sale recovered",
+    recoverAlready: "This sale was already recorded",
+    recoverError: "Couldn't recover the sale. Try again.",
+    stuckOthersNote: "Only its own user can send it again.",
     stuckTitle: "Stuck sales",
     stuckNone: "No stuck sales.",
     stuckCashierNotice: "{{count}} sale(s) refused by the server. The owner has been notified.",

@@ -7,6 +7,7 @@ import { Popover } from "@/src/components/ui/Popover";
 import type { SaleSyncState } from "@/src/components/shell/syncState";
 import { Text } from "@/src/theme/Text";
 import { colors, spacing } from "@/src/theme/tokens";
+import { OthersSalesList } from "./OthersSalesList";
 import { StuckSalesList } from "./StuckSalesList";
 import { TOPBAR_HEIGHT } from "./TopBar";
 
@@ -17,6 +18,7 @@ export function SyncMenu({
   onClose,
   state,
   isOwner,
+  userId,
   onSyncNow,
   onChanged,
 }: {
@@ -24,11 +26,12 @@ export function SyncMenu({
   onClose: () => void;
   state: SaleSyncState;
   isOwner: boolean;
+  userId: string | null;
   onSyncNow: () => Promise<void>;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const clean = state.online && state.pending === 0 && state.stuck === 0;
+  const clean = state.online && state.pending === 0 && state.stuck === 0 && state.others === 0;
   return (
     <Popover visible={visible} onClose={onClose} top={TOPBAR_HEIGHT + 4} width={400}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
@@ -61,11 +64,21 @@ export function SyncMenu({
           onPress={onSyncNow}
         />
 
+        {state.others > 0 ? (
+          isOwner ? (
+            <OthersSalesList userId={userId} onChanged={onChanged} />
+          ) : (
+            <Text style={styles.hint}>
+              {t("shell.othersCashierNotice", { count: state.others })}
+            </Text>
+          )
+        ) : null}
+
         {state.stuck > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t("shell.stuckTitle")}</Text>
             {isOwner ? (
-              <StuckSalesList onRetry={onSyncNow} onChanged={onChanged} />
+              <StuckSalesList userId={userId} onRetry={onSyncNow} onChanged={onChanged} />
             ) : (
               <Text style={styles.hint}>
                 {t("shell.stuckCashierNotice", { count: state.stuck })}

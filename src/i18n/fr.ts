@@ -39,6 +39,27 @@ const fr = {
     stuckDismissTitle: "Supprimer cette vente bloquée ?",
     stuckDismissMessage:
       "Elle disparaît de cet appareil pour toujours. Exportez-la d'abord si vous voulez en garder une trace.",
+    signOutPendingTitle: "Des ventes ne sont pas encore envoyées",
+    signOutPendingMessage:
+      "{{count}} vente(s) de {{name}} attendent le réseau. Elles restent sur cet appareil et ne partiront que lorsque vous vous reconnecterez : personne d'autre ne peut les envoyer à votre place. Le propriétaire peut les récupérer si besoin. Se déconnecter quand même ?",
+    signOutPendingUnknown:
+      "Impossible de vérifier s'il reste des ventes à envoyer. Elles ne sont jamais effacées, mais ne partiront que lorsque vous vous reconnecterez. Se déconnecter quand même ?",
+    signOutStay: "Rester connecté",
+    othersTitle: "Ventes d'un autre utilisateur ({{count}})",
+    othersHint:
+      "Elles ne partent jamais sous un autre compte. Elles partent quand leur auteur se reconnecte, ou le propriétaire peut les récupérer.",
+    othersCashierNotice:
+      "{{count}} vente(s) d'un autre utilisateur attendent sur cet appareil. Elles partiront quand cette personne se reconnectera.",
+    recoverUnknownCashier: "Caissier inconnu (ancienne vente)",
+    recoverButton: "Récupérer en tant que propriétaire",
+    recoverTitle: "Récupérer cette vente ?",
+    recoverMessage:
+      "Elle sera enregistrée à votre nom, marquée « récupérée par le propriétaire ». Le caissier d'origine ({{name}}) est gardé dans le journal.",
+    recoverConfirm: "Récupérer",
+    recovered: "Vente récupérée",
+    recoverAlready: "Cette vente était déjà enregistrée",
+    recoverError: "Impossible de récupérer la vente. Réessayez.",
+    stuckOthersNote: "Seul son auteur peut la renvoyer.",
     stuckTitle: "Ventes bloquées",
     stuckNone: "Aucune vente bloquée.",
     stuckCashierNotice:

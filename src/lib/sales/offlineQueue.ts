@@ -19,6 +19,11 @@ export type PendingSale = {
   created_at: string;
   attempts: number;
   last_error?: string;
+  // The user who rang this sale up, captured when it was accepted. Only that
+  // user's own session may send it (the server credits the session, never a
+  // claim in the payload). Missing on sales queued before audit C05 was fixed:
+  // those are "legacy" and are never sent automatically.
+  cashier_id?: string;
 };
 
 export type StuckSale = {
@@ -95,6 +100,8 @@ function isSale(value: unknown): value is PendingSale {
     Number.isSafeInteger(value.attempts) &&
     typeof value.created_at === "string" &&
     (value.last_error === undefined || typeof value.last_error === "string") &&
+    (value.cashier_id === undefined ||
+      (typeof value.cashier_id === "string" && value.cashier_id.length > 0)) &&
     Array.isArray(value.lines) &&
     value.lines.every(
       (line: unknown) =>
@@ -155,6 +162,37 @@ export function listPendingSales(): Promise<PendingSale[]> {
 }
 export function countPendingSales(): Promise<number> {
   return withStorage(async () => (await readQueue()).length);
+}
+
+// --- ownership (audit C05) --------------------------------------------------
+
+// Splits a queue by who may send each sale. Nobody signed in owns nothing.
+export function partitionByOwner(
+  queue: PendingSale[],
+  userId: string | null
+): { mine: PendingSale[]; others: PendingSale[]; legacy: PendingSale[] } {
+  const mine: PendingSale[] = [];
+  const others: PendingSale[] = [];
+  const legacy: PendingSale[] = [];
+  for (const sale of queue) {
+    if (sale.cashier_id === undefined) legacy.push(sale);
+    else if (userId !== null && sale.cashier_id === userId) mine.push(sale);
+    else others.push(sale);
+  }
+  return { mine, others, legacy };
+}
+// Sales this user may send.
+export function countPendingFor(userId: string | null): Promise<number> {
+  return withStorage(async () => partitionByOwner(await readQueue(), userId).mine.length);
+}
+// Everything on this device that this user may NOT send: other users' sales and
+// legacy sales. These wait for their own user, or for the owner to recover them.
+export function listSalesOfOthers(userId: string | null): Promise<PendingSale[]> {
+  return withStorage(async () => {
+    const { others, legacy } = partitionByOwner(await readQueue(), userId);
+    const keep = new Set([...others, ...legacy].map((sale) => sale.id));
+    return (await readQueue()).filter((sale) => keep.has(sale.id));
+  });
 }
 export function enqueueSale(sale: PendingSale): Promise<void> {
   return withStorage(async () => {

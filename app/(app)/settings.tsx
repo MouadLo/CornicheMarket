@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { useSignOut } from "@/src/lib/auth/useSignOut";
 import { supabase } from "@/src/lib/supabase/client";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
 import {
@@ -36,7 +37,8 @@ const LANGUAGES: { code: SupportedLang; labelKey: "languageFr" | "languageEn" | 
 const STORE_TIMEZONES = ["Africa/Casablanca", "Europe/Paris", "UTC"];
 
 export default function Settings() {
-  const { profile, session, signOut } = useAuth();
+  const { profile, session } = useAuth();
+  const signOut = useSignOut();
   const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
   const [showBackupReminder, setShowBackupReminder] = useState(false);

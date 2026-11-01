@@ -31,6 +31,8 @@ import {
   useSaleSync,
 } from "../../src/lib/sales/useSaleSync";
 
+const USER = "user-1";
+
 // Prefixed with "mock" so Jest hoists these into the jest.mock() factories
 // below correctly.
 const mockSubmitSale = jest.fn();
@@ -47,7 +49,16 @@ jest.mock("../../src/lib/sales/queries", () => ({
 
 // submitWithAuthRetry calls supabase.auth.refreshSession() directly.
 jest.mock("../../src/lib/supabase/client", () => ({
-  supabase: { auth: { refreshSession: (...args: unknown[]) => mockRefreshSession(...args) } },
+  supabase: {
+    auth: {
+      refreshSession: (...args: unknown[]) => mockRefreshSession(...args),
+      // The owner check (audit C05): the signed-in user is the one who rang the sale up.
+      getSession: async () => ({ data: { session: { user: { id: "user-1" } } } }),
+    },
+  },
+}));
+jest.mock("../../src/lib/auth/AuthProvider", () => ({
+  useAuth: () => ({ session: { user: { id: "user-1" } } }),
 }));
 
 const mockStore = new Map<string, string>();
@@ -73,7 +84,8 @@ describe("pendingSaleFrom", () => {
     const sale = pendingSaleFrom(
       "abc-123",
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 1400 },
-      []
+      [],
+      USER
     );
     expect(sale.id).toBe("abc-123");
     expect(sale.attempts).toBe(0);
@@ -87,7 +99,8 @@ describe("pendingSaleFrom", () => {
     const sale = pendingSaleFrom(
       "abc-123",
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 0 },
-      []
+      [],
+      USER
     );
     const after = new Date().toISOString();
     expect(sale.created_at >= before).toBe(true);
@@ -98,7 +111,8 @@ describe("pendingSaleFrom", () => {
     const sale = pendingSaleFrom(
       "abc-456",
       { customer_id: "cust-99", payment_method: "credit", discount_cents: 0, total_cents: 500 },
-      []
+      [],
+      USER
     );
     expect(sale.customer_id).toBe("cust-99");
   });
@@ -109,7 +123,8 @@ describe("sync cycle: no duplicate submissions", () => {
     return pendingSaleFrom(
       id,
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 700 },
-      []
+      [],
+      USER
     );
   }
 
@@ -207,7 +222,8 @@ describe("submitWithAuthRetry: an expired token syncs after refresh and is never
     return pendingSaleFrom(
       id,
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 900 },
-      []
+      [],
+      USER
     );
   }
 
@@ -254,7 +270,8 @@ describe("quarantine: stuck queue", () => {
     return pendingSaleFrom(
       id,
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 700 },
-      []
+      [],
+      USER
     );
   }
 
@@ -310,7 +327,8 @@ function queued(id: string) {
   return pendingSaleFrom(
     id,
     { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 100 },
-    []
+    [],
+    USER
   );
 }
 
@@ -325,9 +343,9 @@ describe("shared sync ownership", () => {
       return read.promise;
     });
     mockSubmitSale.mockResolvedValue(undefined);
-    const first = syncPendingSales();
+    const first = syncPendingSales(USER);
     await entered.promise;
-    const second = syncPendingSales();
+    const second = syncPendingSales(USER);
     expect(second).toBe(first);
     read.resolve(raw);
     await Promise.all([first, second]);
@@ -345,10 +363,10 @@ describe("shared sync ownership", () => {
         return network.promise;
       })
       .mockResolvedValue(undefined);
-    const first = syncPendingSales();
+    const first = syncPendingSales(USER);
     await entered.promise;
     await enqueueSale(queued("B"));
-    const second = syncPendingSales();
+    const second = syncPendingSales(USER);
     expect(mockSubmitSale).toHaveBeenCalledTimes(1);
     network.resolve();
     await Promise.all([first, second]);
@@ -359,9 +377,9 @@ describe("shared sync ownership", () => {
   it("releases ownership after a read failure", async () => {
     await enqueueSale(queued("A"));
     jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error("read failed"));
-    await expect(syncPendingSales()).rejects.toThrow("read failed");
+    await expect(syncPendingSales(USER)).rejects.toThrow("read failed");
     mockSubmitSale.mockResolvedValue(undefined);
-    await syncPendingSales();
+    await syncPendingSales(USER);
     expect(mockSubmitSale).toHaveBeenCalledTimes(1);
   });
 
@@ -369,10 +387,10 @@ describe("shared sync ownership", () => {
     await enqueueSale(queued("A"));
     mockSubmitSale.mockResolvedValue(undefined);
     jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
-    await expect(syncPendingSales()).rejects.toThrow("disk full");
+    await expect(syncPendingSales(USER)).rejects.toThrow("disk full");
     expect((await listPendingSales())[0].attempts).toBe(0);
     expect(await listStuckSales()).toEqual([]);
-    await syncPendingSales();
+    await syncPendingSales(USER);
     expect(mockSubmitSale.mock.calls.map(([sale]) => sale.id)).toEqual(["A", "A"]);
     expect(await listPendingSales()).toEqual([]);
   });
@@ -383,8 +401,8 @@ describe("shared sync ownership", () => {
       .mockRejectedValueOnce(new Error("Network request failed"))
       .mockResolvedValue(undefined);
     jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
-    await expect(syncPendingSales()).rejects.toThrow("disk full");
-    await syncPendingSales();
+    await expect(syncPendingSales(USER)).rejects.toThrow("disk full");
+    await syncPendingSales(USER);
     expect(await listPendingSales()).toEqual([]);
   });
 
@@ -394,7 +412,7 @@ describe("shared sync ownership", () => {
     mockSubmitSale
       .mockRejectedValueOnce(new Error("foreign key violation"))
       .mockResolvedValue(undefined);
-    expect(await syncPendingSales()).toBe("foreign key violation");
+    expect(await syncPendingSales(USER)).toBe("foreign key violation");
     expect(await listPendingSales()).toEqual([]);
     expect((await listStuckSales())[0].sale.id).toBe("A");
     expect(mockSubmitSale).toHaveBeenCalledTimes(2);
@@ -404,7 +422,7 @@ describe("shared sync ownership", () => {
     await enqueueSale(queued("A"));
     await enqueueSale(queued("B"));
     mockSubmitSale.mockRejectedValue(new Error("Network request failed"));
-    await Promise.all([syncPendingSales(), syncPendingSales()]);
+    await Promise.all([syncPendingSales(USER), syncPendingSales(USER)]);
     expect(mockSubmitSale).toHaveBeenCalledTimes(1);
     expect((await listPendingSales()).map((sale) => [sale.id, sale.attempts])).toEqual([
       ["A", 1],
@@ -468,10 +486,10 @@ it("runs a requested follow-up after a permanent rejection", async () => {
       return network.promise;
     })
     .mockResolvedValue(undefined);
-  const first = syncPendingSales();
+  const first = syncPendingSales(USER);
   await entered.promise;
   await enqueueSale(queued("B"));
-  const second = syncPendingSales();
+  const second = syncPendingSales(USER);
   network.reject(new Error("foreign key violation"));
   await Promise.all([first, second]);
   expect(mockSubmitSale.mock.calls.map(([sale]) => sale.id)).toEqual(["A", "B"]);
@@ -498,7 +516,7 @@ it.each(["quarantine", "retry"])(
     expect(await countStuckSales()).toBe(1);
     // The queues in mockStore are the persisted state read by a fresh sync run.
     mockSubmitSale.mockResolvedValue(undefined);
-    await syncPendingSales();
+    await syncPendingSales(USER);
     expect(await countPendingSales()).toBe(0);
     expect(await countStuckSales()).toBe(0);
     await retryStuckSale("A");
@@ -519,10 +537,10 @@ it("preserves the pending copy when reconciliation fails and succeeds on retry",
   await expect(quarantineSale(sale, "invalid")).rejects.toThrow();
   mockSubmitSale.mockResolvedValue(undefined);
   jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("reconciliation failed"));
-  await expect(syncPendingSales()).rejects.toThrow("reconciliation failed");
+  await expect(syncPendingSales(USER)).rejects.toThrow("reconciliation failed");
   expect(await countPendingSales()).toBe(1);
   expect(await countStuckSales()).toBe(1);
-  await syncPendingSales();
+  await syncPendingSales(USER);
   expect(await countPendingSales()).toBe(0);
   expect(await countStuckSales()).toBe(0);
   expect(mockSubmitSale.mock.calls.map(([item]) => item.id)).toEqual(["A", "A"]);
