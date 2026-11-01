@@ -27,6 +27,7 @@ jest.mock("../../src/lib/auth/AuthProvider", () => ({
 jest.mock("../../src/lib/sales/useKeyboardWedge", () => ({ useKeyboardWedge: jest.fn() }));
 jest.mock("../../src/lib/useDebouncedValue", () => ({ useDebouncedValue: () => "" }));
 jest.mock("../../src/lib/products/offlineCache", () => ({
+  getCachedGrid: async () => null,
   refreshProductCache: async () => {},
   getProductCacheMeta: async () => null,
   findCachedByBarcode: async () => null,

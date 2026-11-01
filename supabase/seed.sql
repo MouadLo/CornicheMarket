@@ -524,3 +524,11 @@ begin
   raise notice '  Cashier: cashier@corniche.local / cashier123';
   raise notice '=====================================================';
 end $$;
+
+-- Local dev only: a few Favoris tiles so the Sell grid has a hand-picked tab.
+insert into public.sell_grid_tiles (tab_id, product_id, position)
+select (select id from public.sell_grid_tabs where kind = 'favorites'), p.id,
+       row_number() over (order by p.name)
+from public.products p
+where p.name in ('Coca-Cola 33cl', 'Baguette', 'Bananes', 'Allumettes', 'Lait Centrale 1L')
+on conflict do nothing;

@@ -195,6 +195,13 @@ const en: Translations = {
     saleDiscountTooHigh: "Discount exceeds the basket total.",
     remove: "Remove",
     weightRequired: "Enter the weight.",
+    grid: {
+      favorites: "Favorites",
+      tileLabel: "{{name}}, {{price}}, {{count}} in the basket",
+      tileLabelEmpty: "{{name}}, {{price}}",
+      stockLabel: "stock {{count}}",
+      tabs: "Categories",
+    },
     stuck: {
       title: "Stuck sales",
       empty: "No stuck sales.",

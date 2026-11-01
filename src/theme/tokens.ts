@@ -39,6 +39,19 @@ export const colors = {
   disabledFg: "#4f5b66",
 } as const;
 
+// The 8 tile colours (SELL-GRID-DESIGN 2.2): a light tint for the tile and a
+// stronger strip on its start edge. ink900 on every tint is 13.5:1 or better.
+export const tilePalette = {
+  green: { tint: "#e3f1e6", strip: "#2e8b57" },
+  teal: { tint: "#ddf0ef", strip: "#128c8c" },
+  blue: { tint: "#e2ecfa", strip: "#2f6fd0" },
+  indigo: { tint: "#e7e8fa", strip: "#5560d6" },
+  purple: { tint: "#f0e6f7", strip: "#8a4fbf" },
+  red: { tint: "#fbe5e2", strip: "#c8473d" },
+  amber: { tint: "#fbefd5", strip: "#c98a12" },
+  grey: { tint: "#eceff2", strip: "#7d8a96" },
+} as const;
+
 export const spacing = { s1: 4, s2: 8, s3: 12, s4: 16, s5: 24, s6: 32, s7: 48 } as const;
 
 // Two radii. Pills (chips, badges) use `pill`: a shape, not a third radius.
