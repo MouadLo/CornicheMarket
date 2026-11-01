@@ -72,17 +72,20 @@ export async function fetchCustomerBalances(): Promise<CustomerBalance[]> {
   return (data ?? []) as CustomerBalance[];
 }
 
+// Credit repayments go through record_customer_payment only (migration 026):
+// direct inserts are revoked. `paymentId` is generated once per payment and
+// reused on retry, so a lost response can't record the money twice.
 export async function recordCustomerPayment(
+  paymentId: string,
   customerId: string,
   amountCents: number,
-  method: PaymentMethod,
-  userId: string
+  method: PaymentMethod
 ): Promise<void> {
-  const { error } = await supabase.from("customer_payments").insert({
-    customer_id: customerId,
-    amount_cents: amountCents,
-    method,
-    created_by: userId,
+  const { error } = await supabase.rpc("record_customer_payment", {
+    p_payment_id: paymentId,
+    p_customer_id: customerId,
+    p_amount_cents: amountCents,
+    p_method: method,
   });
   if (error) throw new Error(error.message);
 }

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import * as Crypto from "expo-crypto";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -26,6 +27,10 @@ export default function CreditScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  // One id per payment the cashier is entering, reused if they tap again after
+  // a network failure (the server records it once). Cleared on success, cancel,
+  // switching customer, or changing the amount.
+  const paymentId = useRef<string | null>(null);
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +53,9 @@ export default function CreditScreen() {
     setSaving(true);
     setError(null);
     try {
-      await recordCustomerPayment(customerId, amountCents, "cash", profile.id);
+      paymentId.current ??= Crypto.randomUUID();
+      await recordCustomerPayment(paymentId.current, customerId, amountCents, "cash");
+      paymentId.current = null;
       setPayingId(null);
       setAmount("");
       load();
@@ -95,7 +102,10 @@ export default function CreditScreen() {
               <TextInput
                 style={styles.input}
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={(value) => {
+                  paymentId.current = null;
+                  setAmount(value);
+                }}
                 keyboardType="decimal-pad"
                 placeholder={t("credit.amountReceived")}
                 autoFocus
@@ -109,6 +119,7 @@ export default function CreditScreen() {
                 label={t("credit.cancelPayment")}
                 variant="secondary"
                 onPress={() => {
+                  paymentId.current = null;
                   setPayingId(null);
                   setAmount("");
                 }}
@@ -118,6 +129,7 @@ export default function CreditScreen() {
             <Pressable
               style={styles.payButton}
               onPress={() => {
+                paymentId.current = null;
                 setPayingId(balance.id);
                 setAmount("");
               }}

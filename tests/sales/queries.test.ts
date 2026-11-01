@@ -6,7 +6,7 @@
  * it has no p_occurred_at key, so `payload.p_occurred_at` is undefined and
  * the first assertion below fails immediately.
  */
-import { submitSale } from "../../src/lib/sales/queries";
+import { recordCustomerPayment, submitSale } from "../../src/lib/sales/queries";
 import { pendingSaleFrom } from "../../src/lib/sales/useSaleSync";
 
 // Prefixed with "mock" so Jest allows it inside the jest.mock() factory below.
@@ -99,5 +99,35 @@ describe("submitSale", () => {
     expect(payload.p_lines).toEqual([
       { product_id: "prod-1", quantity: 2, unit_price_cents: 1000, discount_cents: 0 },
     ]);
+  });
+});
+
+describe("recordCustomerPayment (audit C06 / C11)", () => {
+  it("goes through record_customer_payment with the caller's retained id, never a direct insert", async () => {
+    await recordCustomerPayment("pay-1", "cust-1", 2500, "cash");
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith("record_customer_payment", {
+      p_payment_id: "pay-1",
+      p_customer_id: "cust-1",
+      p_amount_cents: 2500,
+      p_method: "cash",
+    });
+  });
+
+  it("sends the same id on a retry, so the server records the money once", async () => {
+    await recordCustomerPayment("pay-2", "cust-1", 2500, "cash");
+    await recordCustomerPayment("pay-2", "cust-1", 2500, "cash");
+    const ids = mockRpc.mock.calls.map(([, payload]) => payload.p_payment_id);
+    expect(ids).toEqual(["pay-2", "pay-2"]);
+  });
+
+  it("throws the server's error so the screen keeps the payment open", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Payment ID conflicts" },
+    } as never);
+    await expect(recordCustomerPayment("pay-3", "cust-1", 1, "cash")).rejects.toThrow(
+      "Payment ID conflicts"
+    );
   });
 });
