@@ -107,7 +107,7 @@ it("retains the basket and reports a failed enqueue without attempting sync", as
     await tree.root.findByType(PaymentSheet).props.onConfirm("cash", null);
   });
   expect(tree.root.findByType(PaymentSheet).props.totalCents).toBe(700);
-  expect(tree.root.findByType(PaymentSheet).props.error).toBe("queue unreadable");
+  expect(tree.root.findByType(PaymentSheet).props.error).toBe("sell.couldNotRecord");
   expect(mockSync).not.toHaveBeenCalled();
 });
 

@@ -50,6 +50,10 @@ const fr = {
       "Elles ne partent jamais sous un autre compte. Elles partent quand leur auteur se reconnecte, ou le propriétaire peut les récupérer.",
     othersCashierNotice:
       "{{count}} vente(s) d'un autre utilisateur attendent sur cet appareil. Elles partiront quand cette personne se reconnectera.",
+    unreadableTitle: "Données de vente illisibles ({{count}})",
+    unreadableHint:
+      "Cette version n'a pas pu lire ces données. Elles sont conservées intactes sur l'appareil : exportez-les pour les récupérer.",
+    unreadableExport: "Exporter",
     recoverUnknownCashier: "Caissier inconnu (ancienne vente)",
     recoverButton: "Récupérer en tant que propriétaire",
     recoverTitle: "Récupérer cette vente ?",
@@ -151,6 +155,18 @@ const fr = {
     lookupFailed: "Recherche échouée",
     recorded: "Vente · {{amount}}",
     couldNotRecord: "Impossible d'enregistrer la vente.",
+    attempt: {
+      title: "Une vente n'a pas été confirmée",
+      summary: "{{amount}} · {{method}}",
+      hint: "Elle est peut-être déjà enregistrée. Vérifiez l'historique avant de la refaire.",
+      retry: "Réessayer cette vente",
+      history: "Voir l'historique des ventes",
+      discard: "Abandonner et commencer une nouvelle vente",
+      discardTitle: "Abandonner cette vente ?",
+      discardMessage:
+        "Elle est peut-être déjà enregistrée. Vérifiez l'historique des ventes avant de continuer : si elle y figure, la refaire la compterait deux fois.",
+      discardConfirm: "Abandonner et nouvelle vente",
+    },
     syncOnline: "En ligne",
     syncOffline: "Hors ligne",
     syncOfflineQueued: "Hors ligne · {{count}} en attente",
