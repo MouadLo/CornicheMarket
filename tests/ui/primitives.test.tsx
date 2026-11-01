@@ -86,7 +86,7 @@ describe("Money", () => {
   it("groups thousands and isolates left-to-right", () => {
     const r = render(<Money cents={348250} />);
     const text = texts(r.root.findByType("Text" as never))[0] ?? "";
-    expect(text).toBe("⁦3 482.50 DH⁩");
+    expect(text).toBe("\u20663\u00a0482.50 DH\u2069");
   });
 
   it("flow tone shows the sign and colours by direction (never colour alone)", () => {
