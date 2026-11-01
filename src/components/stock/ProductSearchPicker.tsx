@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import { fetchProducts, findByBarcode, type Product } from "@/src/lib/products/queries";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   onPick: (product: Product) => void;
@@ -129,30 +131,30 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   input: {
     minHeight: 52,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
   },
   scanButton: {
     minHeight: 52,
     paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#1d7a46",
+    borderRadius: radius.control,
+    backgroundColor: colors.brand700,
     alignItems: "center",
     justifyContent: "center",
   },
-  scanButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  scanButtonText: { color: colors.white, fontWeight: "600", fontSize: 16 },
   result: {
     padding: 12,
-    borderRadius: 10,
-    backgroundColor: "#f4f4f4",
+    borderRadius: radius.control,
+    backgroundColor: colors.sunken,
     gap: 2,
   },
   resultDisabled: { opacity: 0.5 },
   resultName: { fontSize: 15, fontWeight: "600" },
-  resultMeta: { fontSize: 13, color: "#666" },
-  notice: { color: "#b36b00", fontSize: 14 },
+  resultMeta: { fontSize: 13, color: colors.ink600 },
+  notice: { color: colors.warning700, fontSize: 14 },
 });

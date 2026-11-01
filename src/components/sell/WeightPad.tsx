@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -13,6 +13,8 @@ import {
   type WeightKey,
 } from "@/src/lib/sales/weightEntry";
 import { isolateBidi } from "@/src/lib/text/bidi";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   productName: string;
@@ -131,7 +133,7 @@ export function WeightPad({ productName, unitPriceCents, onConfirm, onCancel }: 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     // Capped and scrollable (same pattern as PaymentSheet) so the keypad
@@ -146,22 +148,28 @@ const styles = StyleSheet.create({
   },
   sheetContent: { padding: 20, gap: 10 },
   title: { fontSize: 18, fontWeight: "700", textAlign: "center" },
-  price: { fontSize: 14, color: "#666", textAlign: "center" },
+  price: { fontSize: 14, color: colors.ink600, textAlign: "center" },
   display: { flexDirection: "row", justifyContent: "center", alignItems: "baseline", gap: 8 },
   entry: { fontSize: 44, fontWeight: "800" },
-  unit: { fontSize: 20, fontWeight: "600", color: "#666" },
-  total: { fontSize: 20, fontWeight: "700", color: "#1d7a46", textAlign: "center", minHeight: 26 },
+  unit: { fontSize: 20, fontWeight: "600", color: colors.ink600 },
+  total: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.brand700,
+    textAlign: "center",
+    minHeight: 26,
+  },
   row: { flexDirection: "row", gap: 10 },
   key: {
     flex: 1,
     minHeight: 64,
-    borderRadius: 12,
-    backgroundColor: "#eef3ef",
+    borderRadius: radius.control,
+    backgroundColor: colors.brand100,
     alignItems: "center",
     justifyContent: "center",
   },
-  keyPressed: { backgroundColor: "#d9e6dd" },
-  keyText: { fontSize: 26, fontWeight: "700", color: "#222" },
+  keyPressed: { backgroundColor: colors.brand100 },
+  keyText: { fontSize: 26, fontWeight: "700", color: colors.ink900 },
   actions: { flexDirection: "row", gap: 10, marginTop: 6 },
   flex: { flex: 1 },
 });

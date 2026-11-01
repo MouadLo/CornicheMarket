@@ -1,12 +1,14 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useScanFeedback } from "@/src/lib/sales/scanFeedback";
 import { shouldAcceptScan, type LastScan, type ScanOutcome } from "@/src/lib/sales/scanRules";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   visible: boolean;
@@ -85,19 +87,19 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: colors.black },
   center: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
-  message: { color: "#fff", fontSize: 16, textAlign: "center", marginBottom: 12 },
+  message: { color: colors.white, fontSize: 16, textAlign: "center", marginBottom: 12 },
   feed: { position: "absolute", top: 60, left: 20, right: 20, gap: 6 },
   feedLine: {
-    color: "#fff",
+    color: colors.white,
     fontSize: 15,
     backgroundColor: "rgba(0,0,0,0.55)",
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: radius.control,
     overflow: "hidden",
   },
   overlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 24, gap: 12 },
-  hint: { color: "#fff", fontSize: 16, textAlign: "center" },
+  hint: { color: colors.white, fontSize: 16, textAlign: "center" },
 });

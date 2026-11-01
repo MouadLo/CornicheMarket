@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -7,6 +7,8 @@ import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { changeDue, isShortPayment } from "@/src/lib/sales/totals";
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   visible: boolean;
@@ -160,6 +162,7 @@ export function PaymentSheet({
 
           <BigButton
             label={saving ? t("common.saving") : t("sell.completeSale")}
+            variant="pay"
             onPress={() => onConfirm(method, customerId)}
             disabled={saving || needsCustomer || short}
           />
@@ -180,7 +183,7 @@ function quickAmounts(totalCents: number): number[] {
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "92%",
@@ -191,20 +194,25 @@ const styles = StyleSheet.create({
   method: {
     flex: 1,
     paddingVertical: 16,
-    borderRadius: 12,
-    backgroundColor: "#eee",
+    borderRadius: radius.control,
+    backgroundColor: colors.divider,
     alignItems: "center",
   },
-  methodActive: { backgroundColor: "#1d7a46" },
-  methodText: { fontSize: 15, fontWeight: "600", color: "#333", textTransform: "capitalize" },
-  methodTextActive: { color: "#fff" },
+  methodActive: { backgroundColor: colors.brand700 },
+  methodText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.ink700,
+    textTransform: "capitalize",
+  },
+  methodTextActive: { color: colors.white },
   block: { gap: 10 },
-  label: { fontSize: 14, fontWeight: "600", color: "#444" },
+  label: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   input: {
     minHeight: 56,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 20,
   },
@@ -215,41 +223,41 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: "#eef3ef",
+    borderRadius: radius.control,
+    backgroundColor: colors.brand100,
   },
-  quickText: { fontSize: 15, fontWeight: "600", color: "#1d7a46" },
+  quickText: { fontSize: 15, fontWeight: "600", color: colors.brand700 },
   changeBox: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f3f7f4",
-    borderRadius: 12,
+    backgroundColor: colors.brand50,
+    borderRadius: radius.control,
     padding: 16,
   },
   changeLabel: { fontSize: 16, fontWeight: "600" },
-  changeValue: { fontSize: 26, fontWeight: "800", color: "#1d7a46" },
-  short: { color: "#b3261e", fontSize: 16, fontWeight: "600" },
+  changeValue: { fontSize: 26, fontWeight: "800", color: colors.success700 },
+  short: { color: colors.danger600, fontSize: 16, fontWeight: "600" },
   customers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     minHeight: 48,
     justifyContent: "center",
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: "#eee",
+    borderRadius: radius.pill,
+    backgroundColor: colors.divider,
   },
-  chipActive: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
+  chipActive: { backgroundColor: colors.brand700 },
+  chipText: { fontSize: 14, color: colors.ink700 },
+  chipTextActive: { color: colors.white, fontWeight: "600" },
   newCustomerRow: { flexDirection: "row", gap: 8 },
   addCustomer: {
     paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#1d7a46",
+    borderRadius: radius.control,
+    backgroundColor: colors.brand700,
     alignItems: "center",
     justifyContent: "center",
   },
-  addCustomerText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  error: { color: "#b3261e", fontSize: 14 },
+  addCustomerText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  error: { color: colors.danger600, fontSize: 14 },
 });

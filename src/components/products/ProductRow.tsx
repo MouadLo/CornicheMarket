@@ -1,10 +1,12 @@
 import { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { colors } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 export const PRODUCT_ROW_HEIGHT = 92;
 
@@ -77,16 +79,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
-  pressed: { backgroundColor: "#f6f6f6" },
+  pressed: { backgroundColor: colors.sunken },
   main: { flex: 1, gap: 4 },
   name: { fontSize: 16, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#666" },
+  meta: { fontSize: 13, color: colors.ink600 },
   right: { alignItems: "flex-end", gap: 2 },
   price: { fontSize: 17, fontWeight: "700" },
-  cost: { fontSize: 13, color: "#666" },
-  profit: { fontSize: 14, color: "#1d7a46", fontWeight: "700" },
-  profitNegative: { color: "#b3261e" },
+  cost: { fontSize: 13, color: colors.ink600 },
+  profit: { fontSize: 14, color: colors.success700, fontWeight: "700" },
+  profitNegative: { color: colors.danger600 },
 });

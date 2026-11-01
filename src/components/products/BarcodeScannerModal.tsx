@@ -1,8 +1,10 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 
 import { BigButton } from "@/src/components/BigButton";
+import { colors } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   visible: boolean;
@@ -31,9 +33,7 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
       <View style={styles.container}>
         {!permission?.granted ? (
           <View style={styles.center}>
-            <Text style={styles.message}>
-              Camera access is needed to scan barcodes.
-            </Text>
+            <Text style={styles.message}>Camera access is needed to scan barcodes.</Text>
             <BigButton label="Allow camera" onPress={requestPermission} />
             <BigButton label="Cancel" variant="secondary" onPress={close} />
           </View>
@@ -58,9 +58,9 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: colors.black },
   center: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
-  message: { color: "#fff", fontSize: 16, textAlign: "center", marginBottom: 12 },
+  message: { color: colors.white, fontSize: 16, textAlign: "center", marginBottom: 12 },
   overlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 24, gap: 12 },
-  hint: { color: "#fff", fontSize: 16, textAlign: "center" },
+  hint: { color: colors.white, fontSize: 16, textAlign: "center" },
 });

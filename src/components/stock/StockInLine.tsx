@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -16,6 +16,8 @@ import {
   priceChangePercent,
   suggestSellingPrice,
 } from "@/src/lib/stock/pricing";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 export type LineState = {
   product: Product;
@@ -167,11 +169,11 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: "#e4e4e4",
-    borderRadius: 12,
+    borderColor: colors.divider,
+    borderRadius: radius.control,
     padding: 14,
     gap: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
   },
   headerRow: {
     flexDirection: "row",
@@ -180,25 +182,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   name: { fontSize: 16, fontWeight: "700", flex: 1 },
-  remove: { color: "#b3261e", fontSize: 14, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#666" },
+  remove: { color: colors.danger600, fontSize: 14, fontWeight: "600" },
+  meta: { fontSize: 13, color: colors.ink600 },
   inputs: { flexDirection: "row", gap: 12 },
   inputGroup: { flex: 1, gap: 6 },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
+  label: { fontSize: 13, fontWeight: "600", color: colors.ink700 },
   input: {
     minHeight: 52,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 14,
     fontSize: 16,
   },
-  inputInvalid: { borderColor: "#b3261e" },
-  invalid: { color: "#b3261e", fontSize: 13 },
-  lastPrice: { fontSize: 13, color: "#555" },
-  alert: { backgroundColor: "#fff6e5", borderRadius: 10, padding: 12, gap: 6 },
-  alertTitle: { fontWeight: "700", color: "#8a5a00" },
-  alertBody: { fontSize: 14, color: "#5f4100", flexShrink: 1 },
+  inputInvalid: { borderColor: colors.danger600 },
+  invalid: { color: colors.danger600, fontSize: 13 },
+  lastPrice: { fontSize: 13, color: colors.ink600 },
+  alert: { backgroundColor: colors.warning100, borderRadius: radius.control, padding: 12, gap: 6 },
+  alertTitle: { fontWeight: "700", color: colors.warning700 },
+  alertBody: { fontSize: 14, color: colors.warning700, flexShrink: 1 },
   suggestionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -209,15 +211,15 @@ const styles = StyleSheet.create({
   applyButton: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: "#1d7a46",
+    borderRadius: radius.control,
+    backgroundColor: colors.brand700,
   },
-  applyButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  applyButtonText: { color: colors.white, fontWeight: "700", fontSize: 14 },
   undoButton: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: "#e8e8e8",
+    borderRadius: radius.control,
+    backgroundColor: colors.sunken,
   },
-  undoButtonText: { color: "#333", fontWeight: "600", fontSize: 14 },
+  undoButtonText: { color: colors.ink700, fontWeight: "600", fontSize: 14 },
 });
