@@ -97,6 +97,18 @@ const FUNCTIONS: [string, Record<string, unknown>][] = [
   ["is_owner", {}],
   ["dismiss_price_review", { p_sale_id: NIL }],
   ["dismiss_discount_review", { p_sale_id: NIL }],
+  [
+    "recover_sale",
+    {
+      p_sale_id: NIL,
+      p_customer_id: null,
+      p_payment_method: "cash",
+      p_discount_cents: 0,
+      p_lines: [],
+      p_occurred_at: "2026-01-01T00:00:00Z",
+      p_original_cashier_id: null,
+    },
+  ],
 ];
 
 suite("the anon key alone reaches nothing (C06 / U01)", () => {

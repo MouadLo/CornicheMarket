@@ -78,7 +78,8 @@ async function trySubmit(lines: CartLine[], saleDiscountCents: number): Promise<
       discount_cents: saleDiscountCents,
       total_cents: 0,
     },
-    lines
+    lines,
+    "user-1"
   );
   await enqueueSale(sale);
   return null;

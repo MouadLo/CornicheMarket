@@ -6,7 +6,7 @@
  * it has no p_occurred_at key, so `payload.p_occurred_at` is undefined and
  * the first assertion below fails immediately.
  */
-import { recordCustomerPayment, submitSale } from "../../src/lib/sales/queries";
+import { recordCustomerPayment, recoverSale, submitSale } from "../../src/lib/sales/queries";
 import { pendingSaleFrom } from "../../src/lib/sales/useSaleSync";
 
 // Prefixed with "mock" so Jest allows it inside the jest.mock() factory below.
@@ -43,7 +43,8 @@ describe("submitSale", () => {
     const sale = pendingSaleFrom(
       "sale-1",
       { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 1000 },
-      []
+      [],
+      "user-1"
     );
 
     await submitSale(sale);
@@ -60,7 +61,8 @@ describe("submitSale", () => {
       ...pendingSaleFrom(
         "sale-2",
         { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 500 },
-        []
+        [],
+        "user-1"
       ),
       created_at: pastTime,
     };
@@ -86,7 +88,8 @@ describe("submitSale", () => {
           discount_cents: 0,
           unit_cost_cents: null,
         },
-      ]
+      ],
+      "user-1"
     );
 
     await submitSale(sale);
@@ -129,5 +132,46 @@ describe("recordCustomerPayment (audit C06 / C11)", () => {
     await expect(recordCustomerPayment("pay-3", "cust-1", 1, "cash")).rejects.toThrow(
       "Payment ID conflicts"
     );
+  });
+});
+
+describe("who a sale is credited to (audit C05)", () => {
+  const base = {
+    customer_id: null,
+    payment_method: "cash",
+    discount_cents: 0,
+    total_cents: 100,
+  } as const;
+
+  it("submitSale sends the user who rang it up as an expected-cashier assertion, never as a claim", async () => {
+    await submitSale(pendingSaleFrom("s1", base, [], "user-a"));
+    const [fn, payload] = mockRpc.mock.calls[0];
+    expect(fn).toBe("record_sale");
+    expect(payload.p_expected_cashier).toBe("user-a");
+    expect(payload).not.toHaveProperty("p_cashier_id");
+  });
+
+  it("a legacy sale has no expected cashier", async () => {
+    const legacy = pendingSaleFrom("s2", base, [], "user-a");
+    delete (legacy as { cashier_id?: string }).cashier_id;
+    await submitSale(legacy);
+    expect(mockRpc.mock.calls[0][1].p_expected_cashier).toBeNull();
+  });
+
+  it("recoverSale uses recover_sale, passes the original cashier for the log, and no expected cashier", async () => {
+    mockRpc.mockResolvedValueOnce({ data: true, error: null } as never);
+    await expect(recoverSale(pendingSaleFrom("s3", base, [], "user-a"))).resolves.toBe(true);
+    const [fn, payload] = mockRpc.mock.calls[0];
+    expect(fn).toBe("recover_sale");
+    expect(payload.p_original_cashier_id).toBe("user-a");
+    expect(payload).not.toHaveProperty("p_expected_cashier");
+  });
+
+  it("recoverSale of a legacy sale logs an unknown original cashier", async () => {
+    mockRpc.mockResolvedValueOnce({ data: false, error: null } as never);
+    const legacy = pendingSaleFrom("s4", base, [], "user-a");
+    delete (legacy as { cashier_id?: string }).cashier_id;
+    await expect(recoverSale(legacy)).resolves.toBe(false);
+    expect(mockRpc.mock.calls[0][1].p_original_cashier_id).toBeNull();
   });
 });

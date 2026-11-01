@@ -417,6 +417,35 @@ suite("money and stock writes only go through trusted functions (C06)", () => {
     }
   );
 
+  // Audit C05 (migration 028): only the owner can record a stranded sale as
+  // recovered, and a sale can never be credited to someone else by naming them.
+  // Both probes use a nil id and no lines, so nothing is written even if refused late.
+  it("a cashier cannot recover a sale (owner only)", async () => {
+    const { error } = await client.rpc("recover_sale", {
+      p_sale_id: NO_ROW,
+      p_customer_id: null,
+      p_payment_method: "cash",
+      p_discount_cents: 0,
+      p_lines: [],
+      p_occurred_at: "2026-01-01T00:00:00Z",
+      p_original_cashier_id: cashierId,
+    });
+    expect(error?.message ?? "allowed").toMatch(/Only the owner/);
+  });
+
+  it("a cashier cannot ring a sale up as another user (expected-cashier guard)", async () => {
+    const { error } = await client.rpc("record_sale", {
+      p_sale_id: NO_ROW,
+      p_customer_id: null,
+      p_payment_method: "cash",
+      p_discount_cents: 0,
+      p_lines: [],
+      p_occurred_at: "2026-01-01T00:00:00Z",
+      p_expected_cashier: NO_ROW,
+    });
+    expect(error?.message ?? "allowed").toMatch(/another user/);
+  });
+
   it.each([
     ["products_cashier_view", "selling_price_cents"],
     ["sale_items_cashier_view", "quantity"],

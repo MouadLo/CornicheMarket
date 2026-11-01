@@ -238,6 +238,8 @@ export default function SellScreen() {
     setError(null);
 
     try {
+      // Who rang this sale up, fixed now: only this user's session may send it.
+      if (!profile) throw new Error(t("sell.couldNotRecord"));
       const sale = pendingSaleFrom(
         attemptedSale.current?.id ?? Crypto.randomUUID(),
         {
@@ -246,7 +248,8 @@ export default function SellScreen() {
           discount_cents: discountCents,
           total_cents: total,
         },
-        lines
+        lines,
+        profile.id
       );
       if (
         attemptedSale.current &&

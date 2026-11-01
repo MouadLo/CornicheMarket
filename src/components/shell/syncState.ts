@@ -5,6 +5,8 @@ import type { SyncPillState } from "./TopBar";
 export type SaleSyncState = {
   online: boolean;
   pending: number;
+  // Sales on this device that belong to other users (or are legacy).
+  others: number;
   stuck: number;
   syncing: boolean;
   lastError: string | null;

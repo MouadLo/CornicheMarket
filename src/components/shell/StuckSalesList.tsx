@@ -17,9 +17,14 @@ import { colors, radius, spacing } from "@/src/theme/tokens";
 // The old sell/stuck screen, as a list inside the sync menu: sales the server
 // refused, kept on the device with the reason. Owner only.
 export function StuckSalesList({
+  userId,
   onRetry,
   onChanged,
 }: {
+  // Retry puts a sale back in the queue, where only its own user can send it,
+  // so it is offered only for the signed-in user's own sales. Leave undefined
+  // to offer it for every sale.
+  userId?: string | null;
   onRetry: () => Promise<void>;
   onChanged: () => void;
 }) {
@@ -90,10 +95,15 @@ export function StuckSalesList({
           <Text style={styles.error} numberOfLines={3}>
             {entry.error}
           </Text>
+          {userId !== undefined && entry.sale.cashier_id !== userId ? (
+            <Text style={styles.error}>{t("shell.stuckOthersNote")}</Text>
+          ) : null}
           <View style={styles.actions}>
-            <View style={styles.action}>
-              <BigButton label={t("sell.stuck.retry")} onPress={() => retry(entry.sale.id)} />
-            </View>
+            {userId === undefined || entry.sale.cashier_id === userId ? (
+              <View style={styles.action}>
+                <BigButton label={t("sell.stuck.retry")} onPress={() => retry(entry.sale.id)} />
+              </View>
+            ) : null}
             <View style={styles.action}>
               <BigButton
                 label={t("sell.stuck.export")}

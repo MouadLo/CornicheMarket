@@ -26,8 +26,9 @@ export type SaleSummary = {
   void_reason: string | null;
 };
 
-export async function submitSale(sale: PendingSale): Promise<void> {
-  const { error } = await supabase.rpc("record_sale", {
+// The part of the payload both record_sale and recover_sale take.
+function salePayload(sale: PendingSale) {
+  return {
     p_sale_id: sale.id,
     p_customer_id: sale.customer_id,
     p_payment_method: sale.payment_method,
@@ -42,9 +43,43 @@ export async function submitSale(sale: PendingSale): Promise<void> {
     // the sale (see pendingSaleFrom) -- not when this request happens to
     // reach the server, which may be hours later for an offline sale.
     p_occurred_at: sale.created_at,
-  });
+  };
+}
 
+export async function submitSale(sale: PendingSale): Promise<void> {
+  const { error } = await supabase.rpc("record_sale", {
+    ...salePayload(sale),
+    // An assertion, not a claim: the server credits the caller's session and
+    // refuses the sale if that is not this user (audit C05). Legacy sales have
+    // no user id and are never sent here.
+    p_expected_cashier: sale.cashier_id ?? null,
+  });
   if (error) throw new Error(error.message);
+}
+
+// Owner only. Records a sale stranded on this device by a user who cannot sign
+// back in: credited to the owner, flagged recovered-by-owner, with the original
+// cashier (null if unknown) kept in the activity log. True = recovered now;
+// false = it was already on the server, nothing changed.
+export async function recoverSale(sale: PendingSale): Promise<boolean> {
+  const { data, error } = await supabase.rpc("recover_sale", {
+    ...salePayload(sale),
+    p_original_cashier_id: sale.cashier_id ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
+// Names for the recovery list. The owner can read every profile.
+export async function fetchCashierNames(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+  if (error) throw new Error(error.message);
+  const names: Record<string, string> = {};
+  for (const row of (data ?? []) as { id: string; full_name: string | null }[]) {
+    if (row.full_name) names[row.id] = row.full_name;
+  }
+  return names;
 }
 
 export async function fetchCustomers(): Promise<Customer[]> {
