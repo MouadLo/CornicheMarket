@@ -11,5 +11,14 @@ export function Text({ style, ...rest }: TextProps) {
   const lang = (i18n?.language as Lang | undefined) ?? "fr";
   const flat = StyleSheet.flatten(style) ?? {};
   const family = flat.fontFamily ?? fontFamilyFor(lang, weightFromStyle(flat.fontWeight));
-  return <RNText {...rest} style={[style, { fontFamily: family, fontWeight: "normal" }]} />;
+  return (
+    <RNText
+      {...rest}
+      style={[
+        { writingDirection: lang === "ar" ? "rtl" : "ltr" },
+        style,
+        { fontFamily: family, fontWeight: "normal" },
+      ]}
+    />
+  );
 }

@@ -22,6 +22,13 @@ export function isolateBidi(text: string): string {
   return `${FIRST_STRONG_ISOLATE}${text}${POP_DIRECTIONAL_ISOLATE}`;
 }
 
+// Phone numbers, barcodes and amounts must always read left to right, even
+// inside an Arabic line ("0661 23 45 67" would otherwise show as "67 45 23 0661").
+// LRI ... PDI forces that for just this run of text.
+export function isolateLtr(text: string): string {
+  return `\u2066${text}\u2069`;
+}
+
 // The app's current layout direction, derived from the i18n language --
 // never from the content being displayed. Use this for any row/container
 // whose layout order must follow the UI language, not whatever happens to

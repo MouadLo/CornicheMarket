@@ -1,30 +1,30 @@
-import { Link, Tabs, usePathname } from 'expo-router';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { Slot } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { Link, Tabs, usePathname } from "expo-router";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { Slot } from "expo-router";
+import { useTranslation } from "react-i18next";
 
-import { useAuth } from '@/src/lib/auth/AuthProvider';
+import { useAuth } from "@/src/lib/auth/AuthProvider";
 
 type NavItem = {
   name: string;
-  labelKey: 'sell' | 'products' | 'stockIn' | 'reports' | 'settings';
+  labelKey: "sell" | "products" | "stockIn" | "reports" | "settings";
   ownerOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { name: 'sell', labelKey: 'sell' },
-  { name: 'products', labelKey: 'products' },
-  { name: 'stock-in', labelKey: 'stockIn' },
-  { name: 'reports', labelKey: 'reports', ownerOnly: true },
-  { name: 'settings', labelKey: 'settings' },
+  { name: "sell", labelKey: "sell" },
+  { name: "products", labelKey: "products" },
+  { name: "stock-in", labelKey: "stockIn" },
+  { name: "reports", labelKey: "reports", ownerOnly: true },
+  { name: "settings", labelKey: "settings" },
 ];
 
 export default function AppLayout() {
   const { profile } = useAuth();
   const { t } = useTranslation();
-  const isOwner = profile?.role === 'owner';
+  const isOwner = profile?.role === "owner";
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return <WebSidebarLayout isOwner={isOwner} />;
   }
 
@@ -40,6 +40,8 @@ export default function AppLayout() {
           }}
         />
       ))}
+      {/* Review page for the shared primitives: reachable by URL, not in the nav. */}
+      <Tabs.Screen name="dev-components" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -77,23 +79,23 @@ function WebSidebarLayout({ isOwner }: { isOwner: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  webRoot: { flex: 1, flexDirection: 'row', minHeight: '100%' },
+  webRoot: { flex: 1, flexDirection: "row", minHeight: "100%" },
   sidebar: {
     width: 220,
     borderRightWidth: 1,
-    borderRightColor: '#e2e2e2',
+    borderRightColor: "#e2e2e2",
     paddingVertical: 24,
     paddingHorizontal: 16,
     gap: 4,
   },
-  sidebarTitle: { fontSize: 18, fontWeight: '700', marginBottom: 20 },
+  sidebarTitle: { fontSize: 18, fontWeight: "700", marginBottom: 20 },
   sidebarLink: {
     fontSize: 16,
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 8,
-    color: '#333',
+    color: "#333",
   },
-  sidebarLinkActive: { backgroundColor: '#e8f3ec', color: '#1d7a46', fontWeight: '600' },
+  sidebarLinkActive: { backgroundColor: "#e8f3ec", color: "#1d7a46", fontWeight: "600" },
   content: { flex: 1 },
 });
