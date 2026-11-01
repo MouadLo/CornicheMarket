@@ -10,6 +10,8 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthProvider";
 import { useOrientationLock } from "@/src/lib/device/orientation";
+import { bundledFonts } from "@/src/theme/fonts";
+import { colors } from "@/src/theme/tokens";
 import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
 
 SplashScreen.preventAutoHideAsync();
@@ -86,7 +88,7 @@ const guardStyles = StyleSheet.create({
   retryButton: {
     paddingVertical: 14,
     paddingHorizontal: 32,
-    backgroundColor: "#1d7a46",
+    backgroundColor: colors.brand700,
     borderRadius: 10,
   },
   retryText: { color: "#fff", fontWeight: "600", fontSize: 16 },
@@ -97,6 +99,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    ...bundledFonts,
   });
   const [i18nReady, setI18nReady] = useState(false);
 

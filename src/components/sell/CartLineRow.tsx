@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { centsToDisplay, formatMAD, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { isLineDiscountValid, lineTotal, type CartLine } from "@/src/lib/sales/totals";
 import { isolateBidi } from "@/src/lib/text/bidi";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   line: CartLine;
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: colors.divider,
     gap: 8,
   },
   header: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
@@ -137,20 +139,20 @@ const styles = StyleSheet.create({
   stepButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: "#eee",
+    borderRadius: radius.pill,
+    backgroundColor: colors.divider,
     alignItems: "center",
     justifyContent: "center",
   },
-  stepText: { fontSize: 24, fontWeight: "700", color: "#222" },
+  stepText: { fontSize: 24, fontWeight: "700", color: colors.ink900 },
   quantity: { fontSize: 18, fontWeight: "700", minWidth: 32, textAlign: "center" },
   weightBox: { gap: 4 },
   weightInput: {
     minHeight: 48,
     minWidth: 92,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 12,
     fontSize: 16,
   },
@@ -158,17 +160,17 @@ const styles = StyleSheet.create({
   discountInput: {
     minHeight: 48,
     minWidth: 92,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 12,
     fontSize: 16,
   },
-  label: { fontSize: 12, color: "#666" },
+  label: { fontSize: 12, color: colors.ink600 },
   removeButton: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
-  remove: { color: "#b3261e", fontWeight: "600", fontSize: 14 },
-  unitPrice: { fontSize: 13, color: "#666" },
-  discountInputInvalid: { borderColor: "#b3261e" },
-  weightInputInvalid: { borderColor: "#b3261e" },
-  discountError: { color: "#b3261e", fontSize: 12 },
+  remove: { color: colors.danger600, fontWeight: "600", fontSize: 14 },
+  unitPrice: { fontSize: 13, color: colors.ink600 },
+  discountInputInvalid: { borderColor: colors.danger600 },
+  weightInputInvalid: { borderColor: colors.danger600 },
+  discountError: { color: colors.danger600, fontSize: 12 },
 });

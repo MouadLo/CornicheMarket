@@ -389,6 +389,7 @@ export default function SellScreen() {
 
           <BigButton
             label={t("sell.charge")}
+            variant="pay"
             onPress={() => setPaymentOpen(true)}
             disabled={discountInvalid || quantityInvalid}
           />

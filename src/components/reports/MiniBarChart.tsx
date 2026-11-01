@@ -1,7 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import { centsToDisplay } from "@/src/lib/money";
+import { colors } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 export type ChartPoint = {
   key: string;
@@ -81,14 +83,14 @@ const styles = StyleSheet.create({
   legend: { flexDirection: "row", gap: 16 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   swatch: { width: 12, height: 12, borderRadius: 3 },
-  legendText: { fontSize: 12, color: "#666" },
+  legendText: { fontSize: 12, color: colors.ink600 },
   chart: { flexDirection: "row", alignItems: "flex-end", gap: 10, paddingVertical: 6 },
   column: { alignItems: "center", gap: 4, minWidth: 54 },
   barGroup: { flexDirection: "row", alignItems: "flex-end", gap: 3 },
   bar: { width: 16, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  barPrimary: { backgroundColor: "#1d7a46" },
-  barSecondary: { backgroundColor: "#8fc7a8" },
-  value: { fontSize: 10, color: "#555" },
-  label: { fontSize: 11, color: "#777" },
-  empty: { color: "#666", fontSize: 14, paddingVertical: 12 },
+  barPrimary: { backgroundColor: colors.brand700 },
+  barSecondary: { backgroundColor: colors.brand300 },
+  value: { fontSize: 10, color: colors.ink600 },
+  label: { fontSize: 11, color: colors.ink600 },
+  empty: { color: colors.ink600, fontSize: 14, paddingVertical: 12 },
 });

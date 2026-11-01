@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { applyPercent, formatMAD } from "@/src/lib/money";
 import { bulkAdjustSellingPrice, type Category } from "@/src/lib/products/queries";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 type Props = {
   visible: boolean;
@@ -32,7 +34,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
       setResult(`Updated ${count} product${count === 1 ? "" : "s"}.`);
       onApplied();
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : t('products.bulkUpdateError'));
+      setError(applyError instanceof Error ? applyError.message : t("products.bulkUpdateError"));
     } finally {
       setSubmitting(false);
     }
@@ -54,7 +56,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
           <Text style={styles.label}>Category</Text>
           <View style={styles.chips}>
             <Chip
-              label={t('products.bulkAll')}
+              label={t("products.bulkAll")}
               selected={categoryId === null}
               onPress={() => setCategoryId(null)}
             />
@@ -87,11 +89,11 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
           {result && <Text style={styles.success}>{result}</Text>}
 
           <BigButton
-            label={submitting ? t('common.applying') : t('common.apply')}
+            label={submitting ? t("common.applying") : t("common.apply")}
             onPress={handleApply}
             disabled={!valid || submitting}
           />
-          <BigButton label={t('common.close')} variant="secondary" onPress={close} />
+          <BigButton label={t("common.close")} variant="secondary" onPress={close} />
         </View>
       </View>
     </Modal>
@@ -121,23 +123,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  sheet: { backgroundColor: "#fff", borderRadius: 16, padding: 20, gap: 12, maxHeight: "90%" },
+  sheet: {
+    backgroundColor: colors.white,
+    borderRadius: radius.panel,
+    padding: 20,
+    gap: 12,
+    maxHeight: "90%",
+  },
   title: { fontSize: 20, fontWeight: "700" },
-  label: { fontSize: 14, fontWeight: "600", color: "#444" },
+  label: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 18, backgroundColor: "#eee" },
-  chipSelected: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextSelected: { color: "#fff", fontWeight: "600" },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.divider,
+  },
+  chipSelected: { backgroundColor: colors.brand700 },
+  chipText: { fontSize: 14, color: colors.ink700 },
+  chipTextSelected: { color: colors.white, fontWeight: "600" },
   input: {
     minHeight: 52,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  preview: { fontSize: 14, color: "#555" },
-  error: { color: "#b3261e" },
-  success: { color: "#1d7a46" },
+  preview: { fontSize: 14, color: colors.ink600 },
+  error: { color: colors.danger600 },
+  success: { color: colors.success700 },
 });

@@ -1,7 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { centsToDisplay } from "@/src/lib/money";
 import type { PricePoint } from "@/src/lib/stock/queries";
+import { colors } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 const CHART_HEIGHT = 160;
 const MIN_BAR_FRACTION = 0.08;
@@ -45,12 +47,7 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
             <View key={point.id} style={styles.barColumn}>
               <Text style={styles.barValue}>{centsToDisplay(point.unit_cost_cents)}</Text>
               <View
-                style={[
-                  styles.bar,
-                  { height },
-                  rose && styles.barUp,
-                  fell && styles.barDown,
-                ]}
+                style={[styles.bar, { height }, rose && styles.barUp, fell && styles.barDown]}
               />
               <Text style={styles.barLabel} numberOfLines={1}>
                 {new Date(point.created_at).toLocaleDateString(undefined, {
@@ -69,7 +66,7 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
 const styles = StyleSheet.create({
   wrapper: { gap: 8 },
   scaleRow: { flexDirection: "row", justifyContent: "space-between" },
-  scaleText: { fontSize: 12, color: "#777" },
+  scaleText: { fontSize: 12, color: colors.ink600 },
   chart: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -78,10 +75,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   barColumn: { alignItems: "center", gap: 4, flex: 1, maxWidth: 70 },
-  barValue: { fontSize: 11, color: "#444" },
-  bar: { width: "100%", minWidth: 18, borderRadius: 6, backgroundColor: "#1d7a46" },
-  barUp: { backgroundColor: "#b3261e" },
-  barDown: { backgroundColor: "#2e7d32" },
-  barLabel: { fontSize: 11, color: "#777" },
-  empty: { color: "#666", fontSize: 15 },
+  barValue: { fontSize: 11, color: colors.ink700 },
+  bar: { width: "100%", minWidth: 18, borderRadius: 6, backgroundColor: colors.brand700 },
+  barUp: { backgroundColor: colors.danger600 },
+  barDown: { backgroundColor: colors.success600 },
+  barLabel: { fontSize: 11, color: colors.ink600 },
+  empty: { color: colors.ink600, fontSize: 15 },
 });

@@ -1,8 +1,10 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { router } from "expo-router";
 
 import { BigButton } from "@/src/components/BigButton";
+import { colors, radius } from "@/src/theme/tokens";
+import { Text } from "@/src/theme/Text";
 
 // Shown on Sell in place of the plain "scan or search" hint when the owner
 // has added 0 products -- production starts empty, and that first screen
@@ -38,12 +40,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
     padding: 20,
     gap: 10,
-    backgroundColor: "#f4f6f5",
-    borderRadius: 16,
+    backgroundColor: colors.brand50,
+    borderRadius: radius.panel,
     alignItems: "center",
   },
   title: { fontSize: 18, fontWeight: "700", textAlign: "center" },
-  hint: { fontSize: 14, color: "#666", textAlign: "center" },
+  hint: { fontSize: 14, color: colors.ink600, textAlign: "center" },
   actions: { flexDirection: "row", gap: 10, marginTop: 8, width: "100%", maxWidth: 420 },
   flex: { flex: 1 },
 });
