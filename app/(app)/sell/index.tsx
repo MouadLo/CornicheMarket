@@ -14,7 +14,6 @@ import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
   findCachedByBarcode,
-  getProductCacheMeta,
   refreshProductCache,
   searchCachedProducts,
   type CachedProduct,
@@ -66,7 +65,6 @@ export default function SellScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  const [offlineMeta, setOfflineMeta] = useState<{ refreshedAt: string } | null>(null);
   // null = not checked yet (or the check failed) -- only an explicit `false`
   // shows the empty-store prompt, so a load error never hides the normal
   // screen behind a wrong "add your first product" message.
@@ -98,10 +96,7 @@ export default function SellScreen() {
   // Refresh the local product cache whenever the device comes online.
   useEffect(() => {
     if (sync.online) {
-      refreshProductCache(isOwner)
-        .then(() => getProductCacheMeta())
-        .then(setOfflineMeta)
-        .catch(() => {});
+      refreshProductCache(isOwner).catch(() => {});
     }
   }, [sync.online, isOwner]);
 
@@ -289,19 +284,7 @@ export default function SellScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <SyncBadge online={sync.online} pending={sync.pending} syncing={sync.syncing} />
           <View style={styles.headerLinks}>
-            {isOwner && sync.stuck > 0 && (
-              <Pressable
-                style={styles.headerLink}
-                onPress={() => router.push("/(app)/sell/stuck" as never)}
-              >
-                <Text style={styles.stuckLink}>{t("sell.stuckBanner", { count: sync.stuck })}</Text>
-              </Pressable>
-            )}
-            <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/credit")}>
-              <Text style={styles.link}>{t("sell.credit")}</Text>
-            </Pressable>
             <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
               <Text style={styles.link}>{t("sell.history")}</Text>
             </Pressable>
@@ -323,14 +306,6 @@ export default function SellScreen() {
             </Pressable>
           )}
         </View>
-
-        {!sync.online && offlineMeta && (
-          <Text style={styles.offlineBanner}>
-            {t("sell.offlineBanner", {
-              time: new Date(offlineMeta.refreshedAt).toLocaleTimeString(),
-            })}
-          </Text>
-        )}
 
         {flash && <Text style={styles.flash}>{flash}</Text>}
 
@@ -437,35 +412,6 @@ export default function SellScreen() {
   );
 }
 
-function SyncBadge({
-  online,
-  pending,
-  syncing,
-}: {
-  online: boolean;
-  pending: number;
-  syncing: boolean;
-}) {
-  const { t } = useTranslation();
-  const label = syncing
-    ? t("sell.syncSyncing")
-    : !online
-      ? pending > 0
-        ? t("sell.syncOfflineQueued", { count: pending })
-        : t("sell.syncOffline")
-      : pending > 0
-        ? t("sell.syncPending", { count: pending })
-        : t("sell.syncOnline");
-
-  return (
-    <View
-      style={[styles.badge, !online && styles.badgeOffline, pending > 0 && styles.badgePending]}
-    >
-      <Text style={[styles.badgeText, !online && styles.badgeTextOffline]}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
@@ -473,7 +419,6 @@ const styles = StyleSheet.create({
   headerLinks: { flexDirection: "row", gap: 8 },
   headerLink: { minHeight: 48, minWidth: 48, justifyContent: "center", paddingHorizontal: 8 },
   link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
-  stuckLink: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   searchRow: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
   search: {
@@ -494,7 +439,6 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   flash: { color: "#1d7a46", fontSize: 14 },
-  offlineBanner: { color: "#b36b00", fontSize: 13, fontStyle: "italic" },
   result: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -522,14 +466,4 @@ const styles = StyleSheet.create({
   discountError: { color: "#b3261e", fontSize: 13 },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   totalValue: { fontSize: 30, fontWeight: "800" },
-  badge: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: "#e8f3ec",
-  },
-  badgePending: { backgroundColor: "#fff3d6" },
-  badgeOffline: { backgroundColor: "#fdecea" },
-  badgeText: { fontSize: 13, fontWeight: "700", color: "#1d7a46" },
-  badgeTextOffline: { color: "#b3261e" },
 });

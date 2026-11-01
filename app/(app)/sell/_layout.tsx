@@ -12,9 +12,7 @@ export default function SellLayout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="credit" options={{ title: t("sell.credit") }} />
       <Stack.Screen name="history" options={{ title: t("sell.history") }} />
-      <Stack.Screen name="stuck" options={{ title: t("sell.stuck.title") }} />
     </Stack>
   );
 }

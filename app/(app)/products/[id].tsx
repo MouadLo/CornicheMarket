@@ -33,7 +33,7 @@ export default function EditProduct() {
         setProduct(loadedProduct);
       })
       .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t('products.formLoadError'))
+        setError(loadError instanceof Error ? loadError.message : t("products.formLoadError"))
       )
       .finally(() => setLoading(false));
   }, [id, isOwner, t]);
@@ -44,13 +44,13 @@ export default function EditProduct() {
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
   if (error) return <Text style={{ padding: 20, color: "#b3261e" }}>{error}</Text>;
-  if (!product) return <Text style={{ padding: 20 }}>{t('products.formProductNotFound')}</Text>;
+  if (!product) return <Text style={{ padding: 20 }}>{t("products.formProductNotFound")}</Text>;
 
   return (
     <ProductForm
       categories={categories}
       initial={product}
-      submitLabel={t('products.formSave')}
+      submitLabel={t("products.formSave")}
       onSubmit={async (input) => {
         await updateProduct(product.id, input);
         router.back();

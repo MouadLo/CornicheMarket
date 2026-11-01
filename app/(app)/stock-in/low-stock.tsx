@@ -49,7 +49,7 @@ export default function LowStockScreen() {
         })
       );
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t('stockIn.lowStockLoadError'));
+      setError(loadError instanceof Error ? loadError.message : t("stockIn.lowStockLoadError"));
     } finally {
       setLoading(false);
     }
@@ -82,10 +82,10 @@ export default function LowStockScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Text style={styles.intro}>{t('stockIn.lowStockIntro', { days: COVER_DAYS })}</Text>
+      <Text style={styles.intro}>{t("stockIn.lowStockIntro", { days: COVER_DAYS })}</Text>
 
       {rows.length === 0 ? (
-        <Text style={styles.empty}>{t('stockIn.lowStockEmpty')}</Text>
+        <Text style={styles.empty}>{t("stockIn.lowStockEmpty")}</Text>
       ) : (
         <>
           {rows.map((row) => (
@@ -93,22 +93,25 @@ export default function LowStockScreen() {
               <View style={styles.rowMain}>
                 <Text style={styles.name}>{row.product.name}</Text>
                 <Text style={styles.meta}>
-                  {t('stockIn.lowStockLeft', { stock: row.product.stock_quantity, unit: row.product.unit })}
-                  {' · '}
-                  {t('stockIn.lowStockSold30d', { count: row.sold30d })}
+                  {t("stockIn.lowStockLeft", {
+                    stock: row.product.stock_quantity,
+                    unit: row.product.unit,
+                  })}
+                  {" · "}
+                  {t("stockIn.lowStockSold30d", { count: row.sold30d })}
                   {row.daysLeft !== null
-                    ? ` · ${t('stockIn.lowStockDaysCover', { days: row.daysLeft.toFixed(1) })}`
+                    ? ` · ${t("stockIn.lowStockDaysCover", { days: row.daysLeft.toFixed(1) })}`
                     : ""}
                 </Text>
               </View>
               <View style={styles.suggestBox}>
-                <Text style={styles.suggestLabel}>{t('stockIn.lowStockOrder')}</Text>
+                <Text style={styles.suggestLabel}>{t("stockIn.lowStockOrder")}</Text>
                 <Text style={styles.suggestValue}>{row.suggested}</Text>
               </View>
             </View>
           ))}
 
-          <BigButton label={t('stockIn.lowStockExport')} onPress={exportList} />
+          <BigButton label={t("stockIn.lowStockExport")} onPress={exportList} />
         </>
       )}
     </ScrollView>
@@ -130,7 +133,13 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "600" },
   meta: { fontSize: 13, color: "#666" },
-  suggestBox: { alignItems: "center", backgroundColor: "#eef3ef", borderRadius: 10, padding: 10, minWidth: 72 },
+  suggestBox: {
+    alignItems: "center",
+    backgroundColor: "#eef3ef",
+    borderRadius: 10,
+    padding: 10,
+    minWidth: 72,
+  },
   suggestLabel: { fontSize: 11, color: "#1d7a46", textTransform: "uppercase" },
   suggestValue: { fontSize: 20, fontWeight: "800", color: "#1d7a46" },
   empty: { textAlign: "center", color: "#666", marginTop: 32 },

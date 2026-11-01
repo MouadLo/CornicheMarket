@@ -1,9 +1,10 @@
 import React from "react";
+import { StyleSheet } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-import CreditScreen from "../../app/(app)/sell/credit";
+import CreditScreen from "../../app/(app)/clients";
 import SalesHistory from "../../app/(app)/sell/history";
-import StuckSalesScreen from "../../app/(app)/sell/stuck";
+import { StuckSalesList } from "../../src/components/shell/StuckSalesList";
 import { pressableByText, sizeOf } from "./sellTestUtils";
 
 const MIN = 48;
@@ -11,7 +12,7 @@ const MIN = 48;
 jest.mock("expo-router", () => ({ router: { replace: jest.fn(), push: jest.fn() } }));
 jest.mock("react-i18next", () => {
   const t = (key: string) => key; // stable identity: screens use t in hook deps
-  return { useTranslation: () => ({ t }) };
+  return { useTranslation: () => ({ t, i18n: { language: "fr" } }) };
 });
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner", role: "owner" } }),
@@ -86,11 +87,20 @@ describe("Sell sub-screen buttons are at least 48dp", () => {
     );
   });
 
-  it("stuck sales: retry, export and dismiss", async () => {
-    await render(<StuckSalesScreen />);
+  it("stuck sales (now in the shell's sync menu): retry, export and dismiss", async () => {
+    await render(<StuckSalesList onRetry={async () => {}} onChanged={() => {}} />);
     for (const label of ["sell.stuck.retry", "sell.stuck.export", "sell.stuck.dismiss"]) {
-      const size = sizeOf(pressableByText(tree.root, label));
-      expect({ label, ok: size.minHeight >= MIN }).toEqual({ label, ok: true });
+      // BigButton is a component: its pressable child carries a style that is a
+      // function of the pressed state. Resolve it.
+      const pressable = pressableByText(tree.root, label).findAll(
+        (n) => n.props.style !== undefined
+      )[0];
+      const style =
+        typeof pressable.props.style === "function"
+          ? pressable.props.style({ pressed: false })
+          : pressable.props.style;
+      const flat = StyleSheet.flatten(style) as { minHeight?: number };
+      expect({ label, ok: (flat.minHeight ?? 0) >= MIN }).toEqual({ label, ok: true });
     }
   });
 });
