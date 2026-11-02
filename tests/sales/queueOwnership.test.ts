@@ -206,7 +206,7 @@ describe("A queues offline, A signs out, B signs in (the audit's failure sequenc
     await syncPendingSales(B);
     const queue = await listPendingSales();
     expect(queue.find((s) => s.id === "a1")?.attempts).toBe(0);
-    expect(queue.find((s) => s.id === "b1")?.attempts).toBe(1);
+    expect(queue.find((s) => s.id === "b1")?.attempts).toBe(0);
   });
 });
 

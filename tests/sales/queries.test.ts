@@ -175,3 +175,18 @@ describe("who a sale is credited to (audit C05)", () => {
     expect(mockRpc.mock.calls[0][1].p_original_cashier_id).toBeNull();
   });
 });
+
+it("preserves HTTP 503 when the response error message omits it", async () => {
+  mockRpc.mockResolvedValueOnce({
+    data: null,
+    error: { message: "Service Unavailable" },
+    status: 503,
+  } as never);
+  const sale = pendingSaleFrom(
+    "status-test",
+    { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 100 },
+    [],
+    "user-1"
+  );
+  await expect(submitSale(sale)).rejects.toThrow("503");
+});

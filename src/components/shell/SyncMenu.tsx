@@ -60,7 +60,7 @@ export function SyncMenu({
         <BigButton
           label={t("shell.syncNow")}
           variant="secondary"
-          disabled={state.syncing || !state.online}
+          disabled={state.syncing}
           onPress={onSyncNow}
         />
 
