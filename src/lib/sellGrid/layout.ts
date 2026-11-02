@@ -147,9 +147,19 @@ export function stockLevel(stock: number, lowThreshold: number): StockLevel {
   return "ok";
 }
 
-// How many tile columns fit a pane (tiles are at least 124 dp wide, gaps 10).
-export function tileColumns(paneWidth: number, minTile = 124, gap = 10): number {
+// How many tile columns fit a pane (tiles are at least 132 dp wide, gaps 10: a 4-digit price fits).
+export function tileColumns(paneWidth: number, minTile = 132, gap = 10): number {
   return Math.max(2, Math.floor((paneWidth + gap) / (minTile + gap)));
+}
+
+// The price must fit beside the stock badge without losing its last digits or
+// its "DH". A tile's content is the tile minus its padding (26), the stock badge
+// (26) and a gap (4); the unit takes about 22. A character of the bold amount is
+// about 0.56 of the font size wide. Never below 12, and never above the design's 20.
+export function priceFontSize(amount: string, tileWidth: number): number {
+  const room = tileWidth - 26 - 26 - 4 - 22;
+  const fit = Math.floor(room / (0.56 * Math.max(1, amount.length)));
+  return Math.max(12, Math.min(20, fit));
 }
 
 // Grid and cart side by side from 900 dp (tablet and laptop); stacked below.

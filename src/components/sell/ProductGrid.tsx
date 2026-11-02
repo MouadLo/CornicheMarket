@@ -6,6 +6,7 @@ import { Icon } from "@/src/components/ui/Icon";
 import { formatMADGrouped } from "@/src/lib/money";
 import {
   stockLevel,
+  priceFontSize,
   tileColumns,
   type GridProduct,
   type ResolvedTab,
@@ -38,7 +39,7 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange }: P
   const columns = tileColumns(paneWidth || 760);
   const tileWidth = paneWidth
     ? Math.floor((paneWidth - GAP * (columns - 1) - spacing.s4 * 2) / columns)
-    : 124;
+    : 132;
   const select = (id: string) => {
     setLocalTab(id);
     onTabChange?.(id);
@@ -144,10 +145,16 @@ function Tile({
         ) : null}
       </View>
       <View style={styles.tileBottom}>
-        <Text style={styles.priceLine} numberOfLines={1}>
-          <Text style={[styles.price, tabularNumbers]}>{isolateLtr(amount)}</Text>
+        <View style={styles.priceLine}>
+          <Text
+            style={[styles.price, tabularNumbers, { fontSize: priceFontSize(amount, width) }]}
+            numberOfLines={1}
+          >
+            {isolateLtr(amount)}
+          </Text>
+          {/* Its own element: when space is short the number shrinks, never the unit. */}
           <Text style={styles.unit}>{isolateLtr(kg ? "/kg" : " DH")}</Text>
-        </Text>
+        </View>
         <View
           style={[
             styles.stock,
@@ -228,9 +235,9 @@ const styles = StyleSheet.create({
   },
   qtyText: { fontSize: 13, fontWeight: "700", color: colors.white },
   tileBottom: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  priceLine: { flexShrink: 1 },
-  price: { fontSize: 20, fontWeight: "700", color: colors.ink900 },
-  unit: { fontSize: 13, fontWeight: "600", color: colors.ink600 },
+  priceLine: { flexShrink: 1, flexDirection: "row", alignItems: "flex-end" },
+  price: { flexShrink: 1, fontSize: 20, fontWeight: "700", color: colors.ink900 },
+  unit: { flexShrink: 0, fontSize: 13, fontWeight: "600", color: colors.ink600 },
   stock: {
     minWidth: 26,
     height: 22,
