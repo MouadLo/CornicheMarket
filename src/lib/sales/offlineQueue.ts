@@ -4,6 +4,8 @@ import type { CartLine } from "@/src/lib/sales/totals";
 
 const QUEUE_KEY = "corniche.pendingSales.v1";
 const STUCK_KEY = "corniche.stuckSales.v1";
+// Entries that could not be understood, kept exactly as they were found.
+const UNREADABLE_KEY = "corniche.unreadableSales.v1";
 
 export const MAX_RETRY_ATTEMPTS = 5;
 
@@ -24,6 +26,14 @@ export type PendingSale = {
   // claim in the payload). Missing on sales queued before audit C05 was fixed:
   // those are "legacy" and are never sent automatically.
   cashier_id?: string;
+};
+
+// A stored entry no version of the app can read as a sale. Never deleted: it is
+// listed for the owner and included in the raw recovery export.
+export type UnreadableSale = {
+  source: "pending" | "stuck";
+  raw: unknown;
+  movedAt: string;
 };
 
 export type StuckSale = {
@@ -117,15 +127,48 @@ function isSale(value: unknown): value is PendingSale {
     )
   );
 }
-function isStuck(value: unknown): value is StuckSale {
-  return (
-    isRecord(value) &&
-    isSale(value.sale) &&
-    typeof value.error === "string" &&
-    typeof value.failedAt === "string"
-  );
+// Upgrades a sale written by an older build to the current shape. Only fields
+// whose absence unambiguously meant "none" are filled in (a line's cost,
+// discounts, the customer, the attempt count); anything else that is wrong
+// returns null and the entry is set aside instead. Never throws.
+//   unit_cost_cents: older builds stored products from the offline cache, which
+//   carry no cost, and JSON drops `undefined`, so the key is simply missing.
+export function normalizeSale(value: unknown): PendingSale | null {
+  if (!isRecord(value)) return null;
+  const sale: Record<string, unknown> = { ...value };
+  if (sale.customer_id === undefined) sale.customer_id = null;
+  if (sale.discount_cents === undefined) sale.discount_cents = 0;
+  if (sale.attempts === undefined) sale.attempts = 0;
+  if (sale.last_error === null) delete sale.last_error;
+  if (Array.isArray(sale.lines)) {
+    sale.lines = sale.lines.map((line: unknown) => {
+      if (!isRecord(line)) return line;
+      const next: Record<string, unknown> = { ...line };
+      if (next.unit_cost_cents === undefined) next.unit_cost_cents = null;
+      if (next.discount_cents === undefined) next.discount_cents = 0;
+      return next;
+    });
+  }
+  return isSale(sale) ? sale : null;
 }
-async function readEntries<T>(key: string, valid: (value: unknown) => value is T): Promise<T[]> {
+function normalizeStuck(value: unknown): StuckSale | null {
+  if (!isRecord(value)) return null;
+  const sale = normalizeSale(value.sale);
+  if (!sale || typeof value.error !== "string" || typeof value.failedAt !== "string") return null;
+  return { sale, error: value.error, failedAt: value.failedAt };
+}
+
+// Reads a list of entries. Storage that is not a JSON array is unreadable as a
+// whole and throws, untouched (C02). Within a readable array, old shapes are
+// migrated in memory and entries that cannot be read are copied, byte for byte,
+// to the unreadable list BEFORE they are dropped from this one: if that copy
+// cannot be written, the read fails and nothing has changed. They never block
+// the entries that are fine.
+async function readEntries<T>(
+  key: string,
+  source: UnreadableSale["source"],
+  normalize: (value: unknown) => T | null
+): Promise<T[]> {
   const raw = await AsyncStorage.getItem(key);
   if (raw === null) return [];
   let parsed: unknown;
@@ -136,26 +179,89 @@ async function readEntries<T>(key: string, valid: (value: unknown) => value is T
       `Unreadable sales storage: ${key}. Original data preserved; export raw sales storage for recovery.`
     );
   }
-  if (!Array.isArray(parsed) || !parsed.every(valid)) {
+  if (!Array.isArray(parsed)) {
     throw new Error(
       `Invalid sales storage: ${key}. Original data preserved; export raw sales storage for recovery.`
     );
   }
-  return parsed;
+  const good: T[] = [];
+  const aside: unknown[] = [];
+  for (const entry of parsed) {
+    const normalized = normalize(entry);
+    if (normalized === null) aside.push(entry);
+    else good.push(normalized);
+  }
+  if (aside.length === 0) return good;
+
+  const kept = await readUnreadable();
+  const known = new Set(kept.map((entry) => `${entry.source}:${JSON.stringify(entry.raw)}`));
+  const movedAt = new Date().toISOString();
+  const added = aside
+    .filter((entry) => !known.has(`${source}:${JSON.stringify(entry)}`))
+    .map((entry): UnreadableSale => ({ source, raw: entry, movedAt }));
+  if (added.length > 0) {
+    await AsyncStorage.setItem(UNREADABLE_KEY, JSON.stringify([...kept, ...added]));
+  }
+  // The copy is safe: shrink this list. If this write fails the entries simply
+  // stay where they are and are found (and de-duplicated) on the next read.
+  try {
+    await AsyncStorage.setItem(
+      key,
+      JSON.stringify(parsed.filter((entry) => !aside.includes(entry)))
+    );
+  } catch {
+    /* harmless: see above */
+  }
+  return good;
 }
-const readQueue = () => readEntries(QUEUE_KEY, isSale);
-const readStuck = () => readEntries(STUCK_KEY, isStuck);
+async function readUnreadable(): Promise<UnreadableSale[]> {
+  const raw = await AsyncStorage.getItem(UNREADABLE_KEY);
+  if (raw === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `Unreadable sales storage: ${UNREADABLE_KEY}. Original data preserved; export raw sales storage for recovery.`
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      `Invalid sales storage: ${UNREADABLE_KEY}. Original data preserved; export raw sales storage for recovery.`
+    );
+  }
+  return parsed as UnreadableSale[];
+}
+const readQueue = () => readEntries(QUEUE_KEY, "pending", normalizeSale);
+const readStuck = () => readEntries(STUCK_KEY, "stuck", normalizeStuck);
 const writeQueue = (sales: PendingSale[]) => AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(sales));
 const writeStuck = (sales: StuckSale[]) => AsyncStorage.setItem(STUCK_KEY, JSON.stringify(sales));
 
 // Recovery primitive: returns exact stored strings without parsing or changing
 // them. A read failure propagates; callers must save/share this sensitive data
 // deliberately. Never clear/repair an unreadable queue as a side effect.
-export function exportRawSalesStorage(): Promise<{ pending: string | null; stuck: string | null }> {
+export function exportRawSalesStorage(): Promise<{
+  pending: string | null;
+  stuck: string | null;
+  unreadable: string | null;
+}> {
   return withStorage(async () => ({
     pending: await AsyncStorage.getItem(QUEUE_KEY),
     stuck: await AsyncStorage.getItem(STUCK_KEY),
+    unreadable: await AsyncStorage.getItem(UNREADABLE_KEY),
   }));
+}
+// Entries no version of the app could read, set aside intact (see readEntries).
+export function listUnreadableSales(): Promise<UnreadableSale[]> {
+  return withStorage(async () => {
+    // Reading the lists is what finds and sets aside any such entries.
+    await readQueue();
+    await readStuck();
+    return readUnreadable();
+  });
+}
+export async function countUnreadableSales(): Promise<number> {
+  return (await listUnreadableSales()).length;
 }
 export function listPendingSales(): Promise<PendingSale[]> {
   return withStorage(readQueue);
@@ -197,8 +303,12 @@ export function listSalesOfOthers(userId: string | null): Promise<PendingSale[]>
 export function enqueueSale(sale: PendingSale): Promise<void> {
   return withStorage(async () => {
     const queue = await readQueue();
-    if (!isSale(sale)) throw new Error("Invalid pending sale; nothing written");
-    if (!queue.some((pending) => pending.id === sale.id)) await writeQueue([...queue, sale]);
+    // A line picked from the offline cache has no cost field: store it as null.
+    const accepted = normalizeSale(sale);
+    if (!accepted) throw new Error("Invalid pending sale; nothing written");
+    if (!queue.some((pending) => pending.id === accepted.id)) {
+      await writeQueue([...queue, accepted]);
+    }
   });
 }
 export function removePendingSale(id: string): Promise<void> {

@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Share, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { Money } from "@/src/components/ui/Money";
 import { confirm, showToast } from "@/src/lib/dialog/store";
-import { listSalesOfOthers, type PendingSale } from "@/src/lib/sales/offlineQueue";
+import {
+  listSalesOfOthers,
+  listUnreadableSales,
+  type PendingSale,
+  type UnreadableSale,
+} from "@/src/lib/sales/offlineQueue";
 import { fetchCashierNames } from "@/src/lib/sales/queries";
 import { recoverQueuedSale } from "@/src/lib/sales/recovery";
 import { isolateBidi } from "@/src/lib/text/bidi";
@@ -27,10 +32,13 @@ export function OthersSalesList({
   const [sales, setSales] = useState<PendingSale[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  // Entries no version could read: kept intact, never sent, exported on request.
+  const [unreadable, setUnreadable] = useState<UnreadableSale[]>([]);
 
   const load = useCallback(async () => {
     const list = await listSalesOfOthers(userId);
     setSales(list);
+    setUnreadable(await listUnreadableSales().catch(() => []));
     const ids = [...new Set(list.map((s) => s.cashier_id).filter((id): id is string => !!id))];
     setNames(await fetchCashierNames(ids).catch(() => ({})));
   }, [userId]);
@@ -62,11 +70,25 @@ export function OthersSalesList({
     }
   };
 
-  if (sales.length === 0) return null;
+  const exportUnreadable = () =>
+    Share.share({
+      message: JSON.stringify(
+        unreadable.map(({ source, raw }) => ({ source, raw })),
+        null,
+        2
+      ),
+      title: "Corniche sales (unreadable)",
+    });
+
+  if (sales.length === 0 && unreadable.length === 0) return null;
   return (
     <View style={styles.list}>
-      <Text style={styles.title}>{t("shell.othersTitle", { count: sales.length })}</Text>
-      <Text style={styles.hint}>{t("shell.othersHint")}</Text>
+      {sales.length > 0 ? (
+        <>
+          <Text style={styles.title}>{t("shell.othersTitle", { count: sales.length })}</Text>
+          <Text style={styles.hint}>{t("shell.othersHint")}</Text>
+        </>
+      ) : null}
       {sales.map((sale) => (
         <View key={sale.id} style={styles.card}>
           <View style={styles.row}>
@@ -86,6 +108,19 @@ export function OthersSalesList({
           />
         </View>
       ))}
+      {unreadable.length > 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.title}>
+            {t("shell.unreadableTitle", { count: unreadable.length })}
+          </Text>
+          <Text style={styles.hint}>{t("shell.unreadableHint")}</Text>
+          <BigButton
+            label={t("shell.unreadableExport")}
+            variant="secondary"
+            onPress={exportUnreadable}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -13,6 +13,7 @@ import {
 const mockList = jest.fn();
 const mockNames = jest.fn();
 const mockRecover = jest.fn();
+const mockUnreadable = jest.fn();
 
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -29,6 +30,7 @@ jest.mock("lucide-react-native", () => {
 });
 jest.mock("../../src/lib/sales/offlineQueue", () => ({
   listSalesOfOthers: (...a: unknown[]) => mockList(...a),
+  listUnreadableSales: (...a: unknown[]) => mockUnreadable(...a),
   listStuckSales: async () => [],
   retryStuckSale: jest.fn(),
   dismissStuckSale: jest.fn(),
@@ -77,6 +79,8 @@ beforeEach(() => {
   mockList.mockReset();
   mockNames.mockReset();
   mockRecover.mockReset();
+  mockUnreadable.mockReset();
+  mockUnreadable.mockResolvedValue([]);
   mockNames.mockResolvedValue({ "user-a": "Salma" });
 });
 afterEach(() => {
@@ -94,6 +98,18 @@ describe("the owner's recovery list", () => {
     expect(all.join("|")).toContain("Salma");
     expect(all).toContain("shell.recoverUnknownCashier");
     expect(all).toContain('shell.othersTitle{"count":2}');
+  });
+
+  it("lists entries no version could read, with an export, even when no sale waits", async () => {
+    mockList.mockResolvedValue([]);
+    mockUnreadable.mockResolvedValue([
+      { source: "pending", raw: { id: "incomplete" }, movedAt: "2026-11-01T10:00:00Z" },
+    ]);
+    const r = await render(<OthersSalesList userId="owner" onChanged={() => {}} />);
+    const all = texts(r.root);
+    expect(all).toContain('shell.unreadableTitle{"count":1}');
+    expect(all).toContain("shell.unreadableExport");
+    expect(all.join("|")).not.toContain("shell.othersTitle");
   });
 
   it("renders nothing when there is nothing left on the device", async () => {

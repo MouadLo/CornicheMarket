@@ -6,6 +6,7 @@ import {
   MAX_RETRY_ATTEMPTS,
   countPendingFor,
   countStuckSales,
+  countUnreadableSales,
   listSalesOfOthers,
   partitionByOwner,
   isAuthError,
@@ -154,7 +155,10 @@ export function useSaleSync() {
     try {
       const [pending, others, stuck] = await Promise.all([
         countPendingFor(userId),
-        listSalesOfOthers(userId).then((sales) => sales.length),
+        // Entries no version can read count with the sales waiting on someone else.
+        Promise.all([listSalesOfOthers(userId), countUnreadableSales()]).then(
+          ([sales, unreadable]) => sales.length + unreadable
+        ),
         countStuckSales(),
       ]);
       setState((current) => ({ ...current, pending, others, stuck }));

@@ -52,6 +52,10 @@ const en: Translations = {
       "They are never sent under another account. They go out when their user signs back in, or the owner can recover them.",
     othersCashierNotice:
       "{{count}} sale(s) from another user are waiting on this device. They will be sent when that person signs back in.",
+    unreadableTitle: "Unreadable sales data ({{count}})",
+    unreadableHint:
+      "This version could not read this data. It is kept intact on the device: export it to recover it.",
+    unreadableExport: "Export",
     recoverUnknownCashier: "Unknown cashier (older sale)",
     recoverButton: "Recover as owner",
     recoverTitle: "Recover this sale?",
@@ -152,6 +156,18 @@ const en: Translations = {
     lookupFailed: "Lookup failed",
     recorded: "Sale · {{amount}}",
     couldNotRecord: "Could not record the sale.",
+    attempt: {
+      title: "A sale was not confirmed",
+      summary: "{{amount}} · {{method}}",
+      hint: "It may already be saved. Check the sales history before ringing it up again.",
+      retry: "Retry this sale",
+      history: "Check sales history",
+      discard: "Discard and start a new sale",
+      discardTitle: "Discard this sale?",
+      discardMessage:
+        "It may already be recorded. Check the sales history before continuing: if it is there, ringing it up again would count it twice.",
+      discardConfirm: "Discard and start new sale",
+    },
     syncOnline: "Online",
     syncOffline: "Offline",
     syncOfflineQueued: "Offline · {{count}} queued",
