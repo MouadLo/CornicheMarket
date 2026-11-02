@@ -45,6 +45,7 @@ import {
   type PaymentMethod,
 } from "@/src/lib/sales/queries";
 import {
+  cartLineFrom,
   cartSubtotal,
   hasInvalidQuantity,
   saleTotal,
@@ -194,19 +195,7 @@ export default function SellScreen() {
         };
         return next;
       }
-      return [
-        ...current,
-        {
-          product_id: product.id,
-          name: product.name,
-          unit: product.unit,
-          quantity,
-          unit_price_cents: product.selling_price_cents,
-          discount_cents: 0,
-          // Products picked from the offline cache carry no cost field at all.
-          unit_cost_cents: product.current_cost_cents ?? null,
-        },
-      ];
+      return [...current, cartLineFrom(product, quantity)];
     });
   }, []);
 
