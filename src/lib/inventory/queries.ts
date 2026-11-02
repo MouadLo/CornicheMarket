@@ -129,12 +129,20 @@ export async function applyStockCount(
   counted: number,
   systemQuantity: number,
   note: string,
-  userId: string
+  userId: string,
+  operationId: string
 ): Promise<number> {
   const delta = Number((counted - systemQuantity).toFixed(3));
   if (delta === 0) return 0;
 
-  await createAdjustment(productId, delta, "count_correction", note, userId);
+  const { error } = await supabase.rpc("record_stock_adjustment", {
+    p_operation_id: operationId,
+    p_product_id: productId,
+    p_quantity_delta: delta,
+    p_reason: "count_correction",
+    p_note: note,
+  });
+  if (error) throw new Error(error.message);
   return delta;
 }
 
