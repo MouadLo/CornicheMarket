@@ -1,5 +1,5 @@
 import NetInfo from "@react-native-community/netinfo";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import {
@@ -17,6 +17,7 @@ import {
   confirmPendingSale,
   type PendingSale,
 } from "@/src/lib/sales/offlineQueue";
+import { probeReachable, retryDelay, subscribeToForeground } from "@/src/lib/sales/connectivity";
 import { submitSale } from "@/src/lib/sales/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
@@ -166,26 +167,89 @@ export function useSaleSync() {
       reportError(error);
     }
   }, [reportError, userId]);
-  const sync = useCallback(async () => {
-    setState((current) => ({ ...current, syncing: true, lastError: null }));
+  // Asks the backend itself; NetInfo's flag is a hint, never the answer.
+  const checkReachable = useCallback(async () => {
+    const online = await probeReachable();
+    setState((current) => ({ ...current, online }));
+    return online;
+  }, []);
+  const runSync = useCallback(async () => {
     try {
       const lastError = await syncPendingSales(userId);
       setState((current) => ({ ...current, lastError }));
       await refreshPending();
     } catch (error) {
       reportError(error);
+    }
+  }, [refreshPending, reportError, userId]);
+  // The manual button. It never trusts the "offline" label: it looks first, and
+  // if the server answers it sends. If it truly cannot be reached, no sale is
+  // touched (a failed send would use up the sale's retry attempts).
+  const sync = useCallback(async () => {
+    setState((current) => ({ ...current, syncing: true, lastError: null }));
+    try {
+      if (await checkReachable()) await runSync();
     } finally {
       setState((current) => ({ ...current, syncing: false }));
     }
-  }, [refreshPending, reportError, userId]);
+  }, [checkReachable, runSync]);
+  // The background check: quiet unless there is something to send.
+  const attempt = useRef(0);
+  const tick = useCallback(async () => {
+    if (!(await checkReachable())) return;
+    if ((await countPendingFor(userId)) === 0) return void (await refreshPending());
+    setState((current) => ({ ...current, syncing: true }));
+    try {
+      await runSync();
+    } finally {
+      setState((current) => ({ ...current, syncing: false }));
+    }
+  }, [checkReachable, refreshPending, runSync, userId]);
+  const recheck = useCallback(() => {
+    attempt.current = 0;
+    void tick();
+  }, [tick]);
+
   useEffect(() => {
     void refreshPending();
-    return NetInfo.addEventListener((netState) => {
-      const online = Boolean(netState.isConnected && netState.isInternetReachable !== false);
-      setState((current) => ({ ...current, online }));
-      if (online) void sync();
+    const stopNetInfo = NetInfo.addEventListener((netState) => {
+      // "No connection" is trusted at once; anything else is checked for real.
+      if (netState.isConnected === false) setState((current) => ({ ...current, online: false }));
+      else recheck();
     });
-  }, [refreshPending, sync]);
+    const stopForeground = subscribeToForeground(recheck);
+    return () => {
+      stopNetInfo();
+      stopForeground();
+    };
+  }, [refreshPending, recheck]);
+
+  // Events can be missed (the web does not always send them), so while the app
+  // believes it is offline or sales are waiting, look again on a backoff.
+  const needsRetry = !state.online || state.pending > 0;
+  useEffect(() => {
+    if (!needsRetry) {
+      attempt.current = 0;
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        attempt.current += 1;
+        try {
+          await tick();
+        } finally {
+          if (!cancelled) schedule();
+        }
+      }, retryDelay(attempt.current));
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [needsRetry, tick]);
   return { ...state, sync, refreshPending };
 }
 

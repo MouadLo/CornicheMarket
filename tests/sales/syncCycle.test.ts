@@ -431,6 +431,12 @@ describe("shared sync ownership", () => {
   });
 });
 
+// The reachability check itself is covered in syncRecovery.test.tsx.
+jest.mock("../../src/lib/sales/connectivity", () => ({
+  ...jest.requireActual("../../src/lib/sales/connectivity"),
+  probeReachable: async () => true,
+  subscribeToForeground: () => () => {},
+}));
 jest.mock("@react-native-community/netinfo", () => ({
   __esModule: true,
   default: { addEventListener: jest.fn(() => () => {}) },
