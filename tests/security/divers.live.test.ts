@@ -1,5 +1,5 @@
 /**
- * Divers on the server (migration 030), live: the one built-in free-amount item.
+ * Divers on the server (migration 031), live: the one built-in free-amount item.
  *
  * SETUP: local dev stack, SUPABASE_TEST_* owner and cashier variables:
  *   npx jest tests/security/divers.live.test.ts
