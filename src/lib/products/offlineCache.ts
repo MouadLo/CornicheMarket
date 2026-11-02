@@ -51,6 +51,7 @@ export async function refreshProductCache(isOwner: boolean): Promise<void> {
       .from(source)
       .select(CACHE_COLUMNS)
       .eq("active", true)
+      .eq("kind", "regular")
       .order("name")
       .range(from, from + PAGE_SIZE - 1);
 

@@ -59,7 +59,8 @@ export async function fetchProducts(
   isOwner: boolean
 ): Promise<Product[]> {
   const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
-  let query = supabase.from(productsSource(isOwner)).select(columns);
+  // The built-in Divers item is not part of the catalogue.
+  let query = supabase.from(productsSource(isOwner)).select(columns).eq("kind", "regular");
 
   const term = sanitizeSearch(filters.search);
   if (term) {
@@ -204,7 +205,11 @@ export async function fetchAllProducts(isOwner: boolean): Promise<Product[]> {
 // (production starts with 0 products), so a failed check should never block
 // the Sell screen: callers treat an error the same as "has products."
 export async function hasAnyProducts(): Promise<boolean> {
-  const { data, error } = await supabase.from("products").select("id").limit(1);
+  const { data, error } = await supabase
+    .from("products")
+    .select("id")
+    .eq("kind", "regular")
+    .limit(1);
   if (error) throw new Error(error.message);
   return (data?.length ?? 0) > 0;
 }
