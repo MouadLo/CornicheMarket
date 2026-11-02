@@ -2,6 +2,7 @@ import {
   resolveGrid,
   sellLayoutFor,
   stockLevel,
+  priceFontSize,
   tileColumns,
   type GridProduct,
   type GridTab,
@@ -239,5 +240,32 @@ describe("layout breakpoints", () => {
     expect(tileColumns(780)).toBe(5); // 1280 tablet
     expect(tileColumns(300)).toBe(2);
     expect(tileColumns(10)).toBe(2);
+  });
+});
+
+describe("priceFontSize (a tile price never loses its digits or its DH)", () => {
+  it("keeps the design's 20 for a short price on the narrowest tile", () => {
+    expect(priceFontSize("7.00", 132)).toBe(20);
+  });
+
+  it("shrinks as the amount gets longer, down to a floor of 12", () => {
+    expect(priceFontSize("12.50", 132)).toBe(19);
+    expect(priceFontSize("125.00", 132)).toBe(16);
+    expect(priceFontSize("1\u00a0250.00", 132)).toBe(12);
+  });
+
+  it("a wider tile gives it room back", () => {
+    expect(priceFontSize("125.00", 168)).toBe(20);
+    expect(priceFontSize("1\u00a0250.00", 168)).toBe(20);
+  });
+
+  it("never exceeds the design's 20 and never goes below 12", () => {
+    for (const amount of ["0", "7.00", "12.50", "999.00", "12\u00a0345.00"]) {
+      for (const width of [100, 124, 140, 200, 400]) {
+        const size = priceFontSize(amount, width);
+        expect(size).toBeGreaterThanOrEqual(12);
+        expect(size).toBeLessThanOrEqual(20);
+      }
+    }
   });
 });
