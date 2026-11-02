@@ -6,6 +6,10 @@ import { AppShell } from "../../src/components/shell/AppShell";
 import AppLayout from "../../app/(app)/_layout";
 import { __resetForTests } from "../../src/lib/dialog/store";
 
+// React Native lazily loads and transforms native components on the first render.
+// A cold Jest cache on CI can exceed the default timeout before that render finishes.
+jest.setTimeout(15_000);
+
 let mockPathname = "/sell";
 let mockProfile: { id: string; role: "owner" | "cashier"; full_name: string } | null = null;
 let mockSync = {
