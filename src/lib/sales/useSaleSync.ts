@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import {
-  MAX_RETRY_ATTEMPTS,
   countPendingFor,
   countStuckSales,
   countUnreadableSales,
@@ -12,7 +11,6 @@ import {
   isAuthError,
   isTemporaryError,
   listPendingSales,
-  markAttempt,
   quarantineSale,
   confirmPendingSale,
   type PendingSale,
@@ -114,12 +112,9 @@ export function syncPendingSales(userId: string | null): Promise<string | null> 
             // Not a failure of the sale: the session is not its user's. Leave it
             // queued, uncounted and unquarantined, for the right session.
             if (isWrongSessionError(message)) continue;
-            if (!isTemporaryError(message) || sale.attempts + 1 >= MAX_RETRY_ATTEMPTS) {
-              await quarantineSale(sale, message);
-              continue;
-            }
-            await markAttempt(sale.id, message);
-            return message;
+            if (isTemporaryError(message)) return message;
+            await quarantineSale(sale, message);
+            continue;
           }
           // Storage failures must not be classified as backend rejections or
           // consume the retry budget. Leave the sale for an idempotent replay.
@@ -184,7 +179,7 @@ export function useSaleSync() {
   }, [refreshPending, reportError, userId]);
   // The manual button. It never trusts the "offline" label: it looks first, and
   // if the server answers it sends. If it truly cannot be reached, no sale is
-  // touched (a failed send would use up the sale's retry attempts).
+  // touched (a failed send would need another retry).
   const sync = useCallback(async () => {
     setState((current) => ({ ...current, syncing: true, lastError: null }));
     try {

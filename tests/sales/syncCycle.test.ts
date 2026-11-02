@@ -395,17 +395,6 @@ describe("shared sync ownership", () => {
     expect(await listPendingSales()).toEqual([]);
   });
 
-  it("releases ownership if persisting a network failure fails", async () => {
-    await enqueueSale(queued("A"));
-    mockSubmitSale
-      .mockRejectedValueOnce(new Error("Network request failed"))
-      .mockResolvedValue(undefined);
-    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
-    await expect(syncPendingSales(USER)).rejects.toThrow("disk full");
-    await syncPendingSales(USER);
-    expect(await listPendingSales()).toEqual([]);
-  });
-
   it("normal sync quarantines permanent failures and continues with the next sale", async () => {
     await enqueueSale(queued("A"));
     await enqueueSale(queued("B"));
@@ -425,7 +414,7 @@ describe("shared sync ownership", () => {
     await Promise.all([syncPendingSales(USER), syncPendingSales(USER)]);
     expect(mockSubmitSale).toHaveBeenCalledTimes(1);
     expect((await listPendingSales()).map((sale) => [sale.id, sale.attempts])).toEqual([
-      ["A", 1],
+      ["A", 0],
       ["B", 0],
     ]);
   });
@@ -550,4 +539,15 @@ it("preserves the pending copy when reconciliation fails and succeeds on retry",
   expect(await countPendingSales()).toBe(0);
   expect(await countStuckSales()).toBe(0);
   expect(mockSubmitSale.mock.calls.map(([item]) => item.id)).toEqual(["A", "A"]);
+});
+
+it("keeps a sale pending without consuming attempts through ten 503s and syncs after recovery", async () => {
+  await enqueueSale(queued("outage"));
+  mockSubmitSale.mockRejectedValue(new Error("503 Service Unavailable"));
+  for (let i = 0; i < 10; i++) await syncPendingSales(USER);
+  expect(await listPendingSales()).toEqual([expect.objectContaining({ id: "outage", attempts: 0 })]);
+  expect(await listStuckSales()).toEqual([]);
+  mockSubmitSale.mockResolvedValue(undefined);
+  await syncPendingSales(USER);
+  expect(await listPendingSales()).toEqual([]);
 });
