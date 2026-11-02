@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import * as Crypto from "expo-crypto";
+import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { BigButton } from "@/src/components/BigButton";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -14,12 +16,14 @@ import { fetchProductByBarcode, type Product } from "@/src/lib/products/queries"
 type CountLine = {
   product: Product;
   counted: string;
+  operationId?: string;
   applied?: { delta: number } | { error: string };
 };
 
 export default function StockCountScreen() {
   const { profile } = useAuth();
   const { t } = useTranslation();
+  const busy = useRef(false);
   const [lines, setLines] = useState<CountLine[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -42,41 +46,77 @@ export default function StockCountScreen() {
     return { status: "added", message: t("stockIn.countAdded", { name: match.name }) };
   };
 
-  const apply = async () => {
-    setApplying(true);
-    setDone(null);
+  const eligible = (line: CountLine) =>
+    parseQuantity(line.counted) !== null && !(line.applied && "delta" in line.applied);
 
-    const results = await Promise.all(
-      lines.map(async (line) => {
-        const counted = parseQuantity(line.counted);
-        if (counted === null || !profile) return line;
-        try {
-          const delta = await applyStockCount(
-            line.product.id,
-            counted,
-            line.product.stock_quantity,
-            "Shelf count",
-            profile.id
-          );
-          return { ...line, applied: { delta } };
-        } catch (error) {
-          return {
-            ...line,
-            applied: { error: error instanceof Error ? error.message : t("common.error") },
-          };
-        }
-      })
-    );
-
-    setLines(results);
-    setApplying(false);
-    const changed = results.filter(
-      (line) => line.applied && "delta" in line.applied && line.applied.delta !== 0
-    ).length;
-    setDone(t("stockIn.countDone", { count: changed }));
+  const apply = async (onlyId?: string) => {
+    if (busy.current || !profile) return;
+    busy.current = true;
+    try {
+      const batch = lines.filter(
+        (line) => eligible(line) && (!onlyId || line.product.id === onlyId)
+      );
+      if (!batch.length) return;
+      const confirmed = await confirmDestructive(
+        t("stockIn.countApply", { count: batch.length }),
+        batch
+          .map(
+            (line) =>
+              `${line.product.name}: ${line.product.stock_quantity} → ${parseQuantity(line.counted)} ${line.product.unit}`
+          )
+          .join("\n"),
+        t("common.confirm"),
+        t("common.cancel")
+      );
+      if (!confirmed) return;
+      setApplying(true);
+      setDone(null);
+      const prepared = batch.map((line) => ({
+        ...line,
+        operationId: line.operationId ?? Crypto.randomUUID(),
+      }));
+      // Freeze the payload before the first request. Even a lost response must
+      // keep the same operation ID and discrepancy on its next attempt.
+      setLines((current) =>
+        current.map((line) => prepared.find((p) => p.product.id === line.product.id) ?? line)
+      );
+      const results = await Promise.all(
+        prepared.map(async (line): Promise<CountLine> => {
+          try {
+            const delta = await applyStockCount(
+              line.product.id,
+              parseQuantity(line.counted)!,
+              line.product.stock_quantity,
+              "Shelf count",
+              profile.id,
+              line.operationId
+            );
+            return { ...line, applied: { delta } };
+          } catch (error) {
+            return {
+              ...line,
+              applied: { error: error instanceof Error ? error.message : t("common.error") },
+            };
+          }
+        })
+      );
+      setLines((current) =>
+        current.map((line) => results.find((r) => r.product.id === line.product.id) ?? line)
+      );
+      setDone(
+        t("stockIn.countDone", {
+          count: results.filter(
+            (line) => line.applied && "delta" in line.applied && line.applied.delta !== 0
+          ).length,
+        })
+      );
+    } finally {
+      busy.current = false;
+      setApplying(false);
+    }
   };
 
-  const countable = lines.filter((line) => parseQuantity(line.counted) !== null && !line.applied);
+  const countable = lines.filter(eligible);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -95,10 +135,14 @@ export default function StockCountScreen() {
         const difference = counted === null ? null : counted - line.product.stock_quantity;
 
         return (
-          <View key={line.product.id} style={styles.row}>
+          <View
+            key={line.product.id}
+            style={[styles.row, line.applied && "delta" in line.applied && styles.completed]}
+          >
             <View style={styles.rowTop}>
               <Text style={styles.name}>{line.product.name}</Text>
               <Pressable
+                disabled={applying || Boolean(line.operationId)}
                 onPress={() => setLines((current) => current.filter((_, i) => i !== index))}
                 hitSlop={8}
               >
@@ -112,10 +156,15 @@ export default function StockCountScreen() {
               </Text>
               <TextInput
                 style={styles.input}
+                editable={!applying && !line.operationId}
                 value={line.counted}
                 onChangeText={(value) =>
                   setLines((current) =>
-                    current.map((item, i) => (i === index ? { ...item, counted: value } : item))
+                    current.map((item, i) =>
+                      i === index && !item.operationId && !busy.current
+                        ? { ...item, counted: value }
+                        : item
+                    )
                   )
                 }
                 keyboardType="decimal-pad"
@@ -136,7 +185,14 @@ export default function StockCountScreen() {
                       })}
                 </Text>
               ) : (
-                <Text style={styles.error}>{line.applied.error}</Text>
+                <View>
+                  <Text style={styles.error}>{line.applied.error}</Text>
+                  <BigButton
+                    label={t("common.retry")}
+                    onPress={() => apply(line.product.id)}
+                    disabled={applying}
+                  />
+                </View>
               )
             ) : (
               difference !== null && (
@@ -164,7 +220,7 @@ export default function StockCountScreen() {
               ? t("stockIn.countApplying")
               : t("stockIn.countApply", { count: countable.length })
           }
-          onPress={apply}
+          onPress={() => apply()}
           disabled={applying}
         />
       )}
@@ -181,6 +237,7 @@ export default function StockCountScreen() {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 48 },
   intro: { fontSize: 13, color: "#666", lineHeight: 19 },
+  completed: { backgroundColor: "#edf7ee", borderColor: "#1d7a46" },
   row: { borderWidth: 1, borderColor: "#eee", borderRadius: 12, padding: 14, gap: 8 },
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   name: { fontSize: 16, fontWeight: "600", flex: 1 },
