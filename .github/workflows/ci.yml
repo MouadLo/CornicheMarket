@@ -72,9 +72,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Pinned: "latest" started rejecting `[inbucket]` in supabase/config.toml
+      # (it wants `[local_smtp]`), so `supabase start` failed on every PR before
+      # any SQL ran. 2.122.0 is what the repo is developed against. Move to the
+      # new config and bump this together.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
 
       - name: Apply every migration + seed.sql from scratch
         run: supabase start
