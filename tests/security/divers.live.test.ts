@@ -41,7 +41,7 @@ suite("Divers (live)", () => {
     lines: object[],
     id: string = randomUUID(),
     client: SupabaseClient = cashier
-  ): Promise<{ id: string; error: { message: string } | null }> =>
+  ): PromiseLike<{ id: string; error: { message: string } | null }> =>
     client
       .rpc("record_sale", {
         p_sale_id: id,
