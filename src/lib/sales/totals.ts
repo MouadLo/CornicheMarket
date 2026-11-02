@@ -12,6 +12,29 @@ export type CartLine = {
   unit_cost_cents: number | null;
 };
 
+// The one place a cart line is built from a product. The Sell screen and the
+// tests both use it, and a product from the offline cache has no cost field.
+export function cartLineFrom(
+  product: {
+    id: string;
+    name: string;
+    unit: string;
+    selling_price_cents: number;
+    current_cost_cents?: number | null;
+  },
+  quantity: number
+): CartLine {
+  return {
+    product_id: product.id,
+    name: product.name,
+    unit: product.unit,
+    quantity,
+    unit_price_cents: product.selling_price_cents,
+    discount_cents: 0,
+    unit_cost_cents: product.current_cost_cents ?? null,
+  };
+}
+
 export function lineSubtotal(quantity: number, unitPriceCents: number): number {
   return Math.round(quantity * unitPriceCents);
 }
