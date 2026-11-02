@@ -75,6 +75,9 @@ export function isTemporaryError(message: string): boolean {
   return (
     msg.includes("network") ||
     msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("no connection") ||
+    msg.includes("connection refused") ||
     msg.includes("failed to fetch") ||
     msg.includes("fetch failed") ||
     msg.includes("socket") ||

@@ -47,14 +47,17 @@ function salePayload(sale: PendingSale) {
 }
 
 export async function submitSale(sale: PendingSale): Promise<void> {
-  const { error } = await supabase.rpc("record_sale", {
+  const { error, status } = await supabase.rpc("record_sale", {
     ...salePayload(sale),
     // An assertion, not a claim: the server credits the caller's session and
     // refuses the sale if that is not this user (audit C05). Legacy sales have
     // no user id and are never sent here.
     p_expected_cashier: sale.cashier_id ?? null,
   });
-  if (error) throw new Error(error.message);
+  if (error)
+    throw new Error(
+      [502, 503, 504].includes(status) ? `${status} ${error.message}` : error.message
+    );
 }
 
 // Owner only. Records a sale stranded on this device by a user who cannot sign

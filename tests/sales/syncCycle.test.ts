@@ -545,9 +545,18 @@ it("keeps a sale pending without consuming attempts through ten 503s and syncs a
   await enqueueSale(queued("outage"));
   mockSubmitSale.mockRejectedValue(new Error("503 Service Unavailable"));
   for (let i = 0; i < 10; i++) await syncPendingSales(USER);
-  expect(await listPendingSales()).toEqual([expect.objectContaining({ id: "outage", attempts: 0 })]);
+  expect(await listPendingSales()).toEqual([
+    expect.objectContaining({ id: "outage", attempts: 0 }),
+  ]);
   expect(await listStuckSales()).toEqual([]);
   mockSubmitSale.mockResolvedValue(undefined);
   await syncPendingSales(USER);
   expect(await listPendingSales()).toEqual([]);
 });
+
+it.each(["No connection", "connection refused", "request timed out"])(
+  "treats %s as temporary",
+  (message) => {
+    expect(isTemporaryError(message)).toBe(true);
+  }
+);
