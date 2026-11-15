@@ -532,3 +532,15 @@ select (select id from public.sell_grid_tabs where kind = 'favorites'), p.id,
 from public.products p
 where p.name in ('Coca-Cola 33cl', 'Baguette', 'Bananes', 'Allumettes', 'Lait Centrale 1L')
 on conflict do nothing;
+
+-- Sample invoice for the local review flow. Stock changes only on approval.
+insert into public.invoice_drafts (id, supplier_id, invoice_number, source_lines)
+values (
+  '00000000-0000-0000-0000-00000000b001',
+  '00000000-0000-0000-0000-00000000a001',
+  'DEMO-001',
+  '[
+    {"description":"Lait Centrale Danone 1L","billed":"2 cartons × 12 · 216,00 DH","quantity":"24","unit":"piece","unit_cost":"9"},
+    {"description":"Jus de pomme Atlas 25cl","billed":"6 pièces · 24,00 DH","quantity":"6","unit":"piece","unit_cost":"4"}
+  ]'::jsonb
+) on conflict (id) do nothing;
