@@ -1,10 +1,14 @@
+import { Platform } from "react-native";
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from "react-native-svg";
+
+const decorative =
+  Platform.OS === "web" ? { "aria-hidden": true } : { accessibilityElementsHidden: true };
 
 // The Corniche mark: a shop awning over a "C" that doubles as the curve of the
 // bay, with the sun in sand (docs/THEME-STRUCTURE.md 2.1).
 export function BrandMark({ size = 36 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48" accessibilityElementsHidden>
+    <Svg width={size} height={size} viewBox="0 0 48 48" {...decorative}>
       <Defs>
         <ClipPath id="awn">
           <Rect x={6} y={10} width={36} height={9} rx={2} />

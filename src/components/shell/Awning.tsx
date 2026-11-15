@@ -11,8 +11,7 @@ export function Awning() {
   const count = Math.ceil(width / PIECE) + 1;
   return (
     <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      aria-hidden
       style={{ height: 10, flexDirection: "row", overflow: "hidden", backgroundColor: colors.bg }}
     >
       {Array.from({ length: count }, (_, i) => (

@@ -9,7 +9,9 @@ export default function StockInLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="history" options={{ title: "Purchase history" }} />
       <Stack.Screen name="delivery/[id]" options={{ title: t("stockIn.deliveryTitle") }} />
-      <Stack.Screen name="invoice" options={{ title: t("invoices.title") }} />
+      <Stack.Screen name="invoice/index" options={{ title: t("invoices.drafts") }} />
+      <Stack.Screen name="invoice/capture" options={{ title: t("invoices.scan") }} />
+      <Stack.Screen name="invoice/[id]" options={{ title: t("invoices.reviewTitle") }} />
       <Stack.Screen name="low-stock" options={{ title: "Low stock & reorder" }} />
       <Stack.Screen name="adjust" options={{ title: "Stock adjustments" }} />
       <Stack.Screen name="count" options={{ title: "Stock count" }} />

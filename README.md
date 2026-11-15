@@ -86,6 +86,20 @@ npx expo start
 
 Sign in with one of the accounts above.
 
+### Invoice extraction in local development
+
+Run the app against local Supabase as an owner. **Stock → Scan invoice** uploads
+up to three pages to the private invoice bucket. The existing **Sample invoice**
+can be reviewed without any provider credentials.
+
+For real scans, set `ANTHROPIC_API_KEY` in the gitignored
+`supabase/functions/.env` file and run `supabase functions serve extract-invoice
+--env-file supabase/functions/.env` against the local stack. Optionally set
+`INVOICE_MODEL` to override `claude-opus-5-5`. The function sends the photos to
+Claude, records the returned model, token counts and latency, and enforces 60
+extraction attempts per store day. Configure those values as Supabase Edge Function
+secrets in a hosted environment.
+
 ### Troubleshooting
 
 - **Stuck on the loading spinner for more than ~10 seconds**: the app will show an error screen explaining what to check (usually the URL mistake above, or `supabase start` not actually running — check with `npx supabase status`).

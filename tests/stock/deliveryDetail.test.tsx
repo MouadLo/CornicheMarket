@@ -10,6 +10,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import DeliveryDetail from "../../app/(app)/stock-in/delivery/[id]";
 import { BigButton } from "../../src/components/BigButton";
 import { textOf } from "../sales/sellTestUtils";
+jest.mock("../../src/lib/stock/invoices", () => ({ findPurchaseInvoice: async () => null }));
 
 let mockRole = "owner";
 const mockFetchPurchase = jest.fn();

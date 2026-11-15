@@ -20,7 +20,7 @@ import {
   type Supplier,
 } from "@/src/lib/stock/queries";
 import { buildReceivePayload } from "@/src/lib/stock/receive";
-import { sampleInvoiceEnabled } from "@/src/lib/stock/sampleInvoice";
+import { sampleInvoiceEnabled, sampleInvoiceId } from "@/src/lib/stock/sampleInvoice";
 
 export default function StockInScreen() {
   const { profile } = useAuth();
@@ -149,8 +149,17 @@ export default function StockInScreen() {
         <ToolLink label={t("stockIn.toolAdjust")} href="/(app)/stock-in/adjust" />
         <ToolLink label={t("stockIn.toolExpiring")} href="/(app)/stock-in/expiring" />
         <ToolLink label={t("stockIn.toolHistory")} href="/(app)/stock-in/history" />
+        {isOwner && (
+          <>
+            <ToolLink label={t("invoices.scan")} href="/(app)/stock-in/invoice/capture" />
+            <ToolLink label={t("invoices.drafts")} href="/(app)/stock-in/invoice" />
+          </>
+        )}
         {isOwner && sampleInvoiceEnabled && (
-          <ToolLink label={t("invoices.title")} href="/(app)/stock-in/invoice" />
+          <ToolLink
+            label={t("invoices.title")}
+            href={`/(app)/stock-in/invoice/${sampleInvoiceId}`}
+          />
         )}
         {isOwner && negativeStockCount > 0 && (
           <Pressable
