@@ -88,6 +88,27 @@ it.each([
   }
 );
 
+it("keeps the printed billed quantity and cost so the review can convert a carton", () => {
+  const result = normalizeInvoice({
+    ...invoice,
+    lines: [
+      {
+        ...invoice.lines[0],
+        description: "Eau 1.5 L",
+        billing_unit: "carton de 6",
+        quantity_billed: "2",
+        unit_price_text: "30,00",
+      },
+    ],
+  });
+  expect(result.sourceLines[0]).toMatchObject({
+    billed_quantity: "2",
+    billed_unit_cost: "30.00",
+    quantity: "",
+    unit_cost: "",
+  });
+});
+
 it("recognizes the same normalized invoice number only for the same supplier", () => {
   const header = { supplier_id: "supplier", invoice_number: " AB-01 " };
   expect(sameInvoiceHeader(header, { ...header, invoice_number: "ab-01" })).toBe(true);
