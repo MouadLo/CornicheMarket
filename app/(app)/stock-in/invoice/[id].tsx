@@ -17,23 +17,29 @@ import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { formatMAD, lineTotalCents } from "@/src/lib/money";
+import { invoiceMoneyCents } from "@/supabase/functions/_shared/invoiceParse";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import {
   approveInvoiceDraft,
   approvalErrorKey,
   buildReviewedInvoiceLine,
+  billedUnits,
   fetchInvoiceDraft,
   extractInvoice,
+  initialCostBasis,
   initialReviewLine,
   isPackLine,
+  lineCost,
   matchInvoiceLines,
+  recostLines,
   updateInvoiceHeader,
   withProduct,
   withRememberedMatch,
   withUnitsPer,
   InvoiceApprovalError,
   type InvoiceDraft,
+  type CostBasis,
   type InvoiceLineMatch,
   type InvoiceReviewLine,
   type ProductChoice,
@@ -157,8 +163,17 @@ function DraftLoader({ id }: { id: string }) {
 function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   const [draft, setDraft] = useState(initialDraft);
   const { t, i18n } = useTranslation();
+  // Prices printed per billed unit exist on drafts read since HT/TTC was added.
+  // An older draft has nothing to convert, so no basis applies to it.
+  const hasPrinted = initialDraft.source_lines.some((line) => line.billed_unit_cost !== undefined);
+  const [basis, setBasis] = useState<CostBasis>(() => initialCostBasis(initialDraft));
+  const activeBasis = hasPrinted ? basis : undefined;
+  const basisRef = useRef(activeBasis);
+  basisRef.current = activeBasis;
   const [lines, setLines] = useState<InvoiceReviewLine[]>(() =>
-    draft.source_lines.map(initialReviewLine)
+    initialDraft.source_lines.map((source) =>
+      initialReviewLine(source, hasPrinted ? initialCostBasis(initialDraft) : undefined)
+    )
   );
   const [matches, setMatches] = useState<InvoiceLineMatch[]>([]);
   const [purchaseId, setPurchaseId] = useState(draft.purchase_id);
@@ -171,7 +186,12 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   const [error, setError] = useState<string | null>(null);
   const savingNow = useRef(false);
 
-  const reviewed = lines.map(buildReviewedInvoiceLine);
+  const reviewed = lines.map((line, index) =>
+    buildReviewedInvoiceLine(
+      line,
+      activeBasis ? { source: draft.source_lines[index], basis: activeBasis } : undefined
+    )
+  );
   const validLines = reviewed.filter((line): line is NonNullable<typeof line> => line !== null);
   const hasHeader = !!draft.supplier_id && !!draft.invoice_number;
   const ready =
@@ -191,7 +211,15 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   }
 
   function chooseProduct(index: number, product: ProductChoice | null) {
-    updateLine(index, withProduct(draft.source_lines[index], lines[index], product));
+    updateLine(index, withProduct(draft.source_lines[index], lines[index], product, activeBasis));
+  }
+
+  function changeBasis(next: CostBasis) {
+    if (savingNow.current) return;
+    setBasis(next);
+    setLines((current) => recostLines(draft.source_lines, current, next));
+    setConfirmed(false);
+    setError(null);
   }
 
   // Suggestions are a convenience: if they cannot load, the owner searches.
@@ -210,7 +238,8 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             withRememberedMatch(
               draft.source_lines[index],
               line,
-              rows.find((row) => row.line_index === index && row.exact)
+              rows.find((row) => row.line_index === index && row.exact),
+              basisRef.current
             )
           )
         );
@@ -320,6 +349,30 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
         </>
       ) : (
         <>
+          {hasPrinted && (
+            <View style={styles.card}>
+              <Text style={styles.heading}>{t("invoices.priceBasisTitle")}</Text>
+              {basis.printed === null ? (
+                <Text style={styles.warning}>{t("invoices.basisUnknown")}</Text>
+              ) : (
+                draft.totals?.price_basis === basis.printed && (
+                  <Text>{t("invoices.basisDetected")}</Text>
+                )
+              )}
+              <BasisChoice
+                label={t("invoices.printedBasis")}
+                value={basis.printed}
+                disabled={saving}
+                onChange={(printed) => changeBasis({ ...basis, printed })}
+              />
+              <BasisChoice
+                label={t("invoices.costBasis")}
+                value={basis.store}
+                disabled={saving}
+                onChange={(store) => changeBasis({ ...basis, store })}
+              />
+            </View>
+          )}
           {lines.map((line, index) => {
             const product = line.product;
             const result = reviewed[index];
@@ -327,6 +380,29 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             const name = product?.name ?? "";
             const lineMatches = matches.filter((match) => match.line_index === index);
             const pack = isPackLine(source);
+            const billed = billedUnits(source, line);
+            const info =
+              activeBasis && billed !== null ? lineCost(source, billed, activeBasis) : null;
+            const printedCents = invoiceMoneyCents(source.billed_unit_cost ?? "");
+            const costNote =
+              info?.reason === "vat_missing"
+                ? t("invoices.vatMissing")
+                : activeBasis && line.costTouched
+                  ? t("invoices.costTouched")
+                  : info?.converted &&
+                      info.cents !== null &&
+                      printedCents !== null &&
+                      activeBasis?.printed
+                    ? t("invoices.costConverted", {
+                        printed: isolateBidi(
+                          formatMAD(printedCents) + " " + activeBasis.printed.toUpperCase()
+                        ),
+                        cost: isolateBidi(
+                          formatMAD(info.cents) + " " + activeBasis.store.toUpperCase()
+                        ),
+                        rate: info.vat,
+                      })
+                    : null;
             return (
               <View key={index} style={styles.card}>
                 <Text style={styles.heading}>
@@ -445,7 +521,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                     })}
                     value={line.unitsPer}
                     disabled={saving}
-                    onChange={(text) => updateLine(index, withUnitsPer(source, line, text))}
+                    onChange={(text) =>
+                      updateLine(index, withUnitsPer(source, line, text, activeBasis))
+                    }
                   />
                 )}
                 <InvoiceInput
@@ -462,8 +540,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                   label={t("invoices.unitCost")}
                   value={line.unitCost}
                   disabled={saving}
-                  onChange={(unitCost) => updateLine(index, { unitCost })}
+                  onChange={(unitCost) => updateLine(index, { unitCost, costTouched: true })}
                 />
+                {costNote && <Text>{costNote}</Text>}
                 {result && (
                   <Text style={styles.delta}>
                     {t("invoices.delta", {
@@ -510,6 +589,42 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
         </>
       )}
     </ScrollView>
+  );
+}
+
+function BasisChoice({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: "ht" | "ttc" | null;
+  disabled: boolean;
+  onChange: (value: "ht" | "ttc") => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.field}>
+      <Text>{label}</Text>
+      <View style={styles.units}>
+        {(["ht", "ttc"] as const).map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="radio"
+            accessibilityLabel={
+              label + " " + t(option === "ht" ? "invoices.basisHT" : "invoices.basisTTC")
+            }
+            accessibilityState={{ checked: option === value, disabled }}
+            disabled={disabled}
+            style={[styles.unit, option === value && styles.selected]}
+            onPress={() => onChange(option)}
+          >
+            <Text>{t(option === "ht" ? "invoices.basisHT" : "invoices.basisTTC")}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
