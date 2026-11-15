@@ -41,7 +41,7 @@ export default function InvoiceScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   if (profile?.role !== "owner" || !id) {
-    return <Text style={styles.container}>{t("invoices.unavailable")}</Text>;
+    return <Text style={styles.container}>{t("stockIn.blockedText")}</Text>;
   }
   return <DraftLoader key={id} id={id} />;
 }

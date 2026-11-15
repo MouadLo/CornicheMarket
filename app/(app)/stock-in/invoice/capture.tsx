@@ -1,4 +1,5 @@
 import { useNetInfo } from "@react-native-community/netinfo";
+import { decode } from "base64-arraybuffer";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -78,8 +79,7 @@ export default function InvoiceCapture() {
           base64: true,
         });
         if (!jpeg.base64) throw new Error("Missing JPEG");
-        const bytes = Uint8Array.from(atob(jpeg.base64), (char) => char.charCodeAt(0));
-        await uploadInvoicePage(id, i + 1, bytes.buffer);
+        await uploadInvoicePage(id, i + 1, decode(jpeg.base64));
         uploaded.current.add(i);
       }
       void extractInvoice(id).catch(() => undefined);
