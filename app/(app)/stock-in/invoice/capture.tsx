@@ -1,4 +1,3 @@
-import { useNetInfo } from "@react-native-community/netinfo";
 import { decode } from "base64-arraybuffer";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -9,26 +8,27 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { createInvoiceDraft, extractInvoice, uploadInvoicePage } from "@/src/lib/stock/invoices";
 import { Text } from "@/src/theme/Text";
 
 export default function InvoiceCapture() {
   const { profile } = useAuth();
   const { t } = useTranslation();
-  const network = useNetInfo();
-  const offline = network.isConnected === false || network.isInternetReachable === false;
+  const { online } = useSaleSync();
   const [pages, setPages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [locked, setLocked] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<"uploading" | "extracting" | null>(null);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const draftId = useRef<string>();
   const uploaded = useRef(new Set<number>());
+  const busy = stage !== null;
 
   if (profile?.role !== "owner") return <Text>{t("stockIn.blockedText")}</Text>;
 
   async function pick(camera: boolean) {
-    if (offline || locked || inFlight.current || pages.length >= 3) return;
+    if (locked || inFlight.current || pages.length >= 3) return;
     inFlight.current = true;
     setError("");
     try {
@@ -57,9 +57,9 @@ export default function InvoiceCapture() {
   }
 
   async function scan() {
-    if (offline || inFlight.current || !pages.length) return;
+    if (inFlight.current || !pages.length) return;
     inFlight.current = true;
-    setBusy(true);
+    setStage("uploading");
     setError("");
     try {
       draftId.current ??= await createInvoiceDraft();
@@ -82,20 +82,21 @@ export default function InvoiceCapture() {
         await uploadInvoicePage(id, i + 1, decode(jpeg.base64));
         uploaded.current.add(i);
       }
-      void extractInvoice(id).catch(() => undefined);
+      setStage("extracting");
+      await extractInvoice(id);
       router.replace({ pathname: "/(app)/stock-in/invoice/[id]", params: { id } });
     } catch {
       setError("invoices.uploadError");
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      setStage(null);
     }
   }
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text>{t("invoices.captureHelp")}</Text>
-      {offline && <Text accessibilityRole="alert">{t("invoices.offline")}</Text>}
+      {!online && <Text accessibilityRole="alert">{t("invoices.offline")}</Text>}
       {pages.map((page, index) => (
         <View key={index} style={{ gap: 6 }}>
           <Image
@@ -117,19 +118,27 @@ export default function InvoiceCapture() {
       <BigButton
         variant="secondary"
         label={t("invoices.takePhoto")}
-        disabled={offline || locked || busy || pages.length >= 3}
+        disabled={locked || busy || pages.length >= 3}
         onPress={() => pick(true)}
       />
       <BigButton
         variant="secondary"
         label={t("invoices.pickPhotos")}
-        disabled={offline || locked || busy || pages.length >= 3}
+        disabled={locked || busy || pages.length >= 3}
         onPress={() => pick(false)}
       />
       {error && <Text accessibilityRole="alert">{t(error)}</Text>}
       <BigButton
-        label={t(busy ? "invoices.uploading" : "invoices.extract")}
-        disabled={offline || busy || pages.length === 0}
+        label={t(
+          stage === "uploading"
+            ? "invoices.uploading"
+            : stage === "extracting"
+              ? "invoices.statusExtracting"
+              : error === "invoices.uploadError"
+                ? "invoices.retry"
+                : "invoices.extract"
+        )}
+        disabled={busy || pages.length === 0}
         onPress={scan}
       />
     </ScrollView>

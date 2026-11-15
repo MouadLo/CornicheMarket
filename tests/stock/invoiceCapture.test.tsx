@@ -11,9 +11,12 @@ import {
   uploadInvoicePage,
 } from "../../src/lib/stock/invoices";
 
-let mockOffline = false;
+let mockOnline = true;
 jest.mock("@react-native-community/netinfo", () => ({
-  useNetInfo: () => ({ isConnected: !mockOffline }),
+  useNetInfo: () => ({ isConnected: true, isInternetReachable: false }),
+}));
+jest.mock("../../src/lib/sales/useSaleSync", () => ({
+  useSaleSync: () => ({ online: mockOnline }),
 }));
 jest.mock("expo-router", () => ({ router: { replace: jest.fn() } }));
 jest.mock("expo-image-picker", () => ({
@@ -35,19 +38,64 @@ jest.mock("../../src/lib/stock/invoices", () => ({
 }));
 
 afterEach(() => {
-  mockOffline = false;
+  mockOnline = true;
   jest.clearAllMocks();
 });
 
-it("makes no capture or draft requests while offline", async () => {
-  mockOffline = true;
+async function capturePhoto() {
+  jest.mocked(launchImageLibraryAsync).mockResolvedValue({
+    canceled: false,
+    assets: [{ uri: "one", width: 800, height: 800 }],
+  });
   let tree!: ReactTestRenderer;
   await act(async () => {
     tree = create(<Capture />);
   });
+  const button = (label: string) =>
+    tree.root.findAllByType(BigButton).find((b) => b.props.label === label)!;
+  await act(async () => {
+    await button("invoices.pickPhotos").props.onPress();
+  });
+  return { tree, button };
+}
+
+it("enables scan when the probe is online and NetInfo still reports unreachable", async () => {
+  const { tree, button } = await capturePhoto();
+  expect(JSON.stringify(tree.toJSON())).not.toContain("invoices.offline");
+  expect(button("invoices.extract").props.disabled).toBe(false);
+  act(() => tree.unmount());
+});
+
+it("allows scan when the last probe was offline and retries a failed function call on the same draft", async () => {
+  mockOnline = false;
+  jest.mocked(createInvoiceDraft).mockResolvedValue("draft-1");
+  jest
+    .mocked(manipulateAsync)
+    .mockResolvedValue({ uri: "jpeg", width: 800, height: 800, base64: "AA==" });
+  jest.mocked(uploadInvoicePage).mockResolvedValue(undefined);
+  jest
+    .mocked(extractInvoice)
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValueOnce(undefined);
+
+  const { tree, button } = await capturePhoto();
   expect(JSON.stringify(tree.toJSON())).toContain("invoices.offline");
-  expect(tree.root.findAllByType(BigButton).every((button) => button.props.disabled)).toBe(true);
-  expect(createInvoiceDraft).not.toHaveBeenCalled();
+  expect(button("invoices.extract").props.disabled).toBe(false);
+  await act(async () => {
+    await button("invoices.extract").props.onPress();
+  });
+  expect(JSON.stringify(tree.toJSON())).toContain("invoices.uploadError");
+  expect(router.replace).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await button("invoices.retry").props.onPress();
+  });
+  expect(createInvoiceDraft).toHaveBeenCalledTimes(1);
+  expect(uploadInvoicePage).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(extractInvoice).mock.calls).toEqual([["draft-1"], ["draft-1"]]);
+  expect(router.replace).toHaveBeenCalledWith(
+    expect.objectContaining({ params: { id: "draft-1" } })
+  );
   act(() => tree.unmount());
 });
 
@@ -87,7 +135,7 @@ it("retries a partial upload using the same draft and starts extraction only whe
   expect(extractInvoice).not.toHaveBeenCalled();
   expect(JSON.stringify(tree.toJSON())).toContain("invoices.uploadError");
   await act(async () => {
-    await press("invoices.extract");
+    await press("invoices.retry");
   });
   expect(createInvoiceDraft).toHaveBeenCalledTimes(1);
   expect(jest.mocked(uploadInvoicePage).mock.calls.map(([id, page]) => [id, page])).toEqual([

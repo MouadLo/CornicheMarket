@@ -43,7 +43,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react-native";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { colors } from "@/src/theme/tokens";
@@ -111,20 +111,17 @@ export function shouldFlip(name: IconName, lang: string): boolean {
 
 type Props = { name: IconName; size?: number; color?: string };
 
+const decorative =
+  Platform.OS === "web"
+    ? { "aria-hidden": true }
+    : { accessibilityElementsHidden: true, importantForAccessibility: "no" as const };
+
 // Decorative by default: the label next to it carries the meaning. Icon-only
 // buttons must give their button an accessibilityLabel.
 export function Icon({ name, size = 24, color = colors.ink900 }: Props) {
   const { i18n } = useTranslation();
   const Glyph = ICONS[name];
-  const glyph = (
-    <Glyph
-      size={size}
-      color={color}
-      strokeWidth={2}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-    />
-  );
+  const glyph = <Glyph size={size} color={color} strokeWidth={2} {...decorative} />;
   // Mirror a wrapper, not the SVG: a transform on the SVG itself renders nothing on web.
   return shouldFlip(name, i18n?.language ?? "fr") ? (
     <View style={{ transform: [{ scaleX: -1 }] }}>{glyph}</View>
