@@ -357,8 +357,10 @@ end $$;
 with
   cashier_profile as (select id from profiles where full_name = 'Amina Cashier' limit 1),
   owner_profile as (select id from profiles where full_name = 'Seed System' limit 1),
+  -- Regular products only: Divers (kind 'misc') is a free-amount line that
+  -- record_sale caps and logs; a random 0 DH demo line of it means nothing.
   sellable_products as (
-    select id, selling_price_cents, unit from products where active
+    select id, selling_price_cents, unit from products where active and kind = 'regular'
   ),
   sale_seeds as (
     select
@@ -466,7 +468,7 @@ stock_update as (
   update products p
   set stock_quantity = p.stock_quantity + r.qty
   from restock r
-  where r.product_id = p.id
+  where r.product_id = p.id and p.track_stock
   returning p.id
 )
 update sales
@@ -493,7 +495,7 @@ begin
   for v_product in
     select id, stock_quantity, selling_price_cents
     from products
-    where active and stock_quantity between 1 and 20
+    where active and track_stock and stock_quantity between 1 and 20
     order by stock_quantity asc
     limit 2
   loop

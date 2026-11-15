@@ -32,6 +32,7 @@ export async function exportProducts(): Promise<void> {
     .select(
       "id, name, barcode, unit, selling_price_cents, current_cost_cents, stock_quantity, low_stock_threshold, active, created_at"
     )
+    .eq("kind", "regular")
     .order("name");
 
   if (error) throw new Error(error.message);
