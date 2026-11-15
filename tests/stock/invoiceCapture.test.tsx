@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import Capture from "../../app/(app)/stock-in/invoice/capture";
 import { BigButton } from "../../src/components/BigButton";
 import {
+  InvoiceApprovalError,
   createInvoiceDraft,
   extractInvoice,
   uploadInvoicePage,
@@ -35,6 +36,13 @@ jest.mock("../../src/lib/stock/invoices", () => ({
   createInvoiceDraft: jest.fn(),
   extractInvoice: jest.fn(),
   uploadInvoicePage: jest.fn(),
+  InvoiceApprovalError: class extends Error {
+    code: string | null;
+    constructor(message: string, mockCode: string | null) {
+      super(message);
+      this.code = mockCode;
+    }
+  },
 }));
 
 afterEach(() => {
@@ -84,7 +92,9 @@ it("allows scan when the last probe was offline and retries a failed function ca
   await act(async () => {
     await button("invoices.extract").props.onPress();
   });
-  expect(JSON.stringify(tree.toJSON())).toContain("invoices.uploadError");
+  // The pages arrived: this is a reading failure, not an upload failure.
+  expect(JSON.stringify(tree.toJSON())).toContain("invoices.extractError");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("invoices.uploadError");
   expect(router.replace).not.toHaveBeenCalled();
 
   await act(async () => {
@@ -149,6 +159,34 @@ it("retries a partial upload using the same draft and starts extraction only whe
     base64: true,
   });
   expect(extractInvoice).toHaveBeenCalledWith("draft-1");
+  expect(router.replace).toHaveBeenCalledWith(
+    expect.objectContaining({ params: { id: "draft-1" } })
+  );
+  act(() => tree.unmount());
+});
+
+it("says the daily limit is reached instead of blaming the upload, and offers the draft", async () => {
+  jest.mocked(createInvoiceDraft).mockResolvedValue("draft-1");
+  jest
+    .mocked(manipulateAsync)
+    .mockResolvedValue({ uri: "jpeg", width: 800, height: 800, base64: "AA==" });
+  jest.mocked(uploadInvoicePage).mockResolvedValue(undefined);
+  jest
+    .mocked(extractInvoice)
+    .mockReset()
+    .mockRejectedValue(new InvoiceApprovalError("Extraction unavailable", "429"));
+  jest.mocked(router.replace).mockClear();
+
+  const { tree, button } = await capturePhoto();
+  await act(async () => {
+    await button("invoices.extract").props.onPress();
+  });
+  const content = JSON.stringify(tree.toJSON());
+  expect(content).toContain("invoices.dailyLimit");
+  expect(content).not.toContain("invoices.uploadError");
+  // Scanning again today cannot work; the draft and its photos stay available.
+  expect(button("invoices.extract").props.disabled).toBe(true);
+  act(() => button("invoices.openDraft").props.onPress());
   expect(router.replace).toHaveBeenCalledWith(
     expect.objectContaining({ params: { id: "draft-1" } })
   );
