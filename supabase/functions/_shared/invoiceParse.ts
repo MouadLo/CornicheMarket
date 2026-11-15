@@ -36,7 +36,7 @@ export function validInvoiceDate(date: string): boolean {
 }
 
 const lineKeys = [
-  "description", "billed_text", "quantity_billed", "pack_wording",
+  "description", "billed_text", "quantity_billed", "billing_unit",
   "unit_price_text", "line_total_text", "vat_rate",
 ] as const;
 const headerKeys = ["supplier_name", "invoice_number", "invoice_date", "subtotal_ht", "vat_total", "total_ttc"] as const;
@@ -78,7 +78,7 @@ export function isInvoiceExtraction(value: unknown): value is InvoiceExtraction 
     value.lines.every((line) => hasTexts(line, lineKeys));
 }
 
-export type InvoiceFlag = "totals_mismatch" | "duplicate_invoice" | "unreadable_lines";
+export type InvoiceFlag = "totals_mismatch" | "duplicate_invoice" | "unreadable_lines" | "unit_check";
 
 export function normalizeInvoice(extraction: InvoiceExtraction) {
   const totals = {
@@ -100,17 +100,21 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
       !flags.includes("totals_mismatch")) flags.push("totals_mismatch");
 
   let unreadable = extraction.lines.length === 0;
+  let unitCheck = false;
   const sourceLines = extraction.lines.map((line) => {
     const quantity = invoiceQuantity(line.quantity_billed);
     const cost = invoiceMoneyCents(line.unit_price_text);
     unreadable ||= !line.description?.trim() || quantity === null || cost === null;
     // A billed carton, pack or weight is not necessarily the catalog stock unit.
-    const needsConversion = !!line.pack_wording?.trim() &&
-      !/^(pi[èe]ces?|unit[ée]s?|pcs?\.?|u\.?|قطعة|وحدة)$/iu.test(line.pack_wording.trim());
+    const billingUnit = line.billing_unit?.trim() || null;
+    const needsConversion = billingUnit !== null &&
+      !/^(pi[èe]ces?|unit[ée]s?|pcs?\.?|u\.?|قطعة|قطع|وحدة|وحدات)$/iu.test(billingUnit);
+    unitCheck ||= needsConversion;
     return {
       description: line.description?.trim() ?? "",
-      billed: [line.billed_text, line.pack_wording, line.unit_price_text, line.line_total_text]
+      billed: [line.billed_text, line.unit_price_text, line.line_total_text]
         .filter(Boolean).join(" · "),
+      billing_unit: billingUnit,
       quantity: quantity !== null && !needsConversion ? String(quantity) : "",
       unit: "piece" as const,
       unit_cost: cost !== null && cost <= 100000000 && !needsConversion
@@ -118,6 +122,7 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
     };
   });
   if (unreadable) flags.push("unreadable_lines");
+  if (unitCheck) flags.push("unit_check");
   return { totals, flags, sourceLines };
 }
 

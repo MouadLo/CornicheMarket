@@ -1,10 +1,15 @@
-import { invoiceMoneyCents, invoiceQuantity } from "@/supabase/functions/_shared/invoiceParse";
+import {
+  invoiceMoneyCents,
+  invoiceQuantity,
+  type InvoiceFlag,
+} from "@/supabase/functions/_shared/invoiceParse";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
 type InvoiceSourceLine = {
   description: string;
   billed: string;
+  billing_unit?: string | null;
   quantity: string;
   unit: ProductUnit;
   unit_cost: string;
@@ -17,7 +22,7 @@ export type InvoiceDraft = {
   invoice_date: string | null;
   status: "extracting" | "ready" | "failed";
   photo_paths: string[];
-  flags: ("totals_mismatch" | "duplicate_invoice" | "unreadable_lines")[];
+  flags: InvoiceFlag[];
   extraction_started_at: string | null;
   extraction_error: string | null;
   extraction: { supplier_name?: string | null; invoice_number?: string | null } | null;

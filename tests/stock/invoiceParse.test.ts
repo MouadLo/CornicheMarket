@@ -39,7 +39,7 @@ const invoice: InvoiceExtraction = {
       description: "Produit",
       billed_text: "2 pièces",
       quantity_billed: "2",
-      pack_wording: "pièces",
+      billing_unit: "pièces",
       unit_price_text: "50",
       line_total_text: "99",
       vat_rate: "20%",
@@ -56,14 +56,37 @@ it("allows a difference of exactly one dirham and compares merchandise to HT whe
   ]);
 });
 
-it("keeps billed cartons visible without proposing them as pieces", () => {
-  const result = normalizeInvoice({
-    ...invoice,
-    lines: [{ ...invoice.lines[0], pack_wording: "cartons" }],
-  });
-  expect(result.sourceLines[0]).toMatchObject({ quantity: "", unit_cost: "", unit: "piece" });
-  expect(result.sourceLines[0].billed).toContain("cartons");
-});
+it.each([
+  ["Lait entier 1 L", null, "6", "8,50", "6", "8.50"],
+  ["Lait entier 1 L", "pièce", "6", "8,50", "6", "8.50"],
+  ["أرز ١ كغ", "قطعة", "٣", "١٢٫٥٠", "3", "12.50"],
+  ["أرز ١ كغ", null, "٣", "١٢٫٥٠", "3", "12.50"],
+])(
+  "keeps quantity and unit cost for %s when the billing unit is %s",
+  (description, billing_unit, quantity_billed, unit_price_text, quantity, unit_cost) => {
+    const result = normalizeInvoice({
+      ...invoice,
+      lines: [{ ...invoice.lines[0], description, billing_unit, quantity_billed, unit_price_text }],
+    });
+    expect(result.sourceLines[0]).toMatchObject({ description, billing_unit, quantity, unit_cost });
+    expect(result.flags).toEqual([]);
+  }
+);
+
+it.each([
+  ["Eau 1.5 L", "carton de 6"],
+  ["Riz", "kg"],
+])(
+  "flags %s billed by %s and preserves the printed unit for review",
+  (description, billing_unit) => {
+    const result = normalizeInvoice({
+      ...invoice,
+      lines: [{ ...invoice.lines[0], description, billing_unit }],
+    });
+    expect(result.sourceLines[0]).toMatchObject({ billing_unit, quantity: "", unit_cost: "" });
+    expect(result.flags).toEqual(["unit_check"]);
+  }
+);
 
 it("recognizes the same normalized invoice number only for the same supplier", () => {
   const header = { supplier_id: "supplier", invoice_number: " AB-01 " };

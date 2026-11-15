@@ -16,7 +16,11 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "draft-1" }),
 }));
 jest.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  useTranslation: () => ({
+    t: (key: string, options?: { unit?: string }) =>
+      key === "invoices.billingUnit" ? key + " " + options?.unit : key,
+    i18n: { language: "en" },
+  }),
 }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { role: "owner" } }),
@@ -218,5 +222,26 @@ it("warns about extraction and saves the missing invoice header against its revi
   });
   expect(updateInvoiceHeader).toHaveBeenCalledWith(missing, "supplier-1", "INV-10", "");
   expect(JSON.stringify(tree.toJSON())).not.toContain("invoices.missingHeader");
+  act(() => tree.unmount());
+});
+
+it("displays the billing unit warning and the printed unit beside the blank review fields", async () => {
+  jest.mocked(fetchInvoiceDraft).mockResolvedValue({
+    ...draft,
+    flags: ["unit_check"],
+    source_lines: [
+      { ...draft.source_lines[0], billing_unit: "carton de 6", quantity: "", unit_cost: "" },
+    ],
+  });
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(<InvoiceScreen />);
+  });
+  const content = JSON.stringify(tree.toJSON());
+  expect(content).toContain("invoices.unit_check");
+  expect(content).toMatch(/invoices\.billingUnit[^\"]*carton de 6/);
+  expect(content).not.toContain("invoices.unreadable_lines");
+  const fields = tree.root.findAllByType(TextInput);
+  expect(fields.map((field) => field.props.value)).toEqual(["", ""]);
   act(() => tree.unmount());
 });

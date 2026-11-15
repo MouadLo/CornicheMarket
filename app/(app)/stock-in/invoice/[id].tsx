@@ -235,6 +235,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
         {draft.source_lines.map((line, index) => (
           <Text key={index}>
             {isolateBidi(line.description)} · {isolateBidi(line.billed)}
+            {!!line.billing_unit && (
+              <> · {t("invoices.billingUnit", { unit: isolateBidi(line.billing_unit) })}</>
+            )}
           </Text>
         ))}
       </View>
@@ -303,6 +306,11 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                 <Text style={styles.heading}>
                   {isolateBidi(source.description || t("invoices.unknownLine"))}
                 </Text>
+                {!!source.billing_unit && (
+                  <Text>
+                    {t("invoices.billingUnit", { unit: isolateBidi(source.billing_unit) })}
+                  </Text>
+                )}
                 {product ? (
                   <>
                     <Text>

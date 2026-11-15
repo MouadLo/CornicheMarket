@@ -34,7 +34,9 @@ export function claudeExtractor(apiKey: string, model: string): InvoiceExtractor
         "Invoices may be French or Arabic and use Moroccan numbers: 1 216,00, 216.00, ٢١٦٫٠٠.",
         "Keep values as printed, in strings, including monetary amounts and quantities. Use null when absent or unreadable. Never invent values.",
         "Normalize the invoice date to YYYY-MM-DD when unambiguous; otherwise use null.",
-        "List every merchandise line once, including free items. Keep the source line wording and any unit, carton, pack or weight wording.",
+        "List every merchandise line once, including free items, and keep its source wording.",
+        "billing_unit is what quantity_billed counts, as printed (e.g. carton de 12, pack 6, kg, pièce). Use null when the line simply counts items without a printed billing unit.",
+        "A size or volume in the product name (1 L, 25 cl, 250 g, ١ كغ) stays in description. It is not a billing unit. For 'Lait entier 1 L' with quantity 6 and no billing unit printed, billing_unit is null.",
         "Separate headers, taxes, fees and totals from merchandise. Do not calculate or convert any amount. Do not identify catalog products.",
       ].join(" "),
       messages: [{

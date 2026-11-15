@@ -349,6 +349,8 @@ const en: Translations = {
     duplicate_invoice:
       "This supplier and invoice number already exist. Check the original before proceeding.",
     unreadable_lines: "Some invoice lines could not be read. Check the original.",
+    unit_check: "Confirm the billing unit (carton, kg…). Quantity and cost were left blank.",
+    billingUnit: "Billing unit: {{unit}}",
     photos: "View invoice photos",
     hidePhotos: "Hide photos",
     photoPage: "Page {{page}} of {{count}}",

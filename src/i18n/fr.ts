@@ -349,6 +349,8 @@ const fr = {
     duplicate_invoice:
       "Ce numéro de facture existe déjà pour ce fournisseur. Vérifiez l’original avant de continuer.",
     unreadable_lines: "Certaines lignes de la facture sont illisibles. Vérifiez l’original.",
+    unit_check: "Unité de facturation à confirmer (carton, kg…) : quantité et coût non remplis",
+    billingUnit: "Unité de facturation : {{unit}}",
     photos: "Voir les photos de la facture",
     hidePhotos: "Masquer les photos",
     photoPage: "Page {{page}} sur {{count}}",
