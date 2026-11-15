@@ -1,4 +1,5 @@
 -- Divers on the server (Sell grid PR 2): one built-in free-amount item.
+-- (Numbered 032: 030 is idempotent_adjustments and 031 is invoice_drafts.)
 --
 --   * products.kind / track_stock, and exactly one 'misc' product named Divers
 --     that can be neither deactivated, deleted nor turned into something else;
@@ -44,6 +45,10 @@ begin
   end if;
   if old.kind = 'misc' and (new.active is not true or new.track_stock) then
     raise exception 'The Divers item cannot be deactivated or tracked in stock';
+  end if;
+  -- Whatever the path (a direct update, an old function), Divers never holds stock.
+  if old.kind = 'misc' and new.stock_quantity is distinct from 0 then
+    raise exception 'The Divers item has no stock';
   end if;
   return new;
 end;
@@ -474,8 +479,36 @@ end;
 $$;
 
 
+-------------------------------------------------------------------------------
+-- 6. Nothing receives or counts stock for an untracked item
+-------------------------------------------------------------------------------
+-- The app's product pickers never offer Divers, but a delivery, an invoice
+-- approval (031) or a stock count built by hand would otherwise give it stock
+-- and a purchase cost.
+create function public.refuse_untracked_stock()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if exists (select 1 from products where id = new.product_id and not track_stock) then
+    raise exception 'The Divers item has no stock to receive or count' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_purchase_items_refuse_untracked
+  before insert on public.purchase_items
+  for each row execute function public.refuse_untracked_stock();
+
+create trigger trg_stock_adjustments_refuse_untracked
+  before insert on public.stock_adjustments
+  for each row execute function public.refuse_untracked_stock();
+
 -- Trigger functions are not callable by clients (see 026).
 revoke execute on function
   public.guard_misc_product(),
-  public.log_divers_sale()
+  public.log_divers_sale(),
+  public.refuse_untracked_stock()
 from public, anon, authenticated;

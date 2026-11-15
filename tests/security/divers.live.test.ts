@@ -1,5 +1,5 @@
 /**
- * Divers on the server (migration 031), live: the one built-in free-amount item.
+ * Divers on the server (migration 032), live: the one built-in free-amount item.
  *
  * SETUP: local dev stack, SUPABASE_TEST_* owner and cashier variables:
  *   npx jest tests/security/divers.live.test.ts
@@ -264,6 +264,37 @@ suite("Divers (live)", () => {
         .eq("singleton", true)
         .select();
       expect(write.data ?? []).toEqual([]);
+    });
+  });
+
+  describe("no stock can be received or counted for Divers", () => {
+    it("a delivery with a Divers line is refused and writes nothing", async () => {
+      const res = await owner.rpc("receive_delivery", {
+        p_operation_id: randomUUID(),
+        p_supplier_id: null,
+        p_notes: "ZZ-LIVE divers delivery",
+        p_lines: [{ product_id: diversId, quantity: 3, unit_cost_cents: 100 }],
+      });
+      expect(res.error).not.toBeNull();
+      expect(await stockOf(diversId)).toBe(0);
+    });
+
+    it("its stock cannot be set directly either", async () => {
+      const res = await owner.from("products").update({ stock_quantity: 4 }).eq("id", diversId);
+      expect(res.error).not.toBeNull();
+      expect(await stockOf(diversId)).toBe(0);
+    });
+
+    it("a stock count of Divers is refused", async () => {
+      const res = await owner.rpc("record_stock_adjustment", {
+        p_operation_id: randomUUID(),
+        p_product_id: diversId,
+        p_quantity_delta: 5,
+        p_reason: "count_correction",
+        p_note: "ZZ-LIVE",
+      });
+      expect(res.error).not.toBeNull();
+      expect(await stockOf(diversId)).toBe(0);
     });
   });
 
