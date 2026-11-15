@@ -9,7 +9,12 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { useSaleSync } from "@/src/lib/sales/useSaleSync";
-import { createInvoiceDraft, extractInvoice, uploadInvoicePage } from "@/src/lib/stock/invoices";
+import {
+  createInvoiceDraft,
+  extractInvoice,
+  InvoiceApprovalError,
+  uploadInvoicePage,
+} from "@/src/lib/stock/invoices";
 import { Text } from "@/src/theme/Text";
 
 export default function InvoiceCapture() {
@@ -82,11 +87,25 @@ export default function InvoiceCapture() {
         await uploadInvoicePage(id, i + 1, decode(jpeg.base64));
         uploaded.current.add(i);
       }
-      setStage("extracting");
-      await extractInvoice(id);
-      router.replace({ pathname: "/(app)/stock-in/invoice/[id]", params: { id } });
     } catch {
       setError("invoices.uploadError");
+      inFlight.current = false;
+      setStage(null);
+      return;
+    }
+    // The pages are safe on the server from here: a failed or refused reading
+    // says so, and Retry reads the same draft again without re-uploading.
+    const id = draftId.current;
+    setStage("extracting");
+    try {
+      await extractInvoice(id);
+      router.replace({ pathname: "/(app)/stock-in/invoice/[id]", params: { id } });
+    } catch (caught) {
+      setError(
+        caught instanceof InvoiceApprovalError && caught.code === "429"
+          ? "invoices.dailyLimit"
+          : "invoices.extractError"
+      );
     } finally {
       inFlight.current = false;
       setStage(null);
@@ -134,13 +153,26 @@ export default function InvoiceCapture() {
             ? "invoices.uploading"
             : stage === "extracting"
               ? "invoices.statusExtracting"
-              : error === "invoices.uploadError"
+              : error === "invoices.uploadError" || error === "invoices.extractError"
                 ? "invoices.retry"
                 : "invoices.extract"
         )}
-        disabled={busy || pages.length === 0}
+        disabled={busy || pages.length === 0 || error === "invoices.dailyLimit"}
         onPress={scan}
       />
+      {!!draftId.current &&
+        (error === "invoices.extractError" || error === "invoices.dailyLimit") && (
+          <BigButton
+            variant="secondary"
+            label={t("invoices.openDraft")}
+            onPress={() =>
+              router.replace({
+                pathname: "/(app)/stock-in/invoice/[id]",
+                params: { id: draftId.current! },
+              })
+            }
+          />
+        )}
     </ScrollView>
   );
 }

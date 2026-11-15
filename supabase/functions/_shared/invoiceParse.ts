@@ -80,6 +80,13 @@ export function isInvoiceExtraction(value: unknown): value is InvoiceExtraction 
 
 export type InvoiceFlag = "totals_mismatch" | "duplicate_invoice" | "unreadable_lines" | "unit_check";
 
+// A printed billing unit other than "piece" (carton, pack, kg…): the billed
+// quantity and price are not in stock units until the owner confirms them.
+export function needsUnitConversion(billingUnit: string | null | undefined): boolean {
+  const unit = billingUnit?.trim();
+  return !!unit && !/^(pi[èe]ces?|unit[ée]s?|pcs?\.?|u\.?|قطعة|قطع|وحدة|وحدات)$/iu.test(unit);
+}
+
 export function normalizeInvoice(extraction: InvoiceExtraction) {
   const totals = {
     subtotal_ht: invoiceMoneyCents(extraction.subtotal_ht),
@@ -107,18 +114,22 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
     unreadable ||= !line.description?.trim() || quantity === null || cost === null;
     // A billed carton, pack or weight is not necessarily the catalog stock unit.
     const billingUnit = line.billing_unit?.trim() || null;
-    const needsConversion = billingUnit !== null &&
-      !/^(pi[èe]ces?|unit[ée]s?|pcs?\.?|u\.?|قطعة|قطع|وحدة|وحدات)$/iu.test(billingUnit);
+    const needsConversion = needsUnitConversion(billingUnit);
     unitCheck ||= needsConversion;
+    const billedQuantity = quantity !== null ? String(quantity) : "";
+    const billedCost = cost !== null && cost <= 100000000
+      ? String(Math.floor(cost / 100)) + "." + String(cost % 100).padStart(2, "0") : "";
     return {
       description: line.description?.trim() ?? "",
       billed: [line.billed_text, line.unit_price_text, line.line_total_text]
         .filter(Boolean).join(" · "),
       billing_unit: billingUnit,
-      quantity: quantity !== null && !needsConversion ? String(quantity) : "",
+      // As printed, per billed unit (carton, kg…): the review converts them.
+      billed_quantity: billedQuantity,
+      billed_unit_cost: billedCost,
+      quantity: needsConversion ? "" : billedQuantity,
       unit: "piece" as const,
-      unit_cost: cost !== null && cost <= 100000000 && !needsConversion
-        ? String(Math.floor(cost / 100)) + "." + String(cost % 100).padStart(2, "0") : "",
+      unit_cost: needsConversion ? "" : billedCost,
     };
   });
   if (unreadable) flags.push("unreadable_lines");

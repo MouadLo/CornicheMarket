@@ -25,10 +25,18 @@ import {
   buildReviewedInvoiceLine,
   fetchInvoiceDraft,
   extractInvoice,
+  initialReviewLine,
+  isPackLine,
+  matchInvoiceLines,
   updateInvoiceHeader,
+  withProduct,
+  withRememberedMatch,
+  withUnitsPer,
   InvoiceApprovalError,
   type InvoiceDraft,
+  type InvoiceLineMatch,
   type InvoiceReviewLine,
+  type ProductChoice,
 } from "@/src/lib/stock/invoices";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
@@ -150,12 +158,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   const [draft, setDraft] = useState(initialDraft);
   const { t, i18n } = useTranslation();
   const [lines, setLines] = useState<InvoiceReviewLine[]>(() =>
-    draft.source_lines.map((source) => ({
-      product: null,
-      quantity: source.quantity,
-      unitCost: source.unit_cost,
-    }))
+    draft.source_lines.map(initialReviewLine)
   );
+  const [matches, setMatches] = useState<InvoiceLineMatch[]>([]);
   const [purchaseId, setPurchaseId] = useState(draft.purchase_id);
   const [foundPostedPurchase, setFoundPostedPurchase] = useState(false);
   const { photos } = useLocalSearchParams<{ photos?: string }>();
@@ -185,19 +190,38 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
     setError(null);
   }
 
-  function chooseProduct(index: number, product: NonNullable<InvoiceReviewLine["product"]>) {
-    const previousUnit = lines[index].product?.unit ?? draft.source_lines[index].unit;
-    updateLine(
-      index,
-      product.unit === previousUnit
-        ? { product }
-        : {
-            product,
-            quantity: "",
-            unitCost: "",
-          }
-    );
+  function chooseProduct(index: number, product: ProductChoice | null) {
+    updateLine(index, withProduct(draft.source_lines[index], lines[index], product));
   }
+
+  // Suggestions are a convenience: if they cannot load, the owner searches.
+  // Re-run when the supplier changes, since aliases are per supplier.
+  const supplierId = draft.supplier_id;
+  useEffect(() => {
+    if (purchaseId) return;
+    let active = true;
+    matchInvoiceLines(draft.id).then(
+      (rows) => {
+        if (!active) return;
+        setMatches(rows);
+        if (savingNow.current) return;
+        setLines((current) =>
+          current.map((line, index) =>
+            withRememberedMatch(
+              draft.source_lines[index],
+              line,
+              rows.find((row) => row.line_index === index && row.exact)
+            )
+          )
+        );
+      },
+      () => {}
+    );
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.id, supplierId]);
 
   async function approve() {
     if (savingNow.current || !ready || !confirmed || purchaseId) return;
@@ -301,6 +325,8 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             const result = reviewed[index];
             const source = draft.source_lines[index];
             const name = product?.name ?? "";
+            const lineMatches = matches.filter((match) => match.line_index === index);
+            const pack = isPackLine(source);
             return (
               <View key={index} style={styles.card}>
                 <Text style={styles.heading}>
@@ -318,26 +344,39 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                         name: isolateBidi(name),
                       })}
                     </Text>
+                    {product.kind === "existing" &&
+                      lineMatches.some(
+                        (match) => match.exact && match.product_id === product.id
+                      ) && <Text>{t("invoices.remembered")}</Text>}
                     <BigButton
                       variant="secondary"
                       label={t("invoices.changeProduct")}
                       disabled={saving}
-                      onPress={() =>
-                        updateLine(
-                          index,
-                          product.unit === source.unit
-                            ? { product: null }
-                            : {
-                                product: null,
-                                quantity: "",
-                                unitCost: "",
-                              }
-                        )
-                      }
+                      onPress={() => chooseProduct(index, null)}
                     />
                   </>
                 ) : (
                   <>
+                    {lineMatches
+                      .filter((match) => !match.exact)
+                      .map((match) => (
+                        <BigButton
+                          key={match.product_id}
+                          variant="secondary"
+                          label={t("invoices.suggestion", {
+                            name: isolateBidi(match.product_name),
+                          })}
+                          disabled={saving}
+                          onPress={() =>
+                            chooseProduct(index, {
+                              kind: "existing",
+                              id: match.product_id,
+                              name: match.product_name,
+                              unit: match.product_unit,
+                            })
+                          }
+                        />
+                      ))}
                     <ProductSearchPicker
                       excludeIds={[]}
                       onPick={(picked) =>
@@ -397,6 +436,17 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                       }
                     />
                   </>
+                )}
+                {pack && (
+                  <InvoiceInput
+                    decimal
+                    label={t("invoices.unitsPer", {
+                      unit: isolateBidi(source.billing_unit ?? ""),
+                    })}
+                    value={line.unitsPer}
+                    disabled={saving}
+                    onChange={(text) => updateLine(index, withUnitsPer(source, line, text))}
+                  />
                 )}
                 <InvoiceInput
                   decimal
@@ -508,15 +558,21 @@ function InvoiceHeader({
     try {
       const revision = await updateInvoiceHeader(draft, supplier, number, date);
       const selected = suppliers.find((row) => row.id === supplier);
-      onSaved({
-        ...draft,
-        revision,
-        supplier_id: supplier,
-        invoice_number: number.trim(),
-        invoice_date: date.trim() || null,
-        suppliers: selected ? { name: selected.name } : draft.suppliers,
-        flags: draft.flags.filter((flag) => flag !== "duplicate_invoice"),
-      });
+      // The server re-checks duplicates on save; show its flags, not a guess.
+      const latest = await fetchInvoiceDraft(draft.id).catch(() => null);
+      onSaved(
+        latest?.revision === revision
+          ? latest
+          : {
+              ...draft,
+              revision,
+              supplier_id: supplier,
+              invoice_number: number.trim(),
+              invoice_date: date.trim() || null,
+              suppliers: selected ? { name: selected.name } : draft.suppliers,
+              flags: draft.flags.filter((flag) => flag !== "duplicate_invoice"),
+            }
+      );
     } catch (caught) {
       const code = caught instanceof InvoiceApprovalError ? caught.code : null;
       setError(code === "23505" ? "invoices.duplicate_invoice" : approvalErrorKey(code, false));
