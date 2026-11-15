@@ -3,15 +3,16 @@ import {
   invoiceQuantity,
   needsUnitConversion,
   type InvoiceFlag,
+  type PriceBasis,
 } from "@/supabase/functions/_shared/invoiceParse";
 import { centsToDisplay } from "@/src/lib/money";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import {
-  convertPackLine,
   isWeightBillingUnit,
   parseUnitsPerBillingUnit,
   unitsFromBillingUnit,
 } from "@/src/lib/stock/packs";
+import { convertUnitCostCents } from "@/src/lib/stock/vat";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type InvoiceSourceLine = {
@@ -21,6 +22,8 @@ export type InvoiceSourceLine = {
   // As printed per billed unit; absent on drafts read before part 3.
   billed_quantity?: string;
   billed_unit_cost?: string;
+  // TVA rate printed for the line (or the invoice's single rate); absent on older drafts.
+  vat_percent?: number | null;
   quantity: string;
   unit: ProductUnit;
   unit_cost: string;
@@ -37,6 +40,7 @@ export type InvoiceDraft = {
   extraction_started_at: string | null;
   extraction_error: string | null;
   extraction: { supplier_name?: string | null; invoice_number?: string | null } | null;
+  totals?: { price_basis?: PriceBasis | null; vat_percent?: number | null } | null;
   revision: number;
   source_lines: InvoiceSourceLine[];
   purchase_id: string | null;
@@ -53,6 +57,8 @@ export type InvoiceReviewLine = {
   unitCost: string;
   // Stock units in one billed carton or pack; "" when the line is not billed by pack.
   unitsPer: string;
+  // The owner typed this cost: changing the HT/TTC basis must not overwrite it.
+  costTouched?: boolean;
 };
 
 type ReviewedLine = {
@@ -62,6 +68,12 @@ type ReviewedLine = {
   quantity: number;
   unit_cost_cents: number;
   units_per_billing_unit: number | null;
+  // Audit trail, present when the review knew the printed prices: what the
+  // invoice printed (per billed unit), its basis, the basis stored, the rate used.
+  printed_unit_cost_cents?: number;
+  printed_basis?: PriceBasis | null;
+  cost_basis?: PriceBasis;
+  vat_percent?: number | null;
 };
 
 // A line billed by carton or pack: the owner says how many stock units one
@@ -70,33 +82,103 @@ export function isPackLine(source: InvoiceSourceLine): boolean {
   return needsUnitConversion(source.billing_unit) && !isWeightBillingUnit(source.billing_unit);
 }
 
+// What the printed prices are (HT or TTC, null when unknown) and which cost the
+// owner wants stored. Without a basis nothing is converted for TVA.
+export type CostBasis = { printed: PriceBasis | null; store: PriceBasis };
+
+// A new review defaults to TTC: what the shop really pays per unit.
+export function initialCostBasis(draft: Pick<InvoiceDraft, "totals">): CostBasis {
+  return { printed: draft.totals?.price_basis ?? null, store: "ttc" };
+}
+
+export type LineCost = {
+  cents: number | null;
+  // Why no cost was filled in, for the owner to see.
+  reason: "basis_unknown" | "vat_missing" | null;
+  vat: number | null;
+  converted: boolean;
+};
+
+// The unit cost per STOCK unit for one line, from the price printed per billed
+// unit: TVA added or removed with the line's rate, then divided over the pieces
+// in a carton, in one rounding step.
+export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostBasis): LineCost {
+  const billed = invoiceMoneyCents(source.billed_unit_cost ?? "");
+  const none = { cents: null, reason: null, vat: null, converted: false } as const;
+  if (billed === null) return none;
+  if (!basis)
+    return {
+      ...none,
+      cents: convertUnitCostCents({
+        billedCents: billed,
+        unitsPer: units,
+        from: "ht",
+        to: "ht",
+        vatPercent: null,
+      }),
+    };
+  if (!basis.printed) return { ...none, reason: "basis_unknown" };
+  const vat = source.vat_percent ?? null;
+  const converted = basis.printed !== basis.store;
+  if (converted && vat === null) return { ...none, reason: "vat_missing" };
+  return {
+    cents: convertUnitCostCents({
+      billedCents: billed,
+      unitsPer: units,
+      from: basis.printed,
+      to: basis.store,
+      vatPercent: vat,
+    }),
+    reason: null,
+    vat,
+    converted,
+  };
+}
+
+// How many stock units one billed unit is, when the app can know it: pieces
+// count themselves, a carton needs the owner's count, a weight needs a kg product.
+export function billedUnits(source: InvoiceSourceLine, line: InvoiceReviewLine): number | null {
+  if (isWeightBillingUnit(source.billing_unit)) return line.product?.unit === "kg" ? 1 : null;
+  if (isPackLine(source)) return parseUnitsPerBillingUnit(line.unitsPer);
+  return 1;
+}
+
+// Fill quantity and unit cost from the printed values. Anything the app cannot
+// work out is left for the owner to type, never guessed. A draft read before
+// printed values were kept has nothing to convert and is left as it was.
+function autoFill(
+  source: InvoiceSourceLine,
+  line: InvoiceReviewLine,
+  basis: CostBasis | undefined,
+  costOnly = false
+): InvoiceReviewLine {
+  const units = billedUnits(source, line);
+  if (units === null || source.billed_unit_cost === undefined) return line;
+  const cost = lineCost(source, units, basis);
+  const unitCost = cost.cents !== null ? centsToDisplay(cost.cents) : "";
+  if (costOnly) return { ...line, unitCost };
+  const billedQuantity = invoiceQuantity(source.billed_quantity ?? "");
+  const quantity =
+    billedQuantity === null
+      ? line.quantity
+      : String((Math.round(billedQuantity * 1000) * units) / 1000);
+  return { ...line, quantity, unitCost };
+}
+
 // Typing "pieces per carton" fills quantity and unit cost from the printed
 // values. Anything unreadable leaves them for the owner to type.
 export function withUnitsPer(
   source: InvoiceSourceLine,
   line: InvoiceReviewLine,
-  text: string
+  text: string,
+  basis?: CostBasis
 ): InvoiceReviewLine {
-  const units = parseUnitsPerBillingUnit(text);
-  const quantity = invoiceQuantity(source.billed_quantity ?? "");
-  const cost = invoiceMoneyCents(source.billed_unit_cost ?? "");
-  const converted =
-    units !== null && quantity !== null && cost !== null
-      ? convertPackLine(quantity, cost, units)
-      : null;
-  return converted
-    ? {
-        ...line,
-        unitsPer: text,
-        quantity: String(converted.quantity),
-        unitCost: centsToDisplay(converted.unitCostCents),
-      }
-    : { ...line, unitsPer: text };
+  return autoFill(source, { ...line, unitsPer: text, costTouched: false }, basis);
 }
 
 // A review line as first shown. A pack line whose printed unit names its count
 // ("carton de 12") starts converted with that count; the owner can change it.
-export function initialReviewLine(source: InvoiceSourceLine): InvoiceReviewLine {
+export function initialReviewLine(source: InvoiceSourceLine, basis?: CostBasis): InvoiceReviewLine {
   const line = {
     product: null,
     quantity: source.quantity,
@@ -104,7 +186,9 @@ export function initialReviewLine(source: InvoiceSourceLine): InvoiceReviewLine 
     unitsPer: "",
   };
   const printed = isPackLine(source) ? unitsFromBillingUnit(source.billing_unit) : null;
-  return printed ? withUnitsPer(source, line, String(printed)) : line;
+  return printed
+    ? withUnitsPer(source, line, String(printed), basis)
+    : autoFill(source, line, basis);
 }
 
 // Choosing a product. A kilogram product on a line billed by weight takes the
@@ -113,19 +197,14 @@ export function initialReviewLine(source: InvoiceSourceLine): InvoiceReviewLine 
 export function withProduct(
   source: InvoiceSourceLine,
   line: InvoiceReviewLine,
-  product: ProductChoice | null
+  product: ProductChoice | null,
+  basis?: CostBasis
 ): InvoiceReviewLine {
   const previousUnit = line.product?.unit ?? source.unit;
   if (product?.unit === "kg" && isWeightBillingUnit(source.billing_unit))
-    return {
-      ...line,
-      product,
-      quantity: source.billed_quantity ?? "",
-      unitCost: source.billed_unit_cost ?? "",
-      unitsPer: "",
-    };
+    return autoFill(source, { ...line, product, unitsPer: "", costTouched: false }, basis);
   if ((product?.unit ?? source.unit) === previousUnit) return { ...line, product };
-  return { ...line, product, quantity: "", unitCost: "", unitsPer: "" };
+  return { ...line, product, quantity: "", unitCost: "", unitsPer: "", costTouched: false };
 }
 
 // The owner's earlier choice for this supplier and wording, pre-filled with its
@@ -133,19 +212,32 @@ export function withProduct(
 export function withRememberedMatch(
   source: InvoiceSourceLine,
   line: InvoiceReviewLine,
-  match: InvoiceLineMatch | undefined
+  match: InvoiceLineMatch | undefined,
+  basis?: CostBasis
 ): InvoiceReviewLine {
   if (!match?.exact || line.product) return line;
-  const next = withProduct(source, line, {
-    kind: "existing",
-    id: match.product_id,
-    name: match.product_name,
-    unit: match.product_unit,
-  });
+  const next = withProduct(
+    source,
+    line,
+    { kind: "existing", id: match.product_id, name: match.product_name, unit: match.product_unit },
+    basis
+  );
   // The owner confirmed this count for this exact printed unit: it wins over the guess.
   return isPackLine(source) && match.units_per_billing_unit
-    ? withUnitsPer(source, next, String(match.units_per_billing_unit))
+    ? withUnitsPer(source, next, String(match.units_per_billing_unit), basis)
     : next;
+}
+
+// The owner changed the printed or stored basis: every cost they did not type
+// themselves is worked out again. Quantities and typed costs stay.
+export function recostLines(
+  sources: InvoiceSourceLine[],
+  lines: InvoiceReviewLine[],
+  basis: CostBasis
+): InvoiceReviewLine[] {
+  return lines.map((line, index) =>
+    line.costTouched ? line : autoFill(sources[index], line, basis, true)
+  );
 }
 
 function invoiceMoney(text: string): number | null {
@@ -153,7 +245,10 @@ function invoiceMoney(text: string): number | null {
   return cents !== null && cents <= 100_000_000 ? cents : null;
 }
 
-export function buildReviewedInvoiceLine(line: InvoiceReviewLine): ReviewedLine | null {
+export function buildReviewedInvoiceLine(
+  line: InvoiceReviewLine,
+  audit?: { source: InvoiceSourceLine; basis: CostBasis }
+): ReviewedLine | null {
   const product = line.product;
   if (!product) return null;
 
@@ -172,6 +267,7 @@ export function buildReviewedInvoiceLine(line: InvoiceReviewLine): ReviewedLine 
     newProduct = { name, selling_price_cents: price };
   }
 
+  const printedCost = audit ? invoiceMoneyCents(audit.source.billed_unit_cost ?? "") : null;
   return {
     product_id: product.kind === "existing" ? product.id : null,
     new_product: newProduct,
@@ -179,6 +275,14 @@ export function buildReviewedInvoiceLine(line: InvoiceReviewLine): ReviewedLine 
     quantity,
     unit_cost_cents: cost,
     units_per_billing_unit: unitsPer,
+    ...(audit && printedCost !== null
+      ? {
+          printed_unit_cost_cents: printedCost,
+          printed_basis: audit.basis.printed,
+          cost_basis: audit.basis.store,
+          vat_percent: audit.source.vat_percent ?? null,
+        }
+      : {}),
   };
 }
 
@@ -302,7 +406,7 @@ export async function fetchInvoiceDraft(id: string): Promise<InvoiceDraft> {
     .from("invoice_drafts")
     .select(
       invoiceFields +
-        ", source_lines, extraction, photo_paths, extraction_started_at, extraction_error"
+        ", source_lines, extraction, totals, photo_paths, extraction_started_at, extraction_error"
     )
     .eq("id", id)
     .single<InvoiceDraft>();

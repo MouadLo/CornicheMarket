@@ -1,6 +1,10 @@
 import {
+  isInvoiceExtraction,
   invoiceMoneyCents,
   invoiceQuantity,
+  invoiceVatPercent,
+  priceBasisFromLabel,
+  priceBasisFromTotals,
   normalizeInvoice,
   sameInvoiceHeader,
   type InvoiceExtraction,
@@ -113,4 +117,146 @@ it("recognizes the same normalized invoice number only for the same supplier", (
   const header = { supplier_id: "supplier", invoice_number: " AB-01 " };
   expect(sameInvoiceHeader(header, { ...header, invoice_number: "ab-01" })).toBe(true);
   expect(sameInvoiceHeader(header, { ...header, supplier_id: "other" })).toBe(false);
+});
+
+it.each([
+  ["20%", 20],
+  ["20 %", 20],
+  ["٢٠٪", 20],
+  ["10,00", 10],
+  ["7", 7],
+  ["0", 0],
+  ["14.0", 14],
+  ["20,5", null],
+  ["101", null],
+  ["vingt", null],
+  ["", null],
+  [null, null],
+])("reads the TVA rate %j as %s", (text, rate) => {
+  expect(invoiceVatPercent(text)).toBe(rate);
+});
+
+it.each([
+  ["PU HT", "ht"],
+  ["Prix unitaire H.T.", "ht"],
+  ["Prix hors taxes", "ht"],
+  ["PU TTC", "ttc"],
+  ["Prix T.T.C", "ttc"],
+  ["Prix toutes taxes comprises", "ttc"],
+  ["السعر بدون ضريبة", "ht"],
+  ["السعر شامل الضريبة", "ttc"],
+  ["Prix", null],
+  ["HT / TTC", null],
+  [null, null],
+])("reads the price column heading %j as %s", (label, basis) => {
+  expect(priceBasisFromLabel(label)).toBe(basis);
+});
+
+describe("price basis from the totals", () => {
+  const totals = { subtotal_ht: 10000, vat_total: 2000, total_ttc: 12000 };
+  it("is HT when the lines add up to the HT subtotal", () => {
+    expect(priceBasisFromTotals(10000, totals)).toBe("ht");
+    expect(priceBasisFromTotals(10100, totals)).toBe("ht");
+  });
+  it("is TTC when the lines add up to the TTC total", () => {
+    expect(priceBasisFromTotals(12000, totals)).toBe("ttc");
+    expect(priceBasisFromTotals(11901, totals)).toBe("ttc");
+  });
+  it("is unknown when they match neither, or no totals are printed", () => {
+    expect(priceBasisFromTotals(11000, totals)).toBeNull();
+    expect(priceBasisFromTotals(null, totals)).toBeNull();
+    expect(
+      priceBasisFromTotals(10000, { subtotal_ht: null, vat_total: null, total_ttc: null })
+    ).toBeNull();
+  });
+  it("is HT when there is no TVA at all, since HT and TTC are the same", () => {
+    expect(priceBasisFromTotals(5000, { subtotal_ht: 5000, vat_total: 0, total_ttc: 5000 })).toBe(
+      "ht"
+    );
+  });
+});
+
+describe("normalizeInvoice price basis and TVA", () => {
+  const line = (unit: string, total: string, vat: string | null = "20%") => ({
+    ...invoice.lines[0],
+    billing_unit: null,
+    quantity_billed: "2",
+    unit_price_text: unit,
+    line_total_text: total,
+    vat_rate: vat,
+  });
+  const base = { ...invoice, subtotal_ht: "100,00", vat_total: "20,00", total_ttc: "120,00" };
+
+  it("detects HT lines and keeps each line's rate", () => {
+    const result = normalizeInvoice({
+      ...base,
+      lines: [line("30", "60"), line("20", "40", "10%")],
+    });
+    expect(result.totals).toMatchObject({ price_basis: "ht", vat_percent: null });
+    expect(result.sourceLines.map((l) => l.vat_percent)).toEqual([20, 10]);
+    expect(result.flags).toEqual([]);
+  });
+
+  it("detects TTC lines and does not call that a mismatch", () => {
+    const result = normalizeInvoice({ ...base, lines: [line("36", "72"), line("24", "48")] });
+    expect(result.totals.price_basis).toBe("ttc");
+    expect(result.flags).toEqual([]);
+  });
+
+  it("lets the column heading decide, and refuses to guess when heading and totals disagree", () => {
+    const ttcLines = [line("36", "72"), line("24", "48")];
+    expect(
+      normalizeInvoice({ ...base, price_basis_text: "PU TTC", lines: ttcLines }).totals.price_basis
+    ).toBe("ttc");
+    expect(
+      normalizeInvoice({ ...base, price_basis_text: "PU HT", lines: ttcLines }).totals.price_basis
+    ).toBeNull();
+  });
+
+  it("is unknown when nothing is printed to tell", () => {
+    const result = normalizeInvoice({
+      ...base,
+      subtotal_ht: null,
+      vat_total: null,
+      total_ttc: null,
+      lines: [line("30", "60")],
+    });
+    expect(result.totals.price_basis).toBeNull();
+  });
+
+  it("falls back to the invoice's single rate for a line without one", () => {
+    const result = normalizeInvoice({ ...base, lines: [line("30", "60"), line("20", "40", null)] });
+    expect(result.totals.vat_percent).toBe(20);
+    expect(result.sourceLines.map((l) => l.vat_percent)).toEqual([20, 20]);
+  });
+
+  it("derives the rate from the printed VAT when no line prints one", () => {
+    const result = normalizeInvoice({
+      ...base,
+      lines: [line("30", "60", null), line("20", "40", null)],
+    });
+    expect(result.totals.vat_percent).toBe(20);
+  });
+
+  it("leaves the rate empty when it cannot be known", () => {
+    const result = normalizeInvoice({
+      ...base,
+      vat_total: null,
+      lines: [line("30", "60", null), line("20", "40", null)],
+    });
+    expect(result.totals.vat_percent).toBeNull();
+    expect(result.sourceLines.map((l) => l.vat_percent)).toEqual([null, null]);
+  });
+
+  it("still flags lines that add up to neither total", () => {
+    expect(
+      normalizeInvoice({ ...base, lines: [line("30", "60"), line("20", "99")] }).flags
+    ).toContain("totals_mismatch");
+  });
+});
+
+it("accepts an extraction saved before price_basis_text existed", () => {
+  expect(isInvoiceExtraction(invoice)).toBe(true);
+  expect(isInvoiceExtraction({ ...invoice, price_basis_text: "PU HT" })).toBe(true);
+  expect(isInvoiceExtraction({ ...invoice, price_basis_text: 5 })).toBe(false);
 });

@@ -39,9 +39,15 @@ const lineKeys = [
   "description", "billed_text", "quantity_billed", "billing_unit",
   "unit_price_text", "line_total_text", "vat_rate",
 ] as const;
-const headerKeys = ["supplier_name", "invoice_number", "invoice_date", "subtotal_ht", "vat_total", "total_ttc"] as const;
+const headerKeys = [
+  "supplier_name", "invoice_number", "invoice_date", "subtotal_ht", "vat_total", "total_ttc",
+  "price_basis_text",
+] as const;
+// Drafts read before price_basis_text existed lack it: absent counts as null.
+const optionalHeaderKeys = ["price_basis_text"] as const;
 type ExtractedLine = Record<(typeof lineKeys)[number], string | null>;
-export type InvoiceExtraction = Record<(typeof headerKeys)[number], string | null> & {
+export type InvoiceExtraction = Record<Exclude<(typeof headerKeys)[number], "price_basis_text">, string | null> & {
+  price_basis_text?: string | null;
   lines: ExtractedLine[];
 };
 
@@ -73,9 +79,45 @@ function hasTexts<K extends string>(value: unknown, keys: readonly K[]): value i
 }
 
 export function isInvoiceExtraction(value: unknown): value is InvoiceExtraction {
-  if (!hasTexts(value, headerKeys) || !("lines" in value)) return false;
+  const required = headerKeys.filter((key) => !(optionalHeaderKeys as readonly string[]).includes(key));
+  if (!hasTexts(value, required)) return false;
+  const optional = (value as Record<string, unknown>).price_basis_text;
+  if (optional !== undefined && optional !== null && typeof optional !== "string") return false;
+  if (!("lines" in value)) return false;
   return Array.isArray(value.lines) && value.lines.length <= 500 &&
     value.lines.every((line) => hasTexts(line, lineKeys));
+}
+
+export type PriceBasis = "ht" | "ttc";
+
+// "20%", "20 %", "٢٠٪", "20,00": a whole-number TVA rate (Morocco: 0, 7, 10, 14, 20).
+export function invoiceVatPercent(text: string | null | undefined): number | null {
+  const clean = normalizeInvoiceDigits((text ?? "").trim())
+    .replace(/[%٪]/g, "").replace(/[,٫]/g, ".").trim();
+  if (!/^\d{1,3}(?:\.0{1,2})?$/.test(clean)) return null;
+  const value = Number(clean);
+  return value >= 0 && value <= 100 ? value : null;
+}
+
+// What the unit price column heading says: "PU HT", "Prix unitaire TTC".
+export function priceBasisFromLabel(label: string | null | undefined): PriceBasis | null {
+  const text = (label ?? "").toLowerCase();
+  const ttc = /\bttc\b|t\.t\.c|toutes? taxes|شامل|مع الضريبة|بالضريبة/u.test(text);
+  const ht = /\bht\b|h\.t\b|hors taxes?|بدون|دون|قبل الضريبة/u.test(text);
+  return ttc === ht ? null : ttc ? "ttc" : "ht";
+}
+
+// Which printed total the line totals add up to: that is what the line prices are.
+export function priceBasisFromTotals(
+  lineTotalsSum: number | null,
+  totals: { subtotal_ht: number | null; vat_total: number | null; total_ttc: number | null },
+): PriceBasis | null {
+  if (lineTotalsSum === null) return null;
+  const near = (total: number | null) => total !== null && Math.abs(lineTotalsSum - total) <= 100;
+  const ht = near(totals.subtotal_ht);
+  const ttc = near(totals.total_ttc);
+  if (ht && ttc) return totals.vat_total === 0 ? "ht" : null;
+  return ht ? "ht" : ttc ? "ttc" : null;
 }
 
 export type InvoiceFlag = "totals_mismatch" | "duplicate_invoice" | "unreadable_lines" | "unit_check";
@@ -95,12 +137,31 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
   };
   const flags: InvoiceFlag[] = [];
   const lineTotals = extraction.lines.map((line) => invoiceMoneyCents(line.line_total_text));
-  const printed = totals.subtotal_ht ?? totals.total_ttc;
+  const allLineTotals = lineTotals.length > 0 &&
+    lineTotals.every((value): value is number => value !== null);
+  const lineTotalsSum = allLineTotals ? lineTotals.reduce((sum, value) => sum + (value ?? 0), 0) : null;
+  // Lines may be priced HT or TTC: they only disagree with the invoice when
+  // they add up to neither printed total.
+  const printedTotals = [totals.subtotal_ht, totals.total_ttc].filter((value): value is number => value !== null);
   if (
-    printed !== null && lineTotals.length > 0 &&
-    lineTotals.every((value): value is number => value !== null) &&
-    Math.abs(lineTotals.reduce((sum, value) => sum + value, 0) - printed) > 100
+    lineTotalsSum !== null && printedTotals.length > 0 &&
+    printedTotals.every((total) => Math.abs(lineTotalsSum - total) > 100)
   ) flags.push("totals_mismatch");
+
+  // The column heading says it outright; otherwise the totals do. When the
+  // two disagree, or neither says, the owner is asked in the review.
+  const fromLabel = priceBasisFromLabel(extraction.price_basis_text);
+  const fromTotals = priceBasisFromTotals(lineTotalsSum, totals);
+  const priceBasis = fromLabel && fromTotals && fromLabel !== fromTotals ? null : fromLabel ?? fromTotals;
+
+  // One rate for the whole invoice when its lines agree, or the printed VAT over HT.
+  const lineRates = extraction.lines.map((line) => invoiceVatPercent(line.vat_rate));
+  const distinct = [...new Set(lineRates.filter((rate): rate is number => rate !== null))];
+  let invoiceVat: number | null = distinct.length === 1 ? distinct[0] : null;
+  if (invoiceVat === null && distinct.length === 0 && totals.subtotal_ht && totals.vat_total !== null) {
+    const rate = Math.round((totals.vat_total * 100) / totals.subtotal_ht);
+    if ([0, 7, 10, 14, 20].includes(rate)) invoiceVat = rate;
+  }
 
   if (totals.subtotal_ht !== null && totals.vat_total !== null && totals.total_ttc !== null &&
       Math.abs(totals.subtotal_ht + totals.vat_total - totals.total_ttc) > 100 &&
@@ -108,7 +169,7 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
 
   let unreadable = extraction.lines.length === 0;
   let unitCheck = false;
-  const sourceLines = extraction.lines.map((line) => {
+  const sourceLines = extraction.lines.map((line, index) => {
     const quantity = invoiceQuantity(line.quantity_billed);
     const cost = invoiceMoneyCents(line.unit_price_text);
     unreadable ||= !line.description?.trim() || quantity === null || cost === null;
@@ -127,6 +188,8 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
       // As printed, per billed unit (carton, kg…): the review converts them.
       billed_quantity: billedQuantity,
       billed_unit_cost: billedCost,
+      // The rate printed for this line, else the invoice's single rate.
+      vat_percent: lineRates[index] ?? invoiceVat,
       quantity: needsConversion ? "" : billedQuantity,
       unit: "piece" as const,
       unit_cost: needsConversion ? "" : billedCost,
@@ -134,7 +197,11 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
   });
   if (unreadable) flags.push("unreadable_lines");
   if (unitCheck) flags.push("unit_check");
-  return { totals, flags, sourceLines };
+  return {
+    totals: { ...totals, price_basis: priceBasis, vat_percent: invoiceVat },
+    flags,
+    sourceLines,
+  };
 }
 
 export function sameInvoiceHeader(

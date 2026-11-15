@@ -37,6 +37,7 @@ export function claudeExtractor(apiKey: string, model: string): InvoiceExtractor
         "List every merchandise line once, including free items, and keep its source wording.",
         "billing_unit is what quantity_billed counts, as printed (e.g. carton de 12, pack 6, kg, pièce). Use null when the line simply counts items without a printed billing unit.",
         "A size or volume in the product name (1 L, 25 cl, 250 g, ١ كغ) stays in description. It is not a billing unit. For 'Lait entier 1 L' with quantity 6 and no billing unit printed, billing_unit is null.",
+        "price_basis_text is the heading of the unit price column exactly as printed (e.g. PU HT, Prix unitaire TTC, السعر), or null when there is no heading. vat_rate is the TVA rate printed for that line (e.g. 20%), or null.",
         "Separate headers, taxes, fees and totals from merchandise. Do not calculate or convert any amount. Do not identify catalog products.",
       ].join(" "),
       messages: [{

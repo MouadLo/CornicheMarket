@@ -320,7 +320,9 @@ const cartonLine = {
 };
 
 it("converts a carton line into pieces once the owner says how many are in a carton", async () => {
-  jest.mocked(fetchInvoiceDraft).mockResolvedValue({ ...draft, source_lines: [cartonLine] });
+  jest
+    .mocked(fetchInvoiceDraft)
+    .mockResolvedValue({ ...draft, totals: { price_basis: "ttc" }, source_lines: [cartonLine] });
   jest.mocked(approveInvoiceDraft).mockClear().mockResolvedValue("purchase-1");
   let tree!: ReactTestRenderer;
   await act(async () => {
@@ -365,13 +367,19 @@ it("converts a carton line into pieces once the owner says how many are in a car
       quantity: 12,
       unit_cost_cents: 500,
       units_per_billing_unit: 6,
+      printed_unit_cost_cents: 3000,
+      printed_basis: "ttc",
+      cost_basis: "ttc",
+      vat_percent: null,
     },
   ]);
   act(() => tree.unmount());
 });
 
 it("pre-fills the product and pack size remembered for this supplier", async () => {
-  jest.mocked(fetchInvoiceDraft).mockResolvedValue({ ...draft, source_lines: [cartonLine] });
+  jest
+    .mocked(fetchInvoiceDraft)
+    .mockResolvedValue({ ...draft, totals: { price_basis: "ttc" }, source_lines: [cartonLine] });
   jest.mocked(matchInvoiceLines).mockResolvedValue([
     {
       line_index: 0,
@@ -512,5 +520,159 @@ describe("choosing a product on a billed line", () => {
     expect(isPackLine(kiloLine)).toBe(false);
     expect(isPackLine({ ...kiloLine, billing_unit: "pièce" })).toBe(false);
     expect(isPackLine({ ...kiloLine, billing_unit: null })).toBe(false);
+  });
+});
+
+describe("HT and TTC prices", () => {
+  const htLine = {
+    description: "Lait 1 L",
+    billed: "6 · 8,50 · 51,00",
+    billing_unit: null,
+    billed_quantity: "6",
+    billed_unit_cost: "8.50",
+    vat_percent: 20,
+    quantity: "6",
+    unit: "piece" as const,
+    unit_cost: "8.50",
+  };
+  const render = async (extra: object, line: object = htLine) => {
+    jest.mocked(fetchInvoiceDraft).mockResolvedValue({
+      ...draft,
+      source_lines: [line],
+      ...extra,
+    } as never);
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = create(<InvoiceScreen />);
+    });
+    return tree;
+  };
+  const field = (tree: ReactTestRenderer, label: string) =>
+    tree.root.findAllByType(TextInput).find((f) => f.props.accessibilityLabel?.startsWith(label))!;
+  const radio = (tree: ReactTestRenderer, label: string) =>
+    tree.root
+      .findAllByType(Pressable)
+      .find((p) => plain(String(p.props.accessibilityLabel ?? "")) === label)!;
+
+  it("stores an HT invoice price as the TTC cost by default, and says how", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    const content = plain(JSON.stringify(tree.toJSON()));
+    expect(content).toContain("invoices.basisDetected");
+    expect(content).toContain("invoices.costConverted");
+    act(() => tree.unmount());
+  });
+
+  it("stores the printed HT price as it is when the owner chooses an HT cost", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("8.50");
+    expect(plain(JSON.stringify(tree.toJSON()))).not.toContain("invoices.costConverted");
+    act(() => tree.unmount());
+  });
+
+  it("removes TVA from a TTC invoice price when the owner chooses an HT cost", async () => {
+    const tree = await render(
+      { totals: { price_basis: "ttc" } },
+      { ...htLine, billed_unit_cost: "10.20", unit_cost: "10.20" }
+    );
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("8.50");
+    act(() => tree.unmount());
+  });
+
+  it("keeps a cost the owner typed when the basis changes, and says so", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    act(() => field(tree, "invoices.unitCost").props.onChangeText("11"));
+    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("11");
+    expect(plain(JSON.stringify(tree.toJSON()))).toContain("invoices.costTouched");
+    act(() => tree.unmount());
+  });
+
+  it("asks which it is, and fills nothing, when the invoice does not say", async () => {
+    const tree = await render({ totals: { price_basis: null } });
+    expect(plain(JSON.stringify(tree.toJSON()))).toContain("invoices.basisUnknown");
+    expect(field(tree, "invoices.unitCost").props.value).toBe("");
+    act(() => radio(tree, "invoices.printedBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    expect(plain(JSON.stringify(tree.toJSON()))).not.toContain("invoices.basisUnknown");
+    act(() => tree.unmount());
+  });
+
+  it("leaves the cost blank with a reason when a conversion needs a TVA rate that is missing", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } }, { ...htLine, vat_percent: null });
+    expect(field(tree, "invoices.unitCost").props.value).toBe("");
+    expect(plain(JSON.stringify(tree.toJSON()))).toContain("invoices.vatMissing");
+    // Storing the printed basis needs no rate.
+    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("8.50");
+    act(() => tree.unmount());
+  });
+
+  it("sends the printed price, both bases and the rate with the approved line", async () => {
+    jest.mocked(approveInvoiceDraft).mockClear().mockResolvedValue("purchase-1");
+    const tree = await render({ totals: { price_basis: "ht" } });
+    act(() =>
+      tree.root
+        .findByType(ProductSearchPicker)
+        .props.onPick({ id: "milk", name: "Lait", unit: "piece" })
+    );
+    act(() =>
+      tree.root
+        .findAllByType(Pressable)
+        .find((p) => p.props.accessibilityRole === "checkbox")!
+        .props.onPress()
+    );
+    await act(async () => {
+      await tree.root
+        .findAllByType(BigButton)
+        .find((b) => b.props.label === "invoices.approve")!
+        .props.onPress();
+    });
+    expect(approveInvoiceDraft).toHaveBeenCalledWith(expect.anything(), [
+      {
+        product_id: "milk",
+        new_product: null,
+        unit: "piece",
+        quantity: 6,
+        unit_cost_cents: 1020,
+        units_per_billing_unit: null,
+        printed_unit_cost_cents: 850,
+        printed_basis: "ht",
+        cost_basis: "ttc",
+        vat_percent: 20,
+      },
+    ]);
+    act(() => tree.unmount());
+  });
+
+  it("converts a carton price and divides it in one step", async () => {
+    const tree = await render(
+      { totals: { price_basis: "ht" } },
+      {
+        ...htLine,
+        billing_unit: "carton de 12",
+        billed_quantity: "2",
+        billed_unit_cost: "102.00",
+        quantity: "",
+        unit_cost: "",
+      }
+    );
+    expect(field(tree, "invoices.unitsPer").props.value).toBe("12");
+    expect(field(tree, "invoices.quantity").props.value).toBe("24");
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    act(() => tree.unmount());
+  });
+
+  it("shows no basis choice for an older draft that has no printed prices to convert", async () => {
+    const tree = await render(
+      {},
+      { ...htLine, billed_unit_cost: undefined, vat_percent: undefined }
+    );
+    expect(plain(JSON.stringify(tree.toJSON()))).not.toContain("invoices.priceBasisTitle");
+    expect(field(tree, "invoices.unitCost").props.value).toBe("8.50");
+    act(() => tree.unmount());
   });
 });
