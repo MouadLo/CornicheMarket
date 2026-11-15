@@ -320,6 +320,40 @@ const fr = {
     importProblemsTitle: "Problèmes",
     importRowErrorNoNum: "{{messages}}",
   },
+  invoices: {
+    title: "Facture exemple",
+    unavailable: "La facture exemple est réservée aux propriétaires en développement local.",
+    loadError: "Impossible de charger la facture exemple.",
+    retry: "Réessayer",
+    approved: "Facture approuvée. Stock réceptionné.",
+    alreadyApproved:
+      "Cette facture a déjà été enregistrée. Ouvrez l’achat pour vérifier les quantités réceptionnées.",
+    viewPurchase: "Voir l’achat",
+    matched: "Produit associé : {{name}}",
+    newProduct: "Nouveau produit : {{name}}",
+    changeProduct: "Changer de produit",
+    createProduct: "Créer un produit",
+    productName: "Nom du produit",
+    stockUnit: "Unité de stock",
+    sellingPrice: "Prix de vente (DH)",
+    quantity: "Quantité reçue{{unit}}",
+    unitCost: "Coût par unité de stock (DH)",
+    delta: "Ajouter {{quantity}} {{unit}} · Coût {{total}}",
+    total: "Coût du stock reçu : {{total}}",
+    confirmReceived: "J’ai vérifié les produits, les coûts et les quantités réellement reçues.",
+    incomplete:
+      "Choisissez un produit et saisissez une quantité et un coût valides pour chaque ligne.",
+    changed: "Le brouillon a changé. Rouvrez-le pour vérifier la dernière version.",
+    productChanged:
+      "Un produit choisi a été désactivé ou son unité de stock a changé. Choisissez-le à nouveau.",
+    approvedDifferently:
+      "Cette facture a déjà été approuvée avec d’autres lignes. Ouvrez l’achat pour vérifier.",
+    invalidLines:
+      "Une ligne est incomplète ou invalide. Vérifiez chaque produit, quantité et coût.",
+    approveError: "Impossible de confirmer l’approbation. Réessayez.",
+    saving: "Approbation…",
+    approve: "Approuver et réceptionner",
+  },
   stockIn: {
     title: "Stock",
     supplier: "Fournisseur",

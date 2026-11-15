@@ -87,3 +87,12 @@ jobs:
       # missing "if not exists" or "create or replace").
       - name: Reset and reapply from scratch
         run: supabase db reset
+
+      # Database rules that need the real schema and seed (no app, no network).
+      # Each file is a transaction that raises on any broken rule and rolls back.
+      - name: Database rule tests
+        run: |
+          for f in tests/stock/invoiceApproval.sql; do
+            echo "== $f"
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
