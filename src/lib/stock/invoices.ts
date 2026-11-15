@@ -1,4 +1,4 @@
-import { parseMoneyToCents } from "@/src/lib/money";
+import { invoiceMoneyCents, invoiceQuantity } from "@/supabase/functions/_shared/invoiceParse";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
@@ -12,7 +12,15 @@ type InvoiceSourceLine = {
 
 export type InvoiceDraft = {
   id: string;
-  invoice_number: string;
+  invoice_number: string | null;
+  supplier_id: string | null;
+  invoice_date: string | null;
+  status: "extracting" | "ready" | "failed";
+  photo_paths: string[];
+  flags: ("totals_mismatch" | "duplicate_invoice" | "unreadable_lines")[];
+  extraction_started_at: string | null;
+  extraction_error: string | null;
+  extraction: { supplier_name?: string | null; invoice_number?: string | null } | null;
   revision: number;
   source_lines: InvoiceSourceLine[];
   purchase_id: string | null;
@@ -37,18 +45,8 @@ type ReviewedLine = {
   unit_cost_cents: number;
 };
 
-function normalizeDecimal(text: string): string {
-  return text
-    .trim()
-    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - "٠".charCodeAt(0)))
-    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - "۰".charCodeAt(0)))
-    .replace(/[,٫]/g, ".");
-}
-
 function invoiceMoney(text: string): number | null {
-  const decimal = normalizeDecimal(text);
-  if (!/^\d{1,7}(\.\d{1,2})?$/.test(decimal)) return null;
-  const cents = parseMoneyToCents(decimal);
+  const cents = invoiceMoneyCents(text);
   return cents !== null && cents <= 100_000_000 ? cents : null;
 }
 
@@ -56,11 +54,10 @@ export function buildReviewedInvoiceLine(line: InvoiceReviewLine): ReviewedLine 
   const product = line.product;
   if (!product) return null;
 
-  const decimal = normalizeDecimal(line.quantity);
-  const quantityPattern = product.unit === "kg" ? /^\d{1,6}(\.\d{1,3})?$/ : /^\d{1,6}$/;
-  const quantity = Number(decimal);
+  const quantity = invoiceQuantity(line.quantity);
   const cost = invoiceMoney(line.unitCost);
-  if (!quantityPattern.test(decimal) || quantity <= 0 || cost === null) return null;
+  if (quantity === null || (product.unit !== "kg" && !Number.isInteger(quantity)) || cost === null)
+    return null;
 
   let newProduct: ReviewedLine["new_product"] = null;
   if (product.kind === "new") {
@@ -79,10 +76,98 @@ export function buildReviewedInvoiceLine(line: InvoiceReviewLine): ReviewedLine 
   };
 }
 
+const invoiceFields =
+  "id, invoice_number, revision, purchase_id, supplier_id, invoice_date, status, flags, suppliers(name)";
+export type InvoiceSummary = Pick<
+  InvoiceDraft,
+  | "id"
+  | "purchase_id"
+  | "supplier_id"
+  | "invoice_number"
+  | "invoice_date"
+  | "status"
+  | "flags"
+  | "suppliers"
+>;
+
+export async function listInvoiceDrafts(offset = 0): Promise<InvoiceSummary[]> {
+  const { data, error } = await supabase
+    .from("invoice_drafts")
+    .select(invoiceFields)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + 24);
+  if (error) throw error;
+  return data as unknown as InvoiceSummary[];
+}
+
+export async function createInvoiceDraft(): Promise<string> {
+  const { data, error } = await supabase.rpc("create_invoice_draft");
+  if (error) throw error;
+  return data as string;
+}
+
+export async function uploadInvoicePage(id: string, page: number, jpeg: ArrayBuffer) {
+  const bucket = supabase.storage.from("invoices");
+  const name = `${page}.jpg`;
+  const { error } = await bucket.upload(`${id}/${name}`, jpeg, {
+    contentType: "image/jpeg",
+    upsert: false,
+  });
+  if (!error) return;
+  // A lost response can leave this immutable page uploaded already.
+  const { data } = await bucket.list(id, { search: name });
+  if (!data?.some((file) => file.name === name)) throw error;
+}
+
+export async function extractInvoice(id: string) {
+  const { error } = await supabase.functions.invoke("extract-invoice", { body: { draft_id: id } });
+  if (error) {
+    const status = error.context?.status;
+    throw new InvoiceApprovalError("Extraction unavailable", status === 429 ? "429" : null);
+  }
+}
+
+export async function updateInvoiceHeader(
+  draft: InvoiceDraft,
+  supplier: string | null,
+  number: string,
+  date: string
+) {
+  const { data, error } = await supabase.rpc("update_invoice_draft_header", {
+    p_draft_id: draft.id,
+    p_revision: draft.revision,
+    p_supplier_id: supplier,
+    p_invoice_number: number.trim() || null,
+    p_invoice_date: date.trim() || null,
+  });
+  if (error) throw new InvoiceApprovalError(error.message, error.code);
+  return data as number;
+}
+
+export async function invoicePhotoUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from("invoices").createSignedUrl(path, 120);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function findPurchaseInvoice(id: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("invoice_drafts")
+    .select("id, photo_paths")
+    .eq("purchase_id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.photo_paths.length ? data.id : null;
+}
+
 export async function fetchInvoiceDraft(id: string): Promise<InvoiceDraft> {
   const { data, error } = await supabase
     .from("invoice_drafts")
-    .select("id, invoice_number, revision, source_lines, purchase_id, suppliers(name)")
+    .select(
+      invoiceFields +
+        ", source_lines, extraction, photo_paths, extraction_started_at, extraction_error"
+    )
     .eq("id", id)
     .single<InvoiceDraft>();
   if (error) throw new Error(error.message);

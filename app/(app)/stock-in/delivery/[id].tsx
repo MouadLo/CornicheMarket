@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
+import { findPurchaseInvoice } from "@/src/lib/stock/invoices";
 import { formatMAD } from "@/src/lib/money";
 import {
   fetchPurchase,
@@ -46,6 +47,23 @@ export default function DeliveryDetail() {
   useEffect(() => {
     if (isOwner) load();
   }, [isOwner, load]);
+
+  const [invoiceLink, setInvoiceLink] = useState<{ purchaseId: string; draftId: string } | null>(
+    null
+  );
+  useEffect(() => {
+    if (!isOwner || !id) return;
+    let active = true;
+    findPurchaseInvoice(id).then(
+      (draftId) => {
+        if (active && draftId) setInvoiceLink({ purchaseId: id, draftId });
+      },
+      () => undefined
+    );
+    return () => {
+      active = false;
+    };
+  }, [id, isOwner]);
 
   if (!isOwner) {
     return (
@@ -90,6 +108,18 @@ export default function DeliveryDetail() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {invoiceLink && invoiceLink.purchaseId === id && (
+        <BigButton
+          variant="secondary"
+          label={t("invoices.photos")}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/stock-in/invoice/[id]",
+              params: { id: invoiceLink.draftId, photos: "1" },
+            })
+          }
+        />
+      )}
       {voided && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>

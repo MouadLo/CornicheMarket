@@ -2,21 +2,27 @@ import React from "react";
 import { Pressable, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-import InvoiceScreen from "../../app/(app)/stock-in/invoice";
+import InvoiceScreen from "../../app/(app)/stock-in/invoice/[id]";
 import { BigButton } from "../../src/components/BigButton";
 import { ProductSearchPicker } from "../../src/components/stock/ProductSearchPicker";
-import { approveInvoiceDraft, fetchInvoiceDraft } from "../../src/lib/stock/invoices";
+import {
+  approveInvoiceDraft,
+  fetchInvoiceDraft,
+  updateInvoiceHeader,
+} from "../../src/lib/stock/invoices";
 
-jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+jest.mock("expo-router", () => ({
+  router: { push: jest.fn() },
+  useLocalSearchParams: () => ({ id: "draft-1" }),
+}));
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { role: "owner" } }),
 }));
-jest.mock("../../src/lib/stock/sampleInvoice", () => ({
-  sampleInvoiceEnabled: true,
-  sampleInvoiceId: "draft-1",
+jest.mock("../../src/lib/stock/queries", () => ({
+  fetchSuppliers: async () => [{ id: "supplier-1", name: "Supplier" }],
 }));
 jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/components/stock/ProductSearchPicker", () => ({
@@ -26,25 +32,34 @@ jest.mock("../../src/lib/stock/invoices", () => ({
   ...jest.requireActual("../../src/lib/stock/invoices"),
   fetchInvoiceDraft: jest.fn(),
   approveInvoiceDraft: jest.fn(),
+  updateInvoiceHeader: jest.fn(),
 }));
 
+const draft = {
+  id: "draft-1",
+  revision: 1,
+  invoice_number: "DEMO-001",
+  supplier_id: "supplier-1",
+  invoice_date: null,
+  status: "ready" as const,
+  flags: ["totals_mismatch" as const],
+  photo_paths: [],
+  extraction: null,
+  extraction_started_at: null,
+  extraction_error: null,
+  suppliers: { name: "Supplier" },
+  purchase_id: null,
+  source_lines: [
+    {
+      description: "Milk",
+      billed: "2 cases × 12",
+      quantity: "24",
+      unit: "piece" as const,
+      unit_cost: "9",
+    },
+  ],
+};
 it("submits the corrected quantities and costs only after the owner reconfirms", async () => {
-  const draft = {
-    id: "draft-1",
-    revision: 1,
-    invoice_number: "DEMO-001",
-    suppliers: { name: "Supplier" },
-    purchase_id: null,
-    source_lines: [
-      {
-        description: "Milk",
-        billed: "2 cases × 12",
-        quantity: "24",
-        unit: "piece" as const,
-        unit_cost: "9",
-      },
-    ],
-  };
   jest.mocked(fetchInvoiceDraft).mockResolvedValue(draft);
   jest.mocked(approveInvoiceDraft).mockResolvedValue("purchase-1");
 
@@ -171,4 +186,37 @@ describe("approvalErrorKey: the server's refusals in the owner's language", () =
   ])("%s (revision changed: %s) -> %s", (code, changed, key) => {
     expect(approvalErrorKey(code, changed)).toBe(key);
   });
+});
+
+it("warns about extraction and saves the missing invoice header against its revision", async () => {
+  const missing = { ...draft, invoice_number: null, supplier_id: null };
+  jest.mocked(fetchInvoiceDraft).mockResolvedValue(missing);
+  jest.mocked(updateInvoiceHeader).mockResolvedValue(2);
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(<InvoiceScreen />);
+  });
+  expect(JSON.stringify(tree.toJSON())).toContain("invoices.totals_mismatch");
+  expect(JSON.stringify(tree.toJSON())).toContain("invoices.missingHeader");
+  const button = (label: string) =>
+    tree.root.findAllByType(BigButton).find((b) => b.props.label === label)!;
+  await act(async () => {
+    button("invoices.editHeader").props.onPress();
+  });
+  act(() => {
+    tree.root
+      .findAllByType(Pressable)
+      .find((p) => p.props.accessibilityRole === "radio")!
+      .props.onPress();
+    tree.root
+      .findAllByType(TextInput)
+      .find((p) => p.props.accessibilityLabel === "invoices.invoiceNumber")!
+      .props.onChangeText("INV-10");
+  });
+  await act(async () => {
+    await button("invoices.saveHeader").props.onPress();
+  });
+  expect(updateInvoiceHeader).toHaveBeenCalledWith(missing, "supplier-1", "INV-10", "");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("invoices.missingHeader");
+  act(() => tree.unmount());
 });

@@ -40,7 +40,15 @@
           "cameraPermission": "Allow Corniche Market to scan product barcodes."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Corniche Market to choose invoice photos.",
+          "cameraPermission": "Allow Corniche Market to photograph invoices.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
