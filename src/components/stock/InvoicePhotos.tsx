@@ -8,14 +8,15 @@ import { Text } from "@/src/theme/Text";
 
 export function InvoicePhotos({ paths }: { paths: string[] }) {
   const { t } = useTranslation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const path = paths[page];
-  const viewport = Math.max(180, width - 40);
+  const pageWidth = Math.max(180, Math.min(width - 40, 580));
+  const pageHeight = Math.min(pageWidth * 1.3, height * 0.64);
 
   useEffect(() => {
     if (!path) return;
@@ -42,14 +43,14 @@ export function InvoicePhotos({ paths }: { paths: string[] }) {
       {error ? (
         <BigButton label={t("invoices.retry")} onPress={() => setAttempt((value) => value + 1)} />
       ) : url ? (
-        <ScrollView horizontal style={{ maxHeight: viewport * 1.3 }}>
-          <ScrollView nestedScrollEnabled style={{ maxHeight: viewport * 1.3 }}>
+        <ScrollView horizontal style={{ maxWidth: pageWidth, maxHeight: pageHeight }}>
+          <ScrollView nestedScrollEnabled style={{ maxHeight: pageHeight }}>
             <Image
               source={{ uri: url }}
               onError={() => setError(true)}
               resizeMode="contain"
               accessibilityLabel={t("invoices.photos")}
-              style={{ width: viewport * (zoom ? 2 : 1), height: viewport * (zoom ? 2.6 : 1.3) }}
+              style={{ width: pageWidth * (zoom ? 2 : 1), height: pageHeight * (zoom ? 2 : 1) }}
             />
           </ScrollView>
         </ScrollView>
