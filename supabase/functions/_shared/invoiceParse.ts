@@ -43,19 +43,21 @@ const lineKeys = [
 const optionalLineKeys = ["discount_text"] as const;
 const headerKeys = [
   "supplier_name", "invoice_number", "invoice_date", "subtotal_ht", "vat_total", "total_ttc",
-  "price_basis_text", "global_discount_text",
+  "price_basis_text", "global_discount_text", "stamp_duty_text", "net_to_pay_text",
 ] as const;
-// Drafts read before price_basis_text existed lack it: absent counts as null.
-const optionalHeaderKeys = ["price_basis_text", "global_discount_text"] as const;
+// Drafts read before these keys existed lack them: absent counts as null.
+const optionalHeaderKeys = [
+  "price_basis_text", "global_discount_text", "stamp_duty_text", "net_to_pay_text",
+] as const;
 type ExtractedLine =
   & Record<Exclude<(typeof lineKeys)[number], "discount_text">, string | null>
   & { discount_text?: string | null };
 export type InvoiceExtraction = Record<
-  Exclude<(typeof headerKeys)[number], "price_basis_text" | "global_discount_text">,
+  Exclude<(typeof headerKeys)[number], (typeof optionalHeaderKeys)[number]>,
   string | null
 > & {
-  price_basis_text?: string | null;
-  global_discount_text?: string | null;
+  [K in (typeof optionalHeaderKeys)[number]]?: string | null;
+} & {
   lines: ExtractedLine[];
 };
 
@@ -122,27 +124,23 @@ export function priceBasisFromLabel(label: string | null | undefined): PriceBasi
   return ttc === ht ? null : ttc ? "ttc" : "ht";
 }
 
-// Which printed total the line totals add up to: that is what the line prices are.
-export function priceBasisFromTotals(
-  lineTotalsSum: number | null,
-  totals: { subtotal_ht: number | null; vat_total: number | null; total_ttc: number | null },
-): PriceBasis | null {
-  if (lineTotalsSum === null) return null;
-  const near = (total: number | null) => total !== null && Math.abs(lineTotalsSum - total) <= 100;
-  const ht = near(totals.subtotal_ht);
-  const ttc = near(totals.total_ttc);
-  if (ht && ttc) return totals.vat_total === 0 ? "ht" : null;
-  return ht ? "ht" : ttc ? "ttc" : null;
+// Which printed total the line totals add up to: that is what the line prices
+// are. Both (only possible without TVA) is HT; neither is unknown.
+export function priceBasisFromTotals(lineTotalsSum: number | null, totals: PrintedTotals): PriceBasis | null {
+  const match = matchedTotal(lineTotalsSum, totals);
+  if (match.ht && match.ttc) return totals.vat_total === 0 ? "ht" : null;
+  return match.ht ? "ht" : match.ttc ? "ttc" : null;
 }
 
 export type LineDiscountPrinted =
   | { percent: number; cents: null }
   | { percent: null; cents: number };
 
-// "10%", "-5 %", "٢٠٪", "7,5%" (a percentage of the line) or "5,00", "- 12.50 DH"
-// (an amount off the line). Zero, empty or unreadable text is no discount (null).
+// "10%", "-5 %", "٢٠٪", "7,5%" (a percentage) or "5,00", "- 12.50 DH", "24,24-"
+// (an amount). Zero, empty or unreadable text is no discount (null).
 export function invoiceDiscount(text: string | null | undefined): LineDiscountPrinted | null {
-  const clean = normalizeInvoiceDigits((text ?? "").trim()).replace(/^[-−–]\s*/u, "").trim();
+  const clean = normalizeInvoiceDigits((text ?? "").trim())
+    .replace(/^[-−–]\s*/u, "").replace(/\s*[-−–]$/u, "").trim();
   if (!clean) return null;
   const percent = clean.match(/^(\d{1,3}(?:[.,٫]\d{1,2})?)\s*[%٪]$/u);
   if (percent) {
@@ -162,44 +160,84 @@ export function needsUnitConversion(billingUnit: string | null | undefined): boo
   return !!unit && !/^(pi[èe]ces?|unit[ée]s?|pcs?\.?|u\.?|قطعة|قطع|وحدة|وحدات)$/iu.test(unit);
 }
 
+// The invoice's printed totals, in centimes.
+export type PrintedTotals = {
+  subtotal_ht: number | null;
+  vat_total: number | null;
+  total_ttc: number | null;
+  stamp_duty?: number | null;
+  net_to_pay?: number | null;
+};
+
+const nearCents = (a: number, b: number) => Math.abs(a - b) <= 100;
+
+// What the lines can be checked against. HT is the printed HT total. TTC is the
+// printed TTC total, else HT + TVA, else net to pay less the stamp duty (timbre),
+// which is a fee on cash payment, not part of the goods. A "TTC" that turns out
+// to include the timbre is accepted too.
+export function totalTargets(totals: PrintedTotals): { ht: number | null; ttc: number[] } {
+  const stamp = totals.stamp_duty ?? null;
+  const ttc = [
+    totals.total_ttc,
+    totals.subtotal_ht !== null && totals.vat_total !== null ? totals.subtotal_ht + totals.vat_total : null,
+    totals.net_to_pay != null && stamp !== null ? totals.net_to_pay - stamp : null,
+    totals.total_ttc !== null && stamp !== null ? totals.total_ttc - stamp : null,
+  ].filter((value): value is number => value !== null);
+  return { ht: totals.subtotal_ht, ttc: [...new Set(ttc)] };
+}
+
+// Which printed total (HT or TTC) a sum of lines matches, within 1 DH.
+export function matchedTotal(
+  sum: number | null,
+  totals: PrintedTotals,
+): { ht: boolean; ttc: boolean } {
+  const targets = totalTargets(totals);
+  return {
+    ht: sum !== null && targets.ht !== null && nearCents(sum, targets.ht),
+    ttc: sum !== null && targets.ttc.some((total) => nearCents(sum, total)),
+  };
+}
+
+// A discount on the whole of `sum`: what it takes off, in centimes. Null when
+// it cannot apply (an amount larger than the sum).
+export function discountOff(sum: number, discount: LineDiscountPrinted): number | null {
+  if (discount.percent !== null) return Math.round((sum * Math.round(discount.percent * 100)) / 10000);
+  return discount.cents <= sum ? discount.cents : null;
+}
+
 export function normalizeInvoice(extraction: InvoiceExtraction) {
-  const totals = {
+  const totals: Required<PrintedTotals> = {
     subtotal_ht: invoiceMoneyCents(extraction.subtotal_ht),
     vat_total: invoiceMoneyCents(extraction.vat_total),
     total_ttc: invoiceMoneyCents(extraction.total_ttc),
+    stamp_duty: invoiceMoneyCents(extraction.stamp_duty_text ?? null),
+    net_to_pay: invoiceMoneyCents(extraction.net_to_pay_text ?? null),
   };
   const flags: InvoiceFlag[] = [];
+  // Printed line totals are after each line's own discount.
   const lineTotals = extraction.lines.map((line) => invoiceMoneyCents(line.line_total_text));
   const allLineTotals = lineTotals.length > 0 &&
     lineTotals.every((value): value is number => value !== null);
   const lineTotalsSum = allLineTotals ? lineTotals.reduce((sum, value) => sum + (value ?? 0), 0) : null;
   // A discount on the whole invoice (remise globale) comes off the lines' sum.
-  // An amount needs that sum to be known; a percentage does not.
   const globalText = extraction.global_discount_text?.trim() || null;
   const globalParsed = invoiceDiscount(globalText);
-  const globalUsable = globalParsed &&
-    (globalParsed.percent !== null ||
-      (lineTotalsSum !== null && globalParsed.cents < lineTotalsSum))
-    ? globalParsed : null;
-  const afterGlobal = lineTotalsSum === null || !globalUsable ? null
-    : globalUsable.percent !== null
-      ? Math.round((lineTotalsSum * (10000 - Math.round(globalUsable.percent * 100))) / 10000)
-      : lineTotalsSum - globalUsable.cents;
-  // Lines may be priced HT or TTC: they only disagree with the invoice when
-  // they add up to neither printed total (before or after the global discount).
-  const printedTotals = [totals.subtotal_ht, totals.total_ttc].filter((value): value is number => value !== null);
-  const matchesPrinted = (sum: number | null) =>
-    sum !== null && printedTotals.some((total) => Math.abs(sum - total) <= 100);
-  if (lineTotalsSum !== null && printedTotals.length > 0 &&
-      !matchesPrinted(lineTotalsSum) && !matchesPrinted(afterGlobal)) flags.push("totals_mismatch");
-  // The discount may already be inside the lines: then taking it off again is wrong.
-  const globalCheck = !!globalUsable && printedTotals.length > 0 && !matchesPrinted(afterGlobal);
+  const globalOff = lineTotalsSum !== null && globalParsed ? discountOff(lineTotalsSum, globalParsed) : null;
+  const afterGlobal = lineTotalsSum !== null && globalOff !== null ? lineTotalsSum - globalOff : null;
+
+  // Lines may be priced HT or TTC, with or without the global discount: they
+  // only disagree with the invoice when they match no printed total at all.
+  const targets = totalTargets(totals);
+  const hasTarget = targets.ht !== null || targets.ttc.length > 0;
+  const before = matchedTotal(lineTotalsSum, totals);
+  const after = matchedTotal(afterGlobal, totals);
+  if (lineTotalsSum !== null && hasTarget && !before.ht && !before.ttc && !after.ht && !after.ttc)
+    flags.push("totals_mismatch");
 
   // The column heading says it outright; otherwise the totals do. When the
   // two disagree, or neither says, the owner is asked in the review.
   const fromLabel = priceBasisFromLabel(extraction.price_basis_text);
-  const fromTotals = priceBasisFromTotals(lineTotalsSum, totals) ??
-    priceBasisFromTotals(afterGlobal, totals);
+  const fromTotals = priceBasisFromTotals(lineTotalsSum, totals) ?? priceBasisFromTotals(afterGlobal, totals);
   const priceBasis = fromLabel && fromTotals && fromLabel !== fromTotals ? null : fromLabel ?? fromTotals;
 
   // One rate for the whole invoice when its lines agree, or the printed VAT over HT.
@@ -211,9 +249,13 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
     if ([0, 7, 10, 14, 20].includes(rate)) invoiceVat = rate;
   }
 
-  if (totals.subtotal_ht !== null && totals.vat_total !== null && totals.total_ttc !== null &&
-      Math.abs(totals.subtotal_ht + totals.vat_total - totals.total_ttc) > 100 &&
-      !flags.includes("totals_mismatch")) flags.push("totals_mismatch");
+  // HT + TVA must give the printed TTC (possibly with the timbre in it).
+  if (totals.subtotal_ht !== null && totals.vat_total !== null && totals.total_ttc !== null) {
+    const sum = totals.subtotal_ht + totals.vat_total;
+    const withStamp = totals.stamp_duty !== null && nearCents(sum + totals.stamp_duty, totals.total_ttc);
+    if (!nearCents(sum, totals.total_ttc) && !withStamp && !flags.includes("totals_mismatch"))
+      flags.push("totals_mismatch");
+  }
 
   let unreadable = extraction.lines.length === 0;
   let unitCheck = false;
@@ -226,25 +268,11 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
     const needsConversion = needsUnitConversion(billingUnit);
     unitCheck ||= needsConversion;
     const discountText = line.discount_text?.trim() || null;
-    const discount = invoiceDiscount(discountText);
-    const grossTotal = quantity !== null && cost !== null ? Math.round(quantity * cost) : null;
-    // An amount larger than the line itself is a misreading.
-    const usable = discount && !(discount.cents !== null && grossTotal !== null && discount.cents > grossTotal)
-      ? discount : null;
-    // The printed line total shows which price it was worked from: it should
-    // match the price less the discount. Otherwise the discount may already be
-    // inside the unit price, and applying it again would cost too little.
-    const printedTotal = invoiceMoneyCents(line.line_total_text);
-    let discountCheck = false;
-    if (usable && grossTotal !== null && printedTotal !== null) {
-      const net = usable.percent !== null
-        ? Math.round((grossTotal * (10000 - Math.round(usable.percent * 100))) / 10000)
-        : grossTotal - usable.cents;
-      discountCheck = Math.abs(net - printedTotal) > 100;
-    }
+    const lineTotal = lineTotals[index];
     const billedQuantity = quantity !== null ? String(quantity) : "";
-    const billedCost = cost !== null && cost <= 100000000
-      ? String(Math.floor(cost / 100)) + "." + String(cost % 100).padStart(2, "0") : "";
+    const cents = (value: number | null) => value !== null && value <= 100000000
+      ? String(Math.floor(value / 100)) + "." + String(value % 100).padStart(2, "0") : "";
+    const billedCost = cents(cost);
     return {
       description: line.description?.trim() ?? "",
       billed: [line.billed_text, line.unit_price_text, discountText, line.line_total_text]
@@ -255,13 +283,10 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
       billed_unit_cost: billedCost,
       // The rate printed for this line, else the invoice's single rate.
       vat_percent: lineRates[index] ?? invoiceVat,
-      // The discount as printed, and as the app uses it: a percentage of the
-      // line, or an amount off the whole line, both on the printed price basis.
-      // discount_text without either value could not be read: the owner checks.
+      // The line's discount as printed ("10%", "24,24-"), and its printed total
+      // after that discount: the review reads both and checks one against the other.
       discount_text: discountText,
-      discount_percent: usable?.percent ?? null,
-      discount_cents: usable?.cents ?? null,
-      discount_check: discountCheck,
+      line_total: cents(lineTotal),
       quantity: needsConversion ? "" : billedQuantity,
       unit: "piece" as const,
       unit_cost: needsConversion ? "" : billedCost,
@@ -274,15 +299,9 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
       ...totals,
       price_basis: priceBasis,
       vat_percent: invoiceVat,
-      // The discount on the whole invoice, as printed and as used (a percentage,
-      // or an amount with the lines' sum it comes off). global_discount_text
-      // without either could not be read; global_discount_check means the
-      // printed totals do not match the lines less the discount.
+      // As printed: the review reads it, checks it against the totals and
+      // lets the owner correct it.
       global_discount_text: globalText,
-      global_discount_percent: globalUsable?.percent ?? null,
-      global_discount_cents: globalUsable?.cents ?? null,
-      lines_total_cents: globalUsable?.cents != null ? lineTotalsSum : null,
-      global_discount_check: globalCheck,
     },
     flags,
     sourceLines,

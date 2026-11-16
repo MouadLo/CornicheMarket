@@ -8,8 +8,12 @@ import {
   priceBasisFromTotals,
   normalizeInvoice,
   sameInvoiceHeader,
+  totalTargets,
+  matchedTotal,
+  discountOff,
   type InvoiceExtraction,
 } from "../../supabase/functions/_shared/invoiceParse";
+import { sodaInvoice, waterReceipt } from "../fixtures/realInvoices";
 
 it.each([
   ["1 216,00", 121600],
@@ -280,15 +284,6 @@ it.each([
 });
 
 describe("line discounts in normalizeInvoice", () => {
-  const line = {
-    description: "Huile 5L",
-    billed_text: "10 x 100,00",
-    quantity_billed: "10",
-    billing_unit: null,
-    unit_price_text: "100,00",
-    line_total_text: "900,00",
-    vat_rate: null,
-  };
   const head = {
     supplier_name: "S",
     invoice_number: "1",
@@ -297,36 +292,32 @@ describe("line discounts in normalizeInvoice", () => {
     vat_total: null,
     total_ttc: null,
   };
-  const run = (changes: Partial<typeof line> & { discount_text?: string | null }) =>
-    normalizeInvoice({ ...head, lines: [{ ...line, ...changes }] }).sourceLines[0];
+  const run = (discount_text: string | null) =>
+    normalizeInvoice({
+      ...head,
+      lines: [
+        {
+          description: "Huile 5L",
+          billed_text: null,
+          quantity_billed: "10",
+          billing_unit: null,
+          unit_price_text: "100,00",
+          line_total_text: "900,00",
+          vat_rate: null,
+          discount_text,
+        },
+      ],
+    }).sourceLines[0];
 
-  it("keeps the printed price and reads a percentage discount", () => {
-    const result = run({ discount_text: "10%" });
+  it("keeps the printed price, the discount as printed and the printed line total", () => {
+    const result = run("10%");
     expect(result.billed_unit_cost).toBe("100.00");
-    expect(result.discount_percent).toBe(10);
-    expect(result.discount_check).toBe(false);
+    expect(result.discount_text).toBe("10%");
+    expect(result.line_total).toBe("900.00");
   });
 
-  it("reads an amount discount off the whole line", () => {
-    const result = run({ discount_text: "100,00" });
-    expect(result.discount_cents).toBe(10000);
-    expect(result.discount_check).toBe(false);
-  });
-
-  it("warns when the printed total ignores the discount (maybe already in the price)", () => {
-    expect(run({ discount_text: "10%", line_total_text: "1 000,00" }).discount_check).toBe(true);
-  });
-
-  it("does not apply a discount larger than the line, and keeps its text", () => {
-    const result = run({ discount_text: "5 000,00" });
-    expect(result.discount_cents).toBeNull();
-    expect(result.discount_text).toBe("5 000,00");
-  });
-
-  it("no discount printed: nothing to apply", () => {
-    const result = run({ discount_text: null });
-    expect(result.discount_percent).toBeNull();
-    expect(result.discount_text).toBeNull();
+  it("no discount printed: none kept", () => {
+    expect(run(null).discount_text).toBeNull();
   });
 });
 
@@ -336,76 +327,97 @@ it("accepts lines saved before discount_text existed", () => {
   expect(isInvoiceExtraction({ ...invoice, lines: [{ ...first, discount_text: 5 }] })).toBe(false);
 });
 
-describe("discount on the whole invoice in normalizeInvoice", () => {
-  const lines = [
-    {
-      description: "A",
-      billed_text: null,
-      quantity_billed: "10",
-      billing_unit: null,
-      unit_price_text: "10,00",
-      line_total_text: "100,00",
-      vat_rate: null,
-    },
-    {
-      description: "B",
-      billed_text: null,
-      quantity_billed: "10",
-      billing_unit: null,
-      unit_price_text: "10,00",
-      line_total_text: "100,00",
-      vat_rate: null,
-    },
-  ];
-  const run = (
-    global_discount_text: string | null,
-    totals: { subtotal_ht: string | null; total_ttc?: string | null }
-  ) =>
-    normalizeInvoice({
-      supplier_name: "S",
-      invoice_number: "1",
-      invoice_date: "2026-11-01",
-      vat_total: null,
-      total_ttc: null,
-      ...totals,
-      global_discount_text,
-      lines,
+it("accepts an extraction saved before the discount, stamp and net-to-pay keys existed", () => {
+  expect(isInvoiceExtraction(invoice)).toBe(true);
+  expect(
+    isInvoiceExtraction({
+      ...invoice,
+      global_discount_text: "5%",
+      stamp_duty_text: "1,48",
+      net_to_pay_text: null,
+    })
+  ).toBe(true);
+  expect(isInvoiceExtraction({ ...invoice, stamp_duty_text: 5 })).toBe(false);
+});
+
+describe("totals the lines can be checked against", () => {
+  it("works the TTC out from HT + TVA, or net to pay less the stamp duty, when none is printed", () => {
+    expect(
+      totalTargets({
+        subtotal_ht: 117669,
+        vat_total: 23533,
+        total_ttc: null,
+        stamp_duty: 353,
+        net_to_pay: 141555,
+      })
+    ).toEqual({ ht: 117669, ttc: [141202] });
+  });
+
+  it("accepts a TTC that already includes the stamp duty", () => {
+    const targets = totalTargets({
+      subtotal_ht: 49312,
+      vat_total: 9862,
+      total_ttc: 59322,
+      stamp_duty: 148,
     });
-
-  it("reads a percentage and accepts totals that match the lines less it", () => {
-    const result = run("5%", { subtotal_ht: "190,00" });
-    expect(result.totals.global_discount_percent).toBe(5);
-    expect(result.totals.global_discount_check).toBe(false);
-    expect(result.flags).not.toContain("totals_mismatch");
-    expect(result.totals.price_basis).toBe("ht");
+    expect(targets.ttc).toContain(59174);
   });
 
-  it("reads an amount together with the lines' sum it comes off", () => {
-    const result = run("20,00", { subtotal_ht: "180,00" });
-    expect(result.totals.global_discount_cents).toBe(2000);
-    expect(result.totals.lines_total_cents).toBe(20000);
-    expect(result.totals.global_discount_check).toBe(false);
+  it("matches within 1 DH", () => {
+    const totals = { subtotal_ht: 10000, vat_total: 2000, total_ttc: 12000 };
+    expect(matchedTotal(10099, totals)).toEqual({ ht: true, ttc: false });
+    expect(matchedTotal(11950, totals)).toEqual({ ht: false, ttc: true });
+    expect(matchedTotal(null, totals)).toEqual({ ht: false, ttc: false });
   });
 
-  it("warns when the printed totals ignore the discount (maybe already in the lines)", () => {
-    const result = run("5%", { subtotal_ht: "200,00" });
-    expect(result.totals.global_discount_check).toBe(true);
-  });
-
-  it("does not use an amount larger than the lines, and keeps its text", () => {
-    const result = run("900,00", { subtotal_ht: "200,00" });
-    expect(result.totals.global_discount_cents).toBeNull();
-    expect(result.totals.global_discount_text).toBe("900,00");
-  });
-
-  it("no discount printed: nothing to apply", () => {
-    const result = run(null, { subtotal_ht: "200,00" });
-    expect(result.totals.global_discount_percent).toBeNull();
-    expect(result.totals.global_discount_check).toBe(false);
+  it("takes a discount off a sum, refusing an amount larger than it", () => {
+    expect(discountOff(155320, { percent: null, cents: 14118 })).toBe(14118);
+    expect(discountOff(10000, { percent: 5, cents: null })).toBe(500);
+    expect(discountOff(10000, { percent: null, cents: 10001 })).toBeNull();
   });
 });
 
-it("accepts an extraction saved before global_discount_text existed", () => {
-  expect(isInvoiceExtraction({ ...invoice, global_discount_text: "5%" })).toBe(true);
-  expect(isInvoiceExtraction({ ...invoice, global_discount_text: 5 })).toBe(false);
+describe("real invoices", () => {
+  it("water receipt: TTC prices, a discount on the whole invoice and a stamp duty agree with the totals", () => {
+    const result = normalizeInvoice(waterReceipt);
+    expect(result.flags).toEqual([]);
+    expect(result.totals.price_basis).toBe("ttc");
+    expect(result.totals.vat_percent).toBe(20);
+    expect(result.totals).toMatchObject({
+      subtotal_ht: 117669,
+      total_ttc: null,
+      stamp_duty: 353,
+      net_to_pay: 141555,
+      global_discount_text: "141,18",
+    });
+  });
+
+  it("soda invoice: HT prices with trailing-minus line discounts agree with the net HT total", () => {
+    const result = normalizeInvoice(sodaInvoice);
+    expect(result.flags).toEqual([]);
+    expect(result.totals.price_basis).toBe("ht");
+    expect(result.totals.vat_percent).toBe(20);
+    expect(result.sourceLines[0]).toMatchObject({
+      billed_unit_cost: "50.50",
+      discount_text: "24,24-",
+      line_total: "379.76",
+    });
+    expect(invoiceDiscount("24,24-")).toEqual({ percent: null, cents: 2424 });
+  });
+
+  it("soda invoice: the printed total of line discounts misread as an invoice discount is no mismatch", () => {
+    const result = normalizeInvoice({ ...sodaInvoice, global_discount_text: "37,06-" });
+    expect(result.flags).toEqual([]);
+    expect(result.totals.price_basis).toBe("ht");
+  });
+
+  it("soda invoice: a TTC read with the stamp duty in it is no mismatch", () => {
+    expect(normalizeInvoice({ ...sodaInvoice, total_ttc: "593,22" }).flags).toEqual([]);
+  });
+
+  it("still flags lines that match no printed total", () => {
+    expect(
+      normalizeInvoice({ ...sodaInvoice, subtotal_ht: "450,00", total_ttc: "540,00" }).flags
+    ).toContain("totals_mismatch");
+  });
 });

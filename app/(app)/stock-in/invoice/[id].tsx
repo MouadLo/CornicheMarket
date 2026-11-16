@@ -17,7 +17,15 @@ import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { formatMAD, lineTotalCents } from "@/src/lib/money";
-import { convertUnitCostCents } from "@/src/lib/stock/vat";
+import {
+  costGlobalDiscount,
+  defaultApplyGlobal,
+  initialReview,
+  invoiceSummary,
+  sameGlobalDiscount,
+  type InvoiceSummary,
+  type TotalsInput,
+} from "@/src/lib/stock/invoiceTotals";
 import { invoiceMoneyCents } from "@/supabase/functions/_shared/invoiceParse";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
@@ -25,19 +33,20 @@ import {
   approveInvoiceDraft,
   approvalErrorKey,
   buildReviewedInvoiceLine,
+  confirmedSource,
   discountUnread,
-  globalDiscountUnread,
+  lineAmounts,
+  lineTotalAgrees,
   sourceDiscount,
   billedUnits,
   fetchInvoiceDraft,
   extractInvoice,
-  initialCostBasis,
-  initialReviewLine,
   isPackLine,
   lineCost,
   matchInvoiceLines,
   recostLines,
   updateInvoiceHeader,
+  withPrinted,
   withProduct,
   withRememberedMatch,
   withUnitsPer,
@@ -170,15 +179,14 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   // Prices printed per billed unit exist on drafts read since HT/TTC was added.
   // An older draft has nothing to convert, so no basis applies to it.
   const hasPrinted = initialDraft.source_lines.some((line) => line.billed_unit_cost !== undefined);
-  const [basis, setBasis] = useState<CostBasis>(() => initialCostBasis(initialDraft));
+  const [start] = useState(() => initialReview(initialDraft, hasPrinted));
+  const [basis, setBasis] = useState<CostBasis>(start.basis);
   const activeBasis = hasPrinted ? basis : undefined;
   const basisRef = useRef(activeBasis);
   basisRef.current = activeBasis;
-  const [lines, setLines] = useState<InvoiceReviewLine[]>(() =>
-    initialDraft.source_lines.map((source) =>
-      initialReviewLine(source, hasPrinted ? initialCostBasis(initialDraft) : undefined)
-    )
-  );
+  const [lines, setLines] = useState<InvoiceReviewLine[]>(start.lines);
+  // The invoice's totals as the owner confirms or corrects them.
+  const [totals, setTotals] = useState<TotalsInput>(start.totals);
   const [matches, setMatches] = useState<InvoiceLineMatch[]>([]);
   const [purchaseId, setPurchaseId] = useState(draft.purchase_id);
   const [foundPostedPurchase, setFoundPostedPurchase] = useState(false);
@@ -204,6 +212,7 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
     (sum, line) => sum + (line ? lineTotalCents(line.quantity, line.unit_cost_cents) : 0),
     0
   );
+  const summary = invoiceSummary(draft.source_lines, lines, totals, basis.printed);
 
   function updateLine(index: number, changes: Partial<InvoiceReviewLine>) {
     if (savingNow.current) return;
@@ -218,12 +227,45 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
     updateLine(index, withProduct(draft.source_lines[index], lines[index], product, activeBasis));
   }
 
-  function changeBasis(next: CostBasis) {
+  // Lines, totals and basis change together: the discount on the whole invoice
+  // depends on all three, and every cost the owner did not type follows it.
+  function apply(nextLines: InvoiceReviewLine[], nextTotals: TotalsInput, nextBasis: CostBasis) {
     if (savingNow.current) return;
-    setBasis(next);
-    setLines((current) => recostLines(draft.source_lines, current, next));
+    const next = invoiceSummary(draft.source_lines, nextLines, nextTotals, nextBasis.printed);
+    const full = { ...nextBasis, global: costGlobalDiscount(next, nextTotals) };
+    const recost =
+      !sameGlobalDiscount(full.global, basis.global) ||
+      full.printed !== basis.printed ||
+      full.store !== basis.store;
+    setBasis(full);
+    setTotals(nextTotals);
+    setLines(recost ? recostLines(draft.source_lines, nextLines, full) : nextLines);
     setConfirmed(false);
     setError(null);
+  }
+
+  function changeBasis(next: CostBasis) {
+    apply(lines, totals, next);
+  }
+
+  function editPrinted(
+    index: number,
+    changes: Pick<InvoiceReviewLine, "billedQuantity" | "price" | "discount">
+  ) {
+    const source = draft.source_lines[index];
+    const next = lines.map((line, position) =>
+      position === index ? withPrinted(source, line, changes, activeBasis) : line
+    );
+    apply(next, totals, basis);
+  }
+
+  function editTotals(changes: Partial<TotalsInput>) {
+    const next = { ...totals, ...changes };
+    // A new discount on the whole invoice: apply it when the totals confirm it,
+    // as when the invoice was first read. The owner can still switch it.
+    if (changes.globalDiscount !== undefined && changes.globalDiscount !== totals.globalDiscount)
+      next.applyGlobal = defaultApplyGlobal(draft.source_lines, lines, next, basis.printed);
+    apply(lines, next, basis);
   }
 
   // Suggestions are a convenience: if they cannot load, the owner searches.
@@ -356,27 +398,6 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
           {hasPrinted && (
             <View style={styles.card}>
               <Text style={styles.heading}>{t("invoices.priceBasisTitle")}</Text>
-              {!!basis.global && (
-                <Text>
-                  {t("invoices.globalDiscount", {
-                    discount: isolateBidi(
-                      basis.global.kind === "percent"
-                        ? basis.global.hundredths / 100 + "%"
-                        : formatMAD(basis.global.cents)
-                    ),
-                  })}
-                </Text>
-              )}
-              {globalDiscountUnread(draft.totals) && (
-                <Text style={styles.warning}>
-                  {t("invoices.globalDiscountUnread", {
-                    text: isolateBidi(draft.totals?.global_discount_text ?? ""),
-                  })}
-                </Text>
-              )}
-              {!!basis.global && draft.totals?.global_discount_check && (
-                <Text style={styles.warning}>{t("invoices.globalDiscountCheck")}</Text>
-              )}
               {basis.printed === null ? (
                 <Text style={styles.warning}>{t("invoices.basisUnknown")}</Text>
               ) : (
@@ -406,67 +427,109 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             const lineMatches = matches.filter((match) => match.line_index === index);
             const pack = isPackLine(source);
             const billed = billedUnits(source, line);
+            const printed = confirmedSource(source, line);
             const info =
-              activeBasis && billed !== null ? lineCost(source, billed, activeBasis) : null;
-            const printedCents = invoiceMoneyCents(source.billed_unit_cost ?? "");
+              activeBasis && billed !== null ? lineCost(printed, billed, activeBasis) : null;
+            const printedCents = invoiceMoneyCents(printed.billed_unit_cost ?? "");
+            const amounts = lineAmounts(printed);
+            const agrees = lineTotalAgrees(printed);
+            const printedTotal = invoiceMoneyCents(printed.line_total ?? "");
+            // A discount on the line or on the whole invoice went into this cost.
+            const discounted = !!sourceDiscount(printed) || !!activeBasis?.global;
             const costNote =
               info?.reason === "vat_missing"
                 ? t("invoices.vatMissing")
                 : activeBasis && line.costTouched
                   ? t("invoices.costTouched")
-                  : info?.converted &&
-                      info.cents !== null &&
+                  : (info?.converted || discounted) &&
+                      info?.cents != null &&
                       printedCents !== null &&
                       activeBasis?.printed
-                    ? t("invoices.costConverted", {
-                        printed: isolateBidi(
-                          formatMAD(printedCents) + " " + activeBasis.printed.toUpperCase()
-                        ),
-                        cost: isolateBidi(
-                          formatMAD(info.cents) + " " + activeBasis.store.toUpperCase()
-                        ),
-                        rate: info.vat,
-                      })
+                    ? t(
+                        !discounted
+                          ? "invoices.costConverted"
+                          : info.converted
+                            ? "invoices.costConvertedDiscounted"
+                            : "invoices.costDiscounted",
+                        {
+                          printed: isolateBidi(
+                            formatMAD(printedCents) + " " + activeBasis.printed.toUpperCase()
+                          ),
+                          cost: isolateBidi(
+                            formatMAD(info.cents) + " " + activeBasis.store.toUpperCase()
+                          ),
+                          rate: info.vat,
+                        }
+                      )
                     : null;
-            // Printed price, discount, and the price left after it (per billed unit).
-            const discount = sourceDiscount(source);
-            const netCents =
-              discount && printedCents !== null
-                ? convertUnitCostCents({
-                    billedCents: printedCents,
-                    unitsPer: 1,
-                    from: "ht",
-                    to: "ht",
-                    vatPercent: null,
-                    discount,
-                  })
-                : null;
-            const discountLabel = source.discount_percent
-              ? source.discount_percent + "%"
-              : formatMAD(source.discount_cents ?? 0);
             return (
               <View key={index} style={styles.card}>
                 <Text style={styles.heading}>
                   {isolateBidi(source.description || t("invoices.unknownLine"))}
                 </Text>
-                {netCents !== null && printedCents !== null && (
-                  <Text>
-                    {t("invoices.discountLine", {
-                      gross: isolateBidi(formatMAD(printedCents)),
-                      discount: isolateBidi(discountLabel),
-                      net: isolateBidi(formatMAD(netCents)),
-                    })}
-                  </Text>
-                )}
-                {discountUnread(source) && (
-                  <Text style={styles.warning}>
-                    {t("invoices.discountUnread", {
-                      text: isolateBidi(source.discount_text ?? ""),
-                    })}
-                  </Text>
-                )}
-                {!!discount && source.discount_check && (
-                  <Text style={styles.warning}>{t("invoices.discountCheck")}</Text>
+                {hasPrinted && (
+                  <View style={styles.printed}>
+                    <Text style={styles.subheading}>{t("invoices.invoiceLine")}</Text>
+                    <View style={styles.row}>
+                      <View style={styles.cell}>
+                        <InvoiceInput
+                          decimal
+                          label={t("invoices.billedQuantity")}
+                          value={line.billedQuantity ?? ""}
+                          disabled={saving}
+                          onChange={(billedQuantity) => editPrinted(index, { billedQuantity })}
+                        />
+                      </View>
+                      <View style={styles.cell}>
+                        <InvoiceInput
+                          decimal
+                          label={t("invoices.printedPrice")}
+                          value={line.price ?? ""}
+                          disabled={saving}
+                          onChange={(price) => editPrinted(index, { price })}
+                        />
+                      </View>
+                      <View style={styles.cell}>
+                        <InvoiceInput
+                          label={t("invoices.lineDiscount")}
+                          value={line.discount ?? ""}
+                          disabled={saving}
+                          onChange={(discount) => editPrinted(index, { discount })}
+                        />
+                      </View>
+                    </View>
+                    {amounts && (
+                      <Text>
+                        {t("invoices.lineAmounts", {
+                          gross: isolateBidi(formatMAD(amounts.gross)),
+                          discount: isolateBidi(formatMAD(amounts.discount)),
+                          net: isolateBidi(formatMAD(amounts.net)),
+                        })}
+                      </Text>
+                    )}
+                    {discountUnread(printed) && (
+                      <Text style={styles.warning}>
+                        {t("invoices.discountUnread", {
+                          text: isolateBidi(printed.discount_text ?? ""),
+                        })}
+                      </Text>
+                    )}
+                    {agrees === true && printedTotal !== null && (
+                      <Text style={styles.ok}>
+                        {t("invoices.lineTotalMatches", {
+                          printed: isolateBidi(formatMAD(printedTotal)),
+                        })}
+                      </Text>
+                    )}
+                    {agrees === false && printedTotal !== null && amounts && (
+                      <Text style={styles.warning}>
+                        {t("invoices.lineTotalDiffers", {
+                          printed: isolateBidi(formatMAD(printedTotal)),
+                          net: isolateBidi(formatMAD(amounts.net)),
+                        })}
+                      </Text>
+                    )}
+                  </View>
                 )}
                 {!!source.billing_unit && (
                   <Text>
@@ -617,6 +680,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
               </View>
             );
           })}
+          {hasPrinted && (
+            <TotalsCard summary={summary} totals={totals} disabled={saving} onChange={editTotals} />
+          )}
           {ready ? (
             <>
               <Text style={styles.heading}>
@@ -649,6 +715,116 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
         </>
       )}
     </ScrollView>
+  );
+}
+
+function TotalsCard({
+  summary,
+  totals,
+  disabled,
+  onChange,
+}: {
+  summary: InvoiceSummary;
+  totals: TotalsInput;
+  disabled: boolean;
+  onChange: (changes: Partial<TotalsInput>) => void;
+}) {
+  const { t } = useTranslation();
+  const money = (cents: number) => isolateBidi(formatMAD(cents));
+  const basisLabel = (basis: "ht" | "ttc") =>
+    t(basis === "ht" ? "invoices.basisHT" : "invoices.basisTTC");
+  const { check } = summary;
+  const field = (key: keyof Omit<TotalsInput, "applyGlobal" | "globalDiscount">, label: string) => (
+    <View style={styles.cell}>
+      <InvoiceInput
+        decimal
+        label={t(label)}
+        value={totals[key]}
+        disabled={disabled}
+        onChange={(value) => onChange({ [key]: value })}
+      />
+    </View>
+  );
+  return (
+    <View style={styles.card}>
+      <Text style={styles.heading}>{t("invoices.totalsTitle")}</Text>
+      {summary.gross !== null && summary.lineDiscounts !== null && summary.net !== null ? (
+        <Text>
+          {t("invoices.linesSummary", {
+            gross: money(summary.gross),
+            discounts: money(summary.lineDiscounts),
+            net: money(summary.net),
+          })}
+        </Text>
+      ) : (
+        <Text style={styles.warning}>{t("invoices.linesUnreadable")}</Text>
+      )}
+      <InvoiceInput
+        label={t("invoices.globalDiscountLabel")}
+        value={totals.globalDiscount}
+        disabled={disabled}
+        onChange={(globalDiscount) => onChange({ globalDiscount })}
+      />
+      {summary.globalUnread && (
+        <Text style={styles.warning}>
+          {t("invoices.globalDiscountUnread", { text: isolateBidi(totals.globalDiscount) })}
+        </Text>
+      )}
+      {!!summary.global && (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: totals.applyGlobal, disabled }}
+          disabled={disabled}
+          onPress={() => onChange({ applyGlobal: !totals.applyGlobal })}
+          style={styles.check}
+        >
+          <Text style={styles.checkMark}>{totals.applyGlobal ? "✓" : "○"}</Text>
+          <Text style={styles.checkLabel}>{t("invoices.applyGlobal")}</Text>
+        </Pressable>
+      )}
+      {!!summary.global && summary.globalIncluded && (
+        <Text style={styles.warning}>{t("invoices.globalIncluded")}</Text>
+      )}
+      {totals.applyGlobal && summary.globalOff !== null && summary.linesTotal !== null && (
+        <Text>
+          {t("invoices.afterGlobal", {
+            discount: money(summary.globalOff),
+            total: money(summary.linesTotal),
+          })}
+        </Text>
+      )}
+      <View style={styles.row}>
+        {field("subtotalHt", "invoices.totalHT")}
+        {field("vatTotal", "invoices.totalVAT")}
+        {field("totalTtc", "invoices.totalTTC")}
+      </View>
+      <View style={styles.row}>
+        {field("stampDuty", "invoices.stampDuty")}
+        {field("netToPay", "invoices.netToPay")}
+      </View>
+      {check.status === "match" && (
+        <Text style={styles.ok}>
+          {t("invoices.totalsMatch", {
+            basis: basisLabel(check.basis),
+            total: money(check.printed),
+          })}
+        </Text>
+      )}
+      {check.status === "differs" && summary.linesTotal !== null && (
+        <Text style={styles.warning}>
+          {t("invoices.totalsDiffer", {
+            lines: money(summary.linesTotal),
+            basis: basisLabel(check.basis),
+            total: money(check.printed),
+            diff: money(Math.abs(check.diff)),
+          })}
+        </Text>
+      )}
+      {check.status === "unchecked" && <Text>{t("invoices.totalsUnchecked")}</Text>}
+      {summary.vatOff && <Text style={styles.warning}>{t("invoices.vatOff")}</Text>}
+      {summary.netOff && <Text style={styles.warning}>{t("invoices.netOff")}</Text>}
+      {!!totals.stampDuty.trim() && <Text>{t("invoices.stampNote")}</Text>}
+    </View>
   );
 }
 
@@ -864,6 +1040,11 @@ const styles = StyleSheet.create({
   },
   selected: { backgroundColor: colors.brand100, borderColor: colors.brand700 },
   delta: { color: colors.success700, fontWeight: "700" },
+  ok: { color: colors.success700 },
+  printed: { gap: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  subheading: { color: colors.ink900, fontWeight: "700" },
+  row: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  cell: { flexGrow: 1, flexBasis: 90 },
   check: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: touch.min },
   checkMark: { color: colors.brand700, fontSize: 22 },
   checkLabel: { flex: 1 },
