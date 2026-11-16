@@ -14,6 +14,13 @@ export type LineDiscount =
   | { kind: "percent"; hundredths: number }
   | { kind: "amount"; cents: number; quantityMilli: number };
 
+// A discount on the whole invoice: a percentage in hundredths, or an amount
+// off the lines' sum (`linesTotalCents`), both on the printed price basis. Every
+// line's cost is reduced by the same ratio.
+export type GlobalDiscount =
+  | { kind: "percent"; hundredths: number }
+  | { kind: "amount"; cents: number; linesTotalCents: number };
+
 export function convertUnitCostCents(input: {
   billedCents: number;
   unitsPer: number;
@@ -21,8 +28,9 @@ export function convertUnitCostCents(input: {
   to: PriceBasis;
   vatPercent: number | null;
   discount?: LineDiscount | null;
+  globalDiscount?: GlobalDiscount | null;
 }): number | null {
-  const { billedCents, unitsPer, from, to, vatPercent, discount } = input;
+  const { billedCents, unitsPer, from, to, vatPercent, discount, globalDiscount } = input;
   if (!Number.isInteger(billedCents) || billedCents < 0) return null;
   if (!Number.isInteger(unitsPer) || unitsPer < 1 || unitsPer > 10_000) return null;
   // BigInt: an amount discount multiplies a price by a quantity in thousandths.
@@ -46,6 +54,19 @@ export function convertUnitCostCents(input: {
     if (net < BigInt(0)) return null;
     numerator = net;
     denominator *= BigInt(quantityMilli);
+  }
+  if (globalDiscount?.kind === "percent") {
+    const h = globalDiscount.hundredths;
+    if (!Number.isInteger(h) || h < 0 || h > 10_000) return null;
+    numerator *= BigInt(10_000 - h);
+    denominator *= BigInt(10_000);
+  } else if (globalDiscount?.kind === "amount") {
+    const { cents, linesTotalCents } = globalDiscount;
+    if (!Number.isInteger(cents) || cents < 0) return null;
+    if (!Number.isInteger(linesTotalCents) || linesTotalCents < 1 || cents > linesTotalCents)
+      return null;
+    numerator *= BigInt(linesTotalCents - cents);
+    denominator *= BigInt(linesTotalCents);
   }
   if (from !== to) {
     if (vatPercent === null || !Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100)

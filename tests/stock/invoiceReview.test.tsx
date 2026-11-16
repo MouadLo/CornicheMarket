@@ -639,6 +639,32 @@ describe("HT and TTC prices", () => {
     act(() => mismatch.unmount());
   });
 
+  it("takes the invoice discount off every line cost, after the line discount", async () => {
+    // 8.50 HT less 10% line = 7.65, less 5% invoice = 7.2675, +20% TVA = 8.72 TTC
+    const tree = await render(
+      { totals: { price_basis: "ht", global_discount_text: "5%", global_discount_percent: 5 } },
+      { ...htLine, discount_text: "10%", discount_percent: 10 }
+    );
+    expect(field(tree, "invoices.unitCost").props.value).toBe("8.72");
+    expect(plain(JSON.stringify(tree.toJSON()))).toContain("invoices.globalDiscount");
+    act(() => tree.unmount());
+  });
+
+  it("warns when the invoice discount could not be read or the totals do not match it", async () => {
+    const unread = await render({ totals: { price_basis: "ht", global_discount_text: "spécial" } });
+    expect(plain(JSON.stringify(unread.toJSON()))).toContain("invoices.globalDiscountUnread");
+    act(() => unread.unmount());
+    const mismatch = await render({
+      totals: {
+        price_basis: "ht",
+        global_discount_percent: 5,
+        global_discount_check: true,
+      },
+    });
+    expect(plain(JSON.stringify(mismatch.toJSON()))).toContain("invoices.globalDiscountCheck");
+    act(() => mismatch.unmount());
+  });
+
   it("leaves the cost blank with a reason when a conversion needs a TVA rate that is missing", async () => {
     const tree = await render({ totals: { price_basis: "ht" } }, { ...htLine, vat_percent: null });
     expect(field(tree, "invoices.unitCost").props.value).toBe("");

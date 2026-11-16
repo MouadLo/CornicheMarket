@@ -26,6 +26,7 @@ import {
   approvalErrorKey,
   buildReviewedInvoiceLine,
   discountUnread,
+  globalDiscountUnread,
   sourceDiscount,
   billedUnits,
   fetchInvoiceDraft,
@@ -355,6 +356,27 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
           {hasPrinted && (
             <View style={styles.card}>
               <Text style={styles.heading}>{t("invoices.priceBasisTitle")}</Text>
+              {!!basis.global && (
+                <Text>
+                  {t("invoices.globalDiscount", {
+                    discount: isolateBidi(
+                      basis.global.kind === "percent"
+                        ? basis.global.hundredths / 100 + "%"
+                        : formatMAD(basis.global.cents)
+                    ),
+                  })}
+                </Text>
+              )}
+              {globalDiscountUnread(draft.totals) && (
+                <Text style={styles.warning}>
+                  {t("invoices.globalDiscountUnread", {
+                    text: isolateBidi(draft.totals?.global_discount_text ?? ""),
+                  })}
+                </Text>
+              )}
+              {!!basis.global && draft.totals?.global_discount_check && (
+                <Text style={styles.warning}>{t("invoices.globalDiscountCheck")}</Text>
+              )}
               {basis.printed === null ? (
                 <Text style={styles.warning}>{t("invoices.basisUnknown")}</Text>
               ) : (
