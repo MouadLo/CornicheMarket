@@ -128,3 +128,51 @@ describe("line discounts", () => {
     expect(convertUnitCostCents({ ...base, billedCents: 1000, discount })).toBeNull();
   });
 });
+
+describe("discount on the whole invoice", () => {
+  const base = { unitsPer: 1, from: "ht", to: "ht", vatPercent: null } as const;
+
+  it("takes a percentage off every line cost", () => {
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        globalDiscount: { kind: "percent", hundredths: 500 },
+      })
+    ).toBe(950);
+  });
+
+  it("spreads an amount over the lines in proportion to their sum", () => {
+    // lines add up to 200.00, 20.00 off: every cost is 10% lower
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        globalDiscount: { kind: "amount", cents: 2000, linesTotalCents: 20000 },
+      })
+    ).toBe(900);
+  });
+
+  it("comes after the line discount and before TVA, rounding once", () => {
+    // 100.00 less 10% line = 90.00, less 5% invoice = 85.50, +20% TVA = 102.60
+    expect(
+      convertUnitCostCents({
+        billedCents: 10000,
+        unitsPer: 1,
+        from: "ht",
+        to: "ttc",
+        vatPercent: 20,
+        discount: { kind: "percent", hundredths: 1000 },
+        globalDiscount: { kind: "percent", hundredths: 500 },
+      })
+    ).toBe(10260);
+  });
+
+  it.each([
+    [{ kind: "percent", hundredths: 10001 }],
+    [{ kind: "amount", cents: 30000, linesTotalCents: 20000 }],
+    [{ kind: "amount", cents: 100, linesTotalCents: 0 }],
+  ] as const)("refuses the impossible invoice discount %j", (globalDiscount) => {
+    expect(convertUnitCostCents({ ...base, billedCents: 1000, globalDiscount })).toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ import {
   parseUnitsPerBillingUnit,
   unitsFromBillingUnit,
 } from "@/src/lib/stock/packs";
-import { convertUnitCostCents, type LineDiscount } from "@/src/lib/stock/vat";
+import { convertUnitCostCents, type GlobalDiscount, type LineDiscount } from "@/src/lib/stock/vat";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type InvoiceSourceLine = {
@@ -37,6 +37,19 @@ export type InvoiceSourceLine = {
   unit_cost: string;
 };
 
+// What the parser kept of the invoice's printed totals (all optional: older drafts).
+export type InvoiceTotals = {
+  price_basis?: PriceBasis | null;
+  vat_percent?: number | null;
+  // Discount on the whole invoice (remise globale): as printed, as read, and the
+  // lines' sum an amount comes off. check: printed totals do not match it.
+  global_discount_text?: string | null;
+  global_discount_percent?: number | null;
+  global_discount_cents?: number | null;
+  lines_total_cents?: number | null;
+  global_discount_check?: boolean;
+};
+
 export type InvoiceDraft = {
   id: string;
   invoice_number: string | null;
@@ -48,7 +61,7 @@ export type InvoiceDraft = {
   extraction_started_at: string | null;
   extraction_error: string | null;
   extraction: { supplier_name?: string | null; invoice_number?: string | null } | null;
-  totals?: { price_basis?: PriceBasis | null; vat_percent?: number | null } | null;
+  totals?: InvoiceTotals | null;
   revision: number;
   source_lines: InvoiceSourceLine[];
   purchase_id: string | null;
@@ -85,6 +98,10 @@ type ReviewedLine = {
   // The discount taken off the printed price to reach the cost, when there was one.
   discount_percent?: number | null;
   discount_cents?: number | null;
+  // The invoice-wide discount that was also taken off this cost, when there was one.
+  global_discount_percent?: number | null;
+  global_discount_cents?: number | null;
+  lines_total_cents?: number | null;
 };
 
 // The discount to take off the printed price, or null. A percentage needs no
@@ -118,11 +135,39 @@ export function isPackLine(source: InvoiceSourceLine): boolean {
 
 // What the printed prices are (HT or TTC, null when unknown) and which cost the
 // owner wants stored. Without a basis nothing is converted for TVA.
-export type CostBasis = { printed: PriceBasis | null; store: PriceBasis };
+export type CostBasis = {
+  printed: PriceBasis | null;
+  store: PriceBasis;
+  // Taken off every line's cost, when the invoice prints one.
+  global?: GlobalDiscount | null;
+};
+
+export function totalsGlobalDiscount(
+  totals: InvoiceTotals | null | undefined
+): GlobalDiscount | null {
+  if (totals?.global_discount_percent)
+    return { kind: "percent", hundredths: Math.round(totals.global_discount_percent * 100) };
+  if (totals?.global_discount_cents && totals.lines_total_cents)
+    return {
+      kind: "amount",
+      cents: totals.global_discount_cents,
+      linesTotalCents: totals.lines_total_cents,
+    };
+  return null;
+}
+
+// A discount on the whole invoice was printed but could not be used.
+export function globalDiscountUnread(totals: InvoiceTotals | null | undefined): boolean {
+  return !!totals?.global_discount_text && !totalsGlobalDiscount(totals);
+}
 
 // A new review defaults to TTC: what the shop really pays per unit.
 export function initialCostBasis(draft: Pick<InvoiceDraft, "totals">): CostBasis {
-  return { printed: draft.totals?.price_basis ?? null, store: "ttc" };
+  return {
+    printed: draft.totals?.price_basis ?? null,
+    store: "ttc",
+    global: totalsGlobalDiscount(draft.totals),
+  };
 }
 
 export type LineCost = {
@@ -165,6 +210,7 @@ export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostB
       to: basis.store,
       vatPercent: vat,
       discount,
+      globalDiscount: basis.global ?? null,
     }),
     reason: null,
     vat,
@@ -318,6 +364,18 @@ export function buildReviewedInvoiceLine(
           printed_basis: audit.basis.printed,
           cost_basis: audit.basis.store,
           vat_percent: audit.source.vat_percent ?? null,
+          ...(audit.basis.global
+            ? {
+                global_discount_percent:
+                  audit.basis.global.kind === "percent"
+                    ? audit.basis.global.hundredths / 100
+                    : null,
+                global_discount_cents:
+                  audit.basis.global.kind === "amount" ? audit.basis.global.cents : null,
+                lines_total_cents:
+                  audit.basis.global.kind === "amount" ? audit.basis.global.linesTotalCents : null,
+              }
+            : {}),
           ...(sourceDiscount(audit.source)
             ? {
                 discount_percent: audit.source.discount_percent ?? null,

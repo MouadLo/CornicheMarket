@@ -365,6 +365,11 @@ const en: Translations = {
     discountUnread: 'Printed discount "{{text}}" unreadable: check the cost yourself.',
     discountCheck:
       "The printed line total does not match price less discount: the discount may already be in the price. Check it.",
+    globalDiscount: "Discount on the whole invoice: {{discount}}. It is taken off every line cost.",
+    globalDiscountUnread:
+      'Invoice discount "{{text}}" unreadable: costs do not include it, check them.',
+    globalDiscountCheck:
+      "The printed totals do not match the lines less the invoice discount: it may already be in the prices. Check it.",
     unitsPer: "Pieces per {{unit}}",
     suggestion: "Suggestion: {{name}}",
     remembered: "Matched like this supplier’s last invoice. Please check.",

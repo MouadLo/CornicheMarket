@@ -366,6 +366,12 @@ const fr = {
     discountUnread: "Remise imprimée « {{text}} » illisible : vérifiez le coût vous-même.",
     discountCheck:
       "Le total imprimé de la ligne ne correspond pas au prix moins la remise : la remise est peut-être déjà dans le prix. Vérifiez.",
+    globalDiscount:
+      "Remise sur toute la facture : {{discount}}. Elle est déduite du coût de chaque ligne.",
+    globalDiscountUnread:
+      "Remise globale « {{text}} » illisible : les coûts ne la déduisent pas, vérifiez-les.",
+    globalDiscountCheck:
+      "Les totaux imprimés ne correspondent pas aux lignes moins la remise globale : elle est peut-être déjà dans les prix. Vérifiez.",
     unitsPer: "Pièces par {{unit}}",
     suggestion: "Suggestion : {{name}}",
     remembered: "Associé comme lors de la dernière facture de ce fournisseur. Vérifiez.",
