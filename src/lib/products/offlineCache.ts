@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { supabase } from "@/src/lib/supabase/client";
 import { productsSource, type ProductUnit } from "@/src/lib/products/queries";
+import { rankBySearch } from "@/src/lib/products/search";
 import { fetchGridCategories, fetchGridLayout } from "@/src/lib/sellGrid/queries";
 import type { GridCategory, GridTab, GridTile } from "@/src/lib/sellGrid/layout";
 
@@ -105,18 +106,17 @@ export async function findCachedByBarcode(barcode: string): Promise<CachedProduc
   }
 }
 
+// Active products matching the term, best first (names that start with it,
+// then words, then the rest), accents and case ignored. Ranked before the
+// limit is applied, so the best matches are never cut off by the alphabet.
 export async function searchCachedProducts(term: string, limit = 8): Promise<CachedProduct[]> {
   try {
     const cache = await readCache();
     if (!cache) return [];
-    const { products } = cache;
-    const lower = term.toLowerCase();
-    return products
-      .filter(
-        (p) =>
-          p.active && (p.name.toLowerCase().includes(lower) || (p.barcode ?? "").startsWith(term))
-      )
-      .slice(0, limit);
+    return rankBySearch(
+      cache.products.filter((p) => p.active),
+      term
+    ).slice(0, limit);
   } catch {
     return [];
   }

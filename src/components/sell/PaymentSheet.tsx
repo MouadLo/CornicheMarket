@@ -17,7 +17,8 @@ type Props = {
   saving: boolean;
   error: string | null;
   onClose: () => void;
-  onConfirm: (method: PaymentMethod, customerId: string | null) => void;
+  // change: what to hand back (cash only; 0 for an exact amount or any other method).
+  onConfirm: (method: PaymentMethod, customerId: string | null, change: number) => void;
   onCreateCustomer: (name: string) => Promise<Customer | null>;
 };
 
@@ -163,7 +164,7 @@ export function PaymentSheet({
           <BigButton
             label={saving ? t("common.saving") : t("sell.completeSale")}
             variant="pay"
-            onPress={() => onConfirm(method, customerId)}
+            onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
             disabled={saving || needsCustomer || short}
           />
           <BigButton label={t("common.back")} variant="secondary" onPress={onClose} />

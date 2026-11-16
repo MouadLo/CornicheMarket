@@ -36,6 +36,7 @@ import {
   hasAnyProducts,
   type Product,
 } from "@/src/lib/products/queries";
+import { rankBySearch } from "@/src/lib/products/search";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
@@ -59,6 +60,7 @@ import { ProductGrid } from "@/src/components/sell/ProductGrid";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
+import { colors } from "@/src/theme/tokens";
 
 export default function SellScreen() {
   const { profile } = useAuth();
@@ -74,6 +76,10 @@ export default function SellScreen() {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
+  // The query the current results belong to. Results of an older query are
+  // never shown: a fast tap on a stale list adds the wrong product.
+  const [resultsFor, setResultsFor] = useState("");
+  const [searchSlow, setSearchSlow] = useState(false);
   const [saleDiscount, setSaleDiscount] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   // A weighed (kg) product waiting for its weight on the keypad.
@@ -82,7 +88,25 @@ export default function SellScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
+  // The status line under the search box: what just happened, and for how
+  // long it stays. Its row keeps its height, so showing or clearing it never
+  // moves the tiles under the cashier's finger.
+  const [flash, setFlash] = useState<{ text: string; error: boolean } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showFlash = useCallback((text: string, error = false) => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlash({ text, error });
+    flashTimer.current = setTimeout(() => setFlash(null), error ? 6000 : 3000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    []
+  );
+  // After a cash sale: the change to hand back, kept until the next item is
+  // added or the cashier dismisses it (it used to vanish with the payment sheet).
+  const [changeDue, setChangeDue] = useState<number | null>(null);
   // null = not checked yet (or the check failed) -- only an explicit `false`
   // shows the empty-store prompt, so a load error never hides the normal
   // screen behind a wrong "add your first product" message.
@@ -157,34 +181,55 @@ export default function SellScreen() {
   }, [sync.online, isOwner, loadGrid]);
 
   useEffect(() => {
-    if (!debounced.trim()) {
+    const query = debounced.trim();
+    if (!query) {
       setResults([]);
+      setResultsFor("");
       return;
     }
     let cancelled = false;
+    const finish = (rows: Product[]) => {
+      if (cancelled) return;
+      setResults(rankBySearch(rows, query).slice(0, 8));
+      setResultsFor(query);
+    };
 
-    if (!sync.online) {
-      searchCachedProducts(debounced).then((rows) => {
-        if (!cancelled) setResults(rows as unknown as Product[]);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    fetchProducts(
-      { search: debounced, categoryId: null, lowStockOnly: false, status: "active" },
-      0,
-      isOwner
-    )
-      .then((rows) => !cancelled && setResults(rows.slice(0, 8)))
-      .catch(() => !cancelled && setResults([]));
+    // The device already holds every product: search it first (instant, works
+    // offline). The server is only asked when the cache knows nothing about the
+    // query, for a product added elsewhere since the last refresh.
+    searchCachedProducts(query, 8).then((cached) => {
+      if (cancelled) return;
+      if (cached.length > 0 || !sync.online) {
+        finish(cached as unknown as Product[]);
+        return;
+      }
+      fetchProducts(
+        { search: query, categoryId: null, lowStockOnly: false, status: "active" },
+        0,
+        isOwner
+      )
+        .then(finish)
+        .catch(() => finish([]));
+    });
     return () => {
       cancelled = true;
     };
   }, [debounced, isOwner, sync.online]);
 
+  // Say "Searching…" only when it takes noticeable time, so fast searches do
+  // not flash text on every keystroke.
+  const query = search.trim();
+  const searchPending = query !== "" && resultsFor !== query;
+  useEffect(() => {
+    setSearchSlow(false);
+    if (!searchPending) return;
+    const timer = setTimeout(() => setSearchSlow(true), 500);
+    return () => clearTimeout(timer);
+  }, [searchPending, query]);
+  const shownResults = query !== "" && resultsFor === query ? results : [];
+
   const addLine = useCallback((product: Product, quantity: number) => {
+    setChangeDue(null);
     setLines((current) => {
       const existing = current.findIndex((line) => line.product_id === product.id);
       if (existing >= 0) {
@@ -228,11 +273,11 @@ export default function SellScreen() {
         }
 
         if (!match) {
-          setFlash(t("sell.notFound", { barcode }));
+          showFlash(t("sell.notFound", { barcode }), true);
           return { status: "unknown", message: t("sell.notFound", { barcode }) };
         }
         if (addProduct(match as Product)) {
-          setFlash(t("sell.added", { name: isolateBidi(match.name) }));
+          showFlash(t("sell.added", { name: isolateBidi(match.name) }));
         } else {
           // The weight keypad is a modal of its own; close the camera first
           // rather than stack two modals.
@@ -243,11 +288,11 @@ export default function SellScreen() {
           message: `${isolateBidi(match.name)} · ${centsToDisplay(match.selling_price_cents)} DH`,
         };
       } catch {
-        setFlash(t("sell.lookupFailed"));
+        showFlash(t("sell.lookupFailed"), true);
         return { status: "error", message: null };
       }
     },
-    [addProduct, isOwner, sync.online, t]
+    [addProduct, isOwner, showFlash, sync.online, t]
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.
@@ -256,7 +301,7 @@ export default function SellScreen() {
     addByBarcode(barcode);
   }, !paymentOpen && !weighing);
 
-  const handleConfirm = async (method: PaymentMethod, customerId: string | null) => {
+  const handleConfirm = async (method: PaymentMethod, customerId: string | null, change = 0) => {
     if (accepting.current || !profile || lines.length === 0) return;
 
     if (hasInvalidQuantity(lines)) {
@@ -321,7 +366,8 @@ export default function SellScreen() {
       setLines([]);
       setSaleDiscount("");
       setPaymentOpen(false);
-      setFlash(t("sell.recorded", { amount: formatMAD(total) }));
+      showFlash(t("sell.recorded", { amount: formatMAD(total) }));
+      setChangeDue(method === "cash" && change > 0 ? change : null);
       void sync.sync().catch(() => {
         /* Hook reports sync errors; sale is already accepted. */
       });
@@ -359,7 +405,7 @@ export default function SellScreen() {
         setSaleDiscount("");
         setPaymentOpen(false);
       }
-      setFlash(t("sell.recorded", { amount: formatMAD(attempt.total_cents) }));
+      showFlash(t("sell.recorded", { amount: formatMAD(attempt.total_cents) }));
       void sync.sync().catch(() => {
         /* Hook reports sync errors; sale is already accepted. */
       });
@@ -417,9 +463,20 @@ export default function SellScreen() {
         )}
       </View>
 
-      {flash && <Text style={styles.flash}>{flash}</Text>}
+      <View style={styles.flashRow} accessibilityLiveRegion="polite">
+        {flash ? (
+          <Text style={[styles.flash, flash.error && styles.flashError]}>{flash.text}</Text>
+        ) : null}
+      </View>
 
-      {results.map((product) => (
+      {query !== "" && resultsFor === query && results.length === 0 ? (
+        <Text style={styles.noResults}>{t("sell.noProductFound", { query })}</Text>
+      ) : null}
+      {searchPending && searchSlow ? (
+        <Text style={styles.noResults}>{t("sell.searching")}</Text>
+      ) : null}
+
+      {shownResults.map((product) => (
         <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
           <Text style={styles.resultName}>{isolateBidi(product.name)}</Text>
           <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
@@ -429,6 +486,21 @@ export default function SellScreen() {
   );
   const cartNode = (
     <>
+      {changeDue !== null && (
+        <View style={styles.changeCard} accessibilityRole="alert">
+          <View style={styles.changeText}>
+            <Text style={styles.changeLabel}>{t("sell.changeToGive")}</Text>
+            <Text style={styles.changeValue}>{formatMAD(changeDue)}</Text>
+          </View>
+          <Pressable
+            style={styles.changeDismiss}
+            accessibilityRole="button"
+            onPress={() => setChangeDue(null)}
+          >
+            <Text style={styles.changeDismissText}>{t("sell.changeDone")}</Text>
+          </Pressable>
+        </View>
+      )}
       {unconfirmed && (
         <PendingAttemptCard
           sale={unconfirmed}
@@ -502,7 +574,7 @@ export default function SellScreen() {
         <View style={styles.split}>
           <View style={styles.gridPane}>
             {headerNode}
-            {results.length === 0 && !search.trim() ? (
+            {shownResults.length === 0 && !query ? (
               <ProductGrid
                 tabs={gridTabs}
                 inCart={inCart}
@@ -533,7 +605,7 @@ export default function SellScreen() {
           onCancel={() => setWeighing(null)}
           onConfirm={(quantity) => {
             addLine(weighing, quantity);
-            setFlash(t("sell.added", { name: weighing.name }));
+            showFlash(t("sell.added", { name: isolateBidi(weighing.name) }));
             setWeighing(null);
           }}
         />
@@ -591,7 +663,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  flash: { color: "#1d7a46", fontSize: 14 },
+  flashRow: { minHeight: 22, justifyContent: "center" },
+  flash: { color: colors.success700, fontSize: 15, fontWeight: "600" },
+  flashError: { color: colors.danger700 },
+  noResults: { color: colors.ink600, fontSize: 15, paddingVertical: 8 },
+  changeCard: {
+    margin: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderRadius: 12,
+    backgroundColor: colors.success100,
+  },
+  changeText: { flex: 1, gap: 2 },
+  changeLabel: { fontSize: 15, fontWeight: "600", color: colors.success700 },
+  changeValue: { fontSize: 36, fontWeight: "800", color: colors.success700 },
+  changeDismiss: {
+    minHeight: 48,
+    minWidth: 72,
+    borderRadius: 10,
+    backgroundColor: colors.success600,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  changeDismissText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   result: {
     flexDirection: "row",
     justifyContent: "space-between",
