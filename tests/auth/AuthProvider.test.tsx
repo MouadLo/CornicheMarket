@@ -123,3 +123,95 @@ describe("AuthProvider: the loading state always resolves", () => {
     expect(latest?.loadTimedOut).toBe(false);
   });
 });
+
+describe("AuthProvider: returning to the tab keeps the screen", () => {
+  // Bug: the load timeout fired once, ten seconds after start, and stayed set.
+  // When the tab became visible again the auth library sent a new session for
+  // the same user, the profile was fetched again, `loading` flipped on, and
+  // with the stale timeout the root layout swapped the whole app for the
+  // timeout screen, losing everything the owner had typed.
+  const { supabase } = jest.requireMock("../../src/lib/supabase/client") as {
+    supabase: { from: jest.Mock };
+  };
+  const session = (token: string, user = "owner-1") => ({
+    access_token: token,
+    user: { id: user },
+  });
+  let profileFetches = 0;
+
+  beforeEach(() => {
+    profileFetches = 0;
+    supabase.from.mockImplementation(() => ({
+      select: () => ({
+        eq: (_column: string, id: string) => ({
+          single: () => {
+            profileFetches += 1;
+            return Promise.resolve({
+              data: { id, full_name: "Owner", role: "owner" },
+              error: null,
+            });
+          },
+        }),
+      }),
+    }));
+  });
+
+  async function signedIn() {
+    mockGetSession.mockResolvedValue({ data: { session: session("first") } });
+    const renders: ReturnType<typeof useAuth>[] = [];
+    await act(async () => {
+      create(
+        <AuthProvider>
+          <Probe onRender={(value) => renders.push(value)} />
+        </AuthProvider>
+      );
+    });
+    const emit = mockOnAuthStateChange.mock.calls.at(-1)![0] as (
+      event: string,
+      next: unknown
+    ) => void;
+    return { renders, emit };
+  }
+
+  it("ignores a token refresh for the same user, long after the app loaded", async () => {
+    const { renders, emit } = await signedIn();
+    expect(renders.at(-1)).toMatchObject({ loading: false, profile: { role: "owner" } });
+    expect(profileFetches).toBe(1);
+
+    // The app has been open for a while: the old one-shot timer would have fired.
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    const before = renders.length;
+    await act(async () => {
+      emit("SIGNED_IN", session("refreshed"));
+    });
+
+    const after = renders.slice(before);
+    expect(after.every((value) => !value.loading && !value.loadTimedOut)).toBe(true);
+    expect(renders.at(-1)?.profile?.role).toBe("owner");
+    expect(profileFetches).toBe(1);
+  });
+
+  it("still loads the profile when a different user signs in, without a stale timeout", async () => {
+    const { renders, emit } = await signedIn();
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    const before = renders.length;
+    await act(async () => {
+      emit("SIGNED_IN", session("other", "cashier-2"));
+    });
+    expect(renders.slice(before).some((value) => value.loadTimedOut)).toBe(false);
+    expect(profileFetches).toBe(2);
+    expect(renders.at(-1)).toMatchObject({ loading: false, profile: { id: "cashier-2" } });
+  });
+
+  it("clears the profile on sign-out", async () => {
+    const { renders, emit } = await signedIn();
+    await act(async () => {
+      emit("SIGNED_OUT", null);
+    });
+    expect(renders.at(-1)).toMatchObject({ loading: false, profile: null, session: null });
+  });
+});
