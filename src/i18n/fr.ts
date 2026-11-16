@@ -417,6 +417,17 @@ const fr = {
     editHeader: "Modifier les détails de la facture",
     missingHeader:
       "Choisissez le fournisseur et vérifiez le numéro de facture avant l’approbation.",
+    lineTodo: "Reste à faire sur cette ligne :",
+    lineTodoItem: "{{line}} : {{issues}}",
+    linesTodo: "{{count}} ligne(s) sur {{total}} à compléter avant de valider :",
+    headerOpen: "Enregistrez ou annulez les détails de la facture.",
+    issue_product: "choisir ou créer le produit",
+    issue_productName: "saisir le nom du produit",
+    issue_sellingPrice: "saisir le prix de vente",
+    issue_unitsPer: "saisir les pièces par pack (nombre entier)",
+    issue_quantity: "saisir la quantité reçue",
+    issue_wholeQuantity: "les pièces et packs se reçoivent en nombres entiers",
+    issue_cost: "saisir le coût par unité",
     findSupplier: "Rechercher un fournisseur",
     invoiceNumber: "Numéro de facture",
     invoiceDate: "Date de facture (AAAA-MM-JJ)",
@@ -443,8 +454,6 @@ const fr = {
     delta: "Ajouter {{quantity}} {{unit}} · Coût {{total}}",
     total: "Coût du stock reçu : {{total}}",
     confirmReceived: "J’ai vérifié les produits, les coûts et les quantités réellement reçues.",
-    incomplete:
-      "Choisissez un produit et saisissez une quantité et un coût valides pour chaque ligne.",
     changed: "Le brouillon a changé. Rouvrez-le pour vérifier la dernière version.",
     productChanged:
       "Un produit choisi a été désactivé ou son unité de stock a changé. Choisissez-le à nouveau.",

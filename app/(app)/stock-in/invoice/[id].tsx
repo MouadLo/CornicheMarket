@@ -47,6 +47,7 @@ import {
   lineCost,
   matchInvoiceLines,
   recostLines,
+  reviewLineIssues,
   updateInvoiceHeader,
   withPrinted,
   withProduct,
@@ -207,6 +208,11 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
     )
   );
   const validLines = reviewed.filter((line): line is NonNullable<typeof line> => line !== null);
+  // What is left to do, per line, so the owner knows why approval is not ready.
+  const issues = lines.map((line, index) => reviewLineIssues(draft.source_lines[index], line));
+  const todo = issues
+    .map((list, index) => (list.length ? index : -1))
+    .filter((index) => index >= 0);
   const hasHeader = !!draft.supplier_id && !!draft.invoice_number;
   const ready =
     hasHeader && !headerOpen && validLines.length > 0 && validLines.length === lines.length;
@@ -686,6 +692,16 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                   onChange={(unitCost) => updateLine(index, { unitCost, costTouched: true })}
                 />
                 {costNote && <Text>{costNote}</Text>}
+                {issues[index].length > 0 && (
+                  <View style={styles.todo}>
+                    <Text style={styles.todoTitle}>{t("invoices.lineTodo")}</Text>
+                    {issues[index].map((issue) => (
+                      <Text key={issue} style={styles.todoItem}>
+                        {"• " + t("invoices.issue_" + issue)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
                 {result && (
                   <Text style={styles.delta}>
                     {t("invoices.delta", {
@@ -720,7 +736,32 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
               </Pressable>
             </>
           ) : (
-            <Text>{t("invoices.incomplete")}</Text>
+            <View style={styles.todo}>
+              {!hasHeader && (
+                <Text style={styles.todoItem}>{"• " + t("invoices.missingHeader")}</Text>
+              )}
+              {headerOpen && <Text style={styles.todoItem}>{"• " + t("invoices.headerOpen")}</Text>}
+              {todo.length > 0 && (
+                <>
+                  <Text style={styles.todoTitle}>
+                    {t("invoices.linesTodo", { count: todo.length, total: lines.length })}
+                  </Text>
+                  {todo.map((index) => (
+                    <Text key={index} style={styles.todoItem}>
+                      {"• " +
+                        t("invoices.lineTodoItem", {
+                          line: isolateBidi(
+                            draft.source_lines[index].description || t("invoices.unknownLine")
+                          ),
+                          issues: issues[index]
+                            .map((issue) => t("invoices.issue_" + issue))
+                            .join(", "),
+                        })}
+                    </Text>
+                  ))}
+                </>
+              )}
+            </View>
           )}
           {error && (
             <Text accessibilityRole="alert" style={styles.error}>
@@ -1070,4 +1111,7 @@ const styles = StyleSheet.create({
   checkLabel: { flex: 1 },
   error: { color: colors.danger700 },
   warning: { color: colors.warning700, backgroundColor: colors.warning100, padding: 10 },
+  todo: { gap: 4, padding: 10, backgroundColor: colors.warning100, borderRadius: radius.control },
+  todoTitle: { color: colors.warning700, fontWeight: "700" },
+  todoItem: { color: colors.warning700 },
 });

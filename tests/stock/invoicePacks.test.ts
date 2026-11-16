@@ -1,5 +1,6 @@
 import {
   buildReviewedInvoiceLine,
+  reviewLineIssues,
   canHavePackSize,
   initialReviewLine,
   showsPackSize,
@@ -111,4 +112,72 @@ describe("the owner's earlier answer for this supplier and wording", () => {
 it("guesses nothing on an older draft without printed prices", () => {
   const old = { ...coca, billed_unit_cost: undefined, billed_quantity: undefined };
   expect(initialReviewLine(old)).toMatchObject({ unitsPer: "", quantity: "8" });
+});
+
+describe("what is left to do on a line", () => {
+  // As the parser leaves a printed carton line: quantity and cost wait for the count.
+  const carton: InvoiceSourceLine = {
+    ...water,
+    description: "Eau",
+    billing_unit: "carton",
+    quantity: "",
+    unit_cost: "",
+  };
+
+  it("names each missing piece", () => {
+    const start = initialReviewLine(water, ht);
+    expect(reviewLineIssues(water, start)).toEqual(["product"]);
+    const fresh = withProduct(
+      water,
+      start,
+      { kind: "new", name: " ", unit: "piece", sellingPrice: "" },
+      ht
+    );
+    expect(reviewLineIssues(water, fresh)).toEqual(["productName", "sellingPrice"]);
+    const chosen = { ...start, product: existing("piece") };
+    expect(reviewLineIssues(water, chosen)).toEqual([]);
+    expect(reviewLineIssues(water, { ...chosen, quantity: "" })).toEqual(["quantity"]);
+    expect(reviewLineIssues(water, { ...chosen, quantity: "2.5" })).toEqual(["wholeQuantity"]);
+    expect(reviewLineIssues(water, { ...chosen, unitCost: "abc" })).toEqual(["cost"]);
+    expect(reviewLineIssues(water, withUnitsPer(water, chosen, "1.5", ht))).toEqual(["unitsPer"]);
+  });
+
+  it("asks for the pieces per carton, not quantity and cost, on a carton line without its count", () => {
+    const start = { ...initialReviewLine(carton, ht), product: existing("piece") };
+    expect(start.quantity).toBe("");
+    expect(reviewLineIssues(carton, start)).toEqual(["unitsPer"]);
+    expect(reviewLineIssues(carton, withUnitsPer(carton, start, "6", ht))).toEqual([]);
+  });
+
+  it("is empty exactly when approval accepts the line", () => {
+    const products = [
+      null,
+      existing("piece"),
+      existing("pack"),
+      { kind: "new" as const, name: "N", unit: "piece" as const, sellingPrice: "5" },
+    ];
+    const values = ["", "3", "2.5", "abc"];
+    for (const source of [water, carton])
+      for (const product of products)
+        for (const quantity of values)
+          for (const unitCost of values)
+            for (const unitsPer of ["", "6", "0"]) {
+              const line = { product, quantity, unitCost, unitsPer };
+              expect([
+                source.description,
+                product?.kind,
+                quantity,
+                unitCost,
+                unitsPer,
+                reviewLineIssues(source, line).length === 0,
+              ]).toEqual([
+                source.description,
+                product?.kind,
+                quantity,
+                unitCost,
+                unitsPer,
+                buildReviewedInvoiceLine(line) !== null,
+              ]);
+            }
+  });
 });
