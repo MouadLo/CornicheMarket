@@ -484,6 +484,36 @@ export function buildReviewedInvoiceLine(
   };
 }
 
+// What is still missing before a line can be approved, in the order the owner
+// fills it in. Empty exactly when buildReviewedInvoiceLine accepts the line.
+export type LineIssue =
+  "product" | "productName" | "sellingPrice" | "unitsPer" | "quantity" | "wholeQuantity" | "cost";
+
+export function reviewLineIssues(source: InvoiceSourceLine, line: InvoiceReviewLine): LineIssue[] {
+  const issues: LineIssue[] = [];
+  const product = line.product;
+  if (!product) issues.push("product");
+  if (product?.kind === "new") {
+    const name = product.name.trim();
+    if (!name || name.length > 150) issues.push("productName");
+    if (invoiceMoney(product.sellingPrice) === null) issues.push("sellingPrice");
+  }
+  const unitsTyped = line.unitsPer.trim() !== "";
+  // A printed carton needs its count before quantity and cost can be worked out.
+  if (
+    (unitsTyped && parseUnitsPerBillingUnit(line.unitsPer) === null) ||
+    (!unitsTyped && isPackLine(source) && !line.quantity.trim())
+  )
+    issues.push("unitsPer");
+  const quantity = invoiceQuantity(line.quantity);
+  if (quantity === null) {
+    if (!issues.includes("unitsPer")) issues.push("quantity");
+  } else if ((product?.unit ?? source.unit) !== "kg" && !Number.isInteger(quantity))
+    issues.push("wholeQuantity");
+  if (invoiceMoney(line.unitCost) === null && !issues.includes("unitsPer")) issues.push("cost");
+  return issues;
+}
+
 const invoiceFields =
   "id, invoice_number, revision, purchase_id, supplier_id, invoice_date, status, flags, suppliers(name)";
 export type InvoiceSummary = Pick<

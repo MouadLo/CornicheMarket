@@ -749,6 +749,22 @@ describe("HT and TTC prices", () => {
     act(() => tree.unmount());
   });
 
+  it("says what is left to do on each line and above the approve button", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    expect(content(tree)).toContain("invoices.lineTodo");
+    expect(content(tree)).toContain("invoices.issue_product");
+    expect(content(tree)).toContain("invoices.linesTodo");
+    const create = tree.root
+      .findAllByType(BigButton)
+      .find((button) => button.props.label === "invoices.createProduct")!;
+    act(() => create.props.onPress());
+    expect(content(tree)).toContain("invoices.issue_sellingPrice");
+    act(() => field(tree, "invoices.sellingPrice").props.onChangeText("12"));
+    expect(content(tree)).not.toContain("invoices.lineTodo");
+    expect(content(tree)).not.toContain("invoices.linesTodo");
+    act(() => tree.unmount());
+  });
+
   it("says when the invoice discount cannot be read", async () => {
     const tree = await render({ totals: { price_basis: "ht", global_discount_text: "spécial" } });
     expect(content(tree)).toContain("invoices.globalDiscountUnread");
