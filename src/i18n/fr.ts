@@ -416,7 +416,9 @@ const fr = {
     nextPage: "Page suivante",
     editHeader: "Modifier les détails de la facture",
     missingHeader:
-      "Choisissez le fournisseur et vérifiez le numéro de facture avant l’approbation.",
+      "Choisissez ou créez le fournisseur et confirmez le numéro de facture (Modifier les détails de la facture).",
+    createSupplier: "Créer le fournisseur « {{name}} »",
+    supplierCreateError: "Impossible de créer le fournisseur. Réessayez.",
     lineTodo: "Reste à faire sur cette ligne :",
     lineTodoItem: "{{line}} : {{issues}}",
     linesTodo: "{{count}} ligne(s) sur {{total}} à compléter avant de valider :",

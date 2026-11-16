@@ -5,6 +5,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import InvoiceScreen from "../../app/(app)/stock-in/invoice/[id]";
 import { BigButton } from "../../src/components/BigButton";
 import { ProductSearchPicker } from "../../src/components/stock/ProductSearchPicker";
+import { createSupplier as createSupplierMock } from "../../src/lib/stock/queries";
 import {
   approveInvoiceDraft,
   fetchInvoiceDraft,
@@ -32,6 +33,7 @@ jest.mock("../../src/lib/auth/AuthProvider", () => ({
 }));
 jest.mock("../../src/lib/stock/queries", () => ({
   fetchSuppliers: async () => [{ id: "supplier-1", name: "Supplier" }],
+  createSupplier: jest.fn(async (name: string) => ({ id: "supplier-new", name, phone: null })),
 }));
 jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/components/stock/ProductSearchPicker", () => ({
@@ -262,9 +264,10 @@ it("warns about extraction and saves the missing invoice header against its revi
   expect(JSON.stringify(tree.toJSON())).toContain("invoices.missingHeader");
   const button = (label: string) =>
     tree.root.findAllByType(BigButton).find((b) => b.props.label === label)!;
-  await act(async () => {
-    button("invoices.editHeader").props.onPress();
-  });
+  // The details open by themselves when the supplier or number is missing.
+  expect(button("common.cancel")).toBeDefined();
+  expect(button("invoices.editHeader")).toBeUndefined();
+  await act(async () => {});
   act(() => {
     tree.root
       .findAllByType(Pressable)
@@ -280,6 +283,46 @@ it("warns about extraction and saves the missing invoice header against its revi
   });
   expect(updateInvoiceHeader).toHaveBeenCalledWith(missing, "supplier-1", "INV-10", "");
   expect(JSON.stringify(tree.toJSON())).not.toContain("invoices.missingHeader");
+  act(() => tree.unmount());
+});
+
+it("creates the supplier read from the invoice when it is new, and selects it", async () => {
+  const missing = {
+    ...draft,
+    supplier_id: null,
+    invoice_number: "F/ASB/0198857",
+    extraction: { supplier_name: "Les Eaux Minerales dOulmes SA", invoice_number: "F/ASB/0198857" },
+  };
+  jest.mocked(fetchInvoiceDraft).mockResolvedValue(missing);
+  jest.mocked(updateInvoiceHeader).mockResolvedValue(2);
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(<InvoiceScreen />);
+  });
+  await act(async () => {});
+  const button = (label: string) =>
+    tree.root.findAllByType(BigButton).find((b) => b.props.label === label);
+  const createButton = tree.root
+    .findAllByType(BigButton)
+    .find((b) => String(b.props.label).startsWith("invoices.createSupplier"))!;
+  expect(createButton).toBeDefined();
+  await act(async () => {
+    await createButton.props.onPress();
+  });
+  expect(jest.mocked(createSupplierMock)).toHaveBeenCalledWith(
+    "Les Eaux Minerales dOulmes SA",
+    null
+  );
+  // Created once: the button goes away and the new supplier is selected.
+  expect(
+    tree.root
+      .findAllByType(BigButton)
+      .some((b) => String(b.props.label).startsWith("invoices.createSupplier"))
+  ).toBe(false);
+  await act(async () => {
+    await button("invoices.saveHeader")!.props.onPress();
+  });
+  expect(updateInvoiceHeader).toHaveBeenCalledWith(missing, "supplier-new", "F/ASB/0198857", "");
   act(() => tree.unmount());
 });
 

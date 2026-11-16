@@ -414,7 +414,10 @@ const en: Translations = {
     previousPage: "Previous page",
     nextPage: "Next page",
     editHeader: "Edit invoice details",
-    missingHeader: "Choose the supplier and confirm the invoice number before approval.",
+    missingHeader:
+      "Choose or create the supplier and confirm the invoice number (Edit invoice details).",
+    createSupplier: 'Create supplier "{{name}}"',
+    supplierCreateError: "Could not create the supplier. Try again.",
     lineTodo: "Still to do on this line:",
     lineTodoItem: "{{line}}: {{issues}}",
     linesTodo: "{{count}} of {{total}} line(s) to complete before approving:",
