@@ -62,14 +62,10 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
 
         <View style={styles.discountBox}>
           <Text style={styles.label}>{t("sell.discount")}</Text>
-          <TextInput
-            style={[styles.discountInput, discountTooHigh && styles.discountInputInvalid]}
-            value={line.discount_cents ? centsToDisplay(line.discount_cents) : ""}
-            onChangeText={(value) =>
-              onChange({ ...line, discount_cents: value ? (parseMoneyToCents(value) ?? 0) : 0 })
-            }
-            keyboardType="decimal-pad"
-            placeholder="0.00"
+          <DiscountField
+            cents={line.discount_cents}
+            invalid={discountTooHigh}
+            onCents={(discount_cents) => onChange({ ...line, discount_cents })}
           />
         </View>
 
@@ -87,6 +83,38 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
         {formatMAD(line.unit_price_cents)} / {unitLabel(line.unit, 1, t)}
       </Text>
     </View>
+  );
+}
+
+// The discount field keeps what the cashier typed, for the same reason as the
+// weight field below: formatting the parsed value on every keystroke turned
+// "0.5" into "5.00" and "12" into "1.00" (the first digit was parsed and
+// reformatted before the second arrived), recording ten times the discount
+// meant. The field shows the typed text while it still means the current
+// discount, and the formatted value when the discount changed from outside.
+function DiscountField({
+  cents,
+  invalid,
+  onCents,
+}: {
+  cents: number;
+  invalid: boolean;
+  onCents: (cents: number) => void;
+}) {
+  const [text, setText] = useState(cents ? centsToDisplay(cents) : "");
+  const typedCents = text.trim() === "" ? 0 : (parseMoneyToCents(text) ?? 0);
+  const shown = typedCents === cents ? text : cents ? centsToDisplay(cents) : "";
+  return (
+    <TextInput
+      style={[styles.discountInput, invalid && styles.discountInputInvalid]}
+      value={shown}
+      onChangeText={(value) => {
+        setText(value);
+        onCents(value.trim() === "" ? 0 : (parseMoneyToCents(value) ?? 0));
+      }}
+      keyboardType="decimal-pad"
+      placeholder="0.00"
+    />
   );
 }
 

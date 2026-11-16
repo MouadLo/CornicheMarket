@@ -88,3 +88,77 @@ it("follows an external quantity change (e.g. a second weighing added to the lin
   act(() => setExternal({ ...kgLine, quantity: 1.75 }));
   expect(weightInput().props.value).toBe("1.75");
 });
+
+describe("line discount field", () => {
+  const pieceLine: CartLine = {
+    ...kgLine,
+    product_id: "eau",
+    name: "Eau",
+    unit: "piece",
+    unit_price_cents: 1000,
+  };
+  // The weight field is first on a kg line; on a piece line the discount is the only input.
+  const discountInput = () => tree.root.findAllByType(TextInput).at(-1)!;
+  const typeDiscount = (text: string) =>
+    act(() => {
+      discountInput().props.onChangeText(text);
+    });
+
+  it("keeps what is typed: 12 is twelve dirhams, not one", () => {
+    act(() => {
+      tree = create(<Harness initial={pieceLine} />);
+    });
+    typeDiscount("1");
+    expect(discountInput().props.value).toBe("1");
+    typeDiscount("12");
+    expect(discountInput().props.value).toBe("12");
+    expect(latest.discount_cents).toBe(1200);
+  });
+
+  it("keeps the leading zero and the point: 0.5 is fifty centimes, not five dirhams", () => {
+    act(() => {
+      tree = create(<Harness initial={pieceLine} />);
+    });
+    typeDiscount("0");
+    expect(discountInput().props.value).toBe("0");
+    typeDiscount("0.");
+    expect(discountInput().props.value).toBe("0.");
+    typeDiscount("0.5");
+    expect(discountInput().props.value).toBe("0.5");
+    expect(latest.discount_cents).toBe(50);
+  });
+
+  it("accepts a comma decimal", () => {
+    act(() => {
+      tree = create(<Harness initial={pieceLine} />);
+    });
+    typeDiscount("2,5");
+    expect(discountInput().props.value).toBe("2,5");
+    expect(latest.discount_cents).toBe(250);
+  });
+
+  it("an emptied field is no discount", () => {
+    act(() => {
+      tree = create(<Harness initial={{ ...pieceLine, discount_cents: 300 }} />);
+    });
+    expect(discountInput().props.value).toBe("3.00");
+    typeDiscount("");
+    expect(discountInput().props.value).toBe("");
+    expect(latest.discount_cents).toBe(0);
+  });
+
+  it("follows a discount changed from outside the field", () => {
+    let setExternal: (line: CartLine) => void = () => {};
+    function External() {
+      const [line, setLine] = useState(pieceLine);
+      setExternal = setLine;
+      return <CartLineRow line={line} onChange={setLine} onRemove={() => {}} />;
+    }
+    act(() => {
+      tree = create(<External />);
+    });
+    typeDiscount("1");
+    act(() => setExternal({ ...pieceLine, discount_cents: 450 }));
+    expect(discountInput().props.value).toBe("4.50");
+  });
+});
