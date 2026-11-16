@@ -335,3 +335,77 @@ it("accepts lines saved before discount_text existed", () => {
   const [first] = invoice.lines;
   expect(isInvoiceExtraction({ ...invoice, lines: [{ ...first, discount_text: 5 }] })).toBe(false);
 });
+
+describe("discount on the whole invoice in normalizeInvoice", () => {
+  const lines = [
+    {
+      description: "A",
+      billed_text: null,
+      quantity_billed: "10",
+      billing_unit: null,
+      unit_price_text: "10,00",
+      line_total_text: "100,00",
+      vat_rate: null,
+    },
+    {
+      description: "B",
+      billed_text: null,
+      quantity_billed: "10",
+      billing_unit: null,
+      unit_price_text: "10,00",
+      line_total_text: "100,00",
+      vat_rate: null,
+    },
+  ];
+  const run = (
+    global_discount_text: string | null,
+    totals: { subtotal_ht: string | null; total_ttc?: string | null }
+  ) =>
+    normalizeInvoice({
+      supplier_name: "S",
+      invoice_number: "1",
+      invoice_date: "2026-11-01",
+      vat_total: null,
+      total_ttc: null,
+      ...totals,
+      global_discount_text,
+      lines,
+    });
+
+  it("reads a percentage and accepts totals that match the lines less it", () => {
+    const result = run("5%", { subtotal_ht: "190,00" });
+    expect(result.totals.global_discount_percent).toBe(5);
+    expect(result.totals.global_discount_check).toBe(false);
+    expect(result.flags).not.toContain("totals_mismatch");
+    expect(result.totals.price_basis).toBe("ht");
+  });
+
+  it("reads an amount together with the lines' sum it comes off", () => {
+    const result = run("20,00", { subtotal_ht: "180,00" });
+    expect(result.totals.global_discount_cents).toBe(2000);
+    expect(result.totals.lines_total_cents).toBe(20000);
+    expect(result.totals.global_discount_check).toBe(false);
+  });
+
+  it("warns when the printed totals ignore the discount (maybe already in the lines)", () => {
+    const result = run("5%", { subtotal_ht: "200,00" });
+    expect(result.totals.global_discount_check).toBe(true);
+  });
+
+  it("does not use an amount larger than the lines, and keeps its text", () => {
+    const result = run("900,00", { subtotal_ht: "200,00" });
+    expect(result.totals.global_discount_cents).toBeNull();
+    expect(result.totals.global_discount_text).toBe("900,00");
+  });
+
+  it("no discount printed: nothing to apply", () => {
+    const result = run(null, { subtotal_ht: "200,00" });
+    expect(result.totals.global_discount_percent).toBeNull();
+    expect(result.totals.global_discount_check).toBe(false);
+  });
+});
+
+it("accepts an extraction saved before global_discount_text existed", () => {
+  expect(isInvoiceExtraction({ ...invoice, global_discount_text: "5%" })).toBe(true);
+  expect(isInvoiceExtraction({ ...invoice, global_discount_text: 5 })).toBe(false);
+});
