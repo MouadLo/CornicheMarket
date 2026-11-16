@@ -3,6 +3,7 @@ import {
   isWeightBillingUnit,
   parseUnitsPerBillingUnit,
   unitsFromBillingUnit,
+  unitsFromDescription,
 } from "@/src/lib/stock/packs";
 
 it("receives 1 carton of 12 at 102.00 DH as 12 pieces at 8.50 DH", () => {
@@ -88,4 +89,26 @@ it.each([
   [null, null],
 ])("reads the pack count printed in %j as %s", (unit, expected) => {
   expect(unitsFromBillingUnit(unit)).toBe(expected);
+});
+
+it.each([
+  ["COCA-COLA PET 45*12", 12],
+  ["HAWAI TROPICAL PET 45*12", 12],
+  ["Eau 6x1,5L", 6],
+  ["Jus 12 x 33cl", 12],
+  ["Sidi Ali 1.5L x 6", 6],
+  ["Coca 33cl*24", 24],
+  ["Eau Sidi Ali x24", 24],
+  ["Yaourt pack de 4", 4],
+  ["Lait carton 12", 12],
+  ["حليب علبة ١٢", 12],
+  ["SIDI ALI PET 33CL", null],
+  ["SIDI ALI PET 1.50L", null],
+  ["Lait entier 1 L", null],
+  ["Coca 1*1L", null],
+  ["Huile x1", null],
+  ["Sucre 5000*2000", null],
+  [null, null],
+])("reads the pack count in the product name %j as %s", (name, expected) => {
+  expect(unitsFromDescription(name)).toBe(expected);
 });

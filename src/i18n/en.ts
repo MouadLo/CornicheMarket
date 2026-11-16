@@ -396,6 +396,11 @@ const en: Translations = {
     stampNote: "The stamp duty is not added to product costs.",
     discountLine: "Printed price {{gross}} − discount {{discount}} = {{net}} per billed unit",
     unitsPer: "Pieces per {{unit}}",
+    unitsPerPack: "Pieces per pack or carton",
+    unitsPerPackHint: "Leave empty if the line counts single pieces.",
+    unitsFromName:
+      "{{units}} pieces per pack, read from the product name: check it. Empty the field if the line counts single pieces.",
+    openPackSize: "Billed by pack or carton?",
     suggestion: "Suggestion: {{name}}",
     remembered: "Matched like this supplier’s last invoice. Please check.",
     futureDate: "The invoice date is in the future. Correct the invoice details.",

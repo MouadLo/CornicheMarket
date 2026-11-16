@@ -41,7 +41,9 @@ import {
   billedUnits,
   fetchInvoiceDraft,
   extractInvoice,
+  canHavePackSize,
   isPackLine,
+  showsPackSize,
   lineCost,
   matchInvoiceLines,
   recostLines,
@@ -426,6 +428,7 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             const name = product?.name ?? "";
             const lineMatches = matches.filter((match) => match.line_index === index);
             const pack = isPackLine(source);
+            const packField = showsPackSize(source, line);
             const billed = billedUnits(source, line);
             const printed = confirmedSource(source, line);
             const info =
@@ -636,17 +639,34 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                     />
                   </>
                 )}
-                {pack && (
+                {packField && (
                   <InvoiceInput
                     decimal
-                    label={t("invoices.unitsPer", {
-                      unit: isolateBidi(source.billing_unit ?? ""),
-                    })}
+                    label={
+                      pack
+                        ? t("invoices.unitsPer", { unit: isolateBidi(source.billing_unit ?? "") })
+                        : t("invoices.unitsPerPack")
+                    }
                     value={line.unitsPer}
                     disabled={saving}
                     onChange={(text) =>
                       updateLine(index, withUnitsPer(source, line, text, activeBasis))
                     }
+                  />
+                )}
+                {packField && !pack && (
+                  <Text style={line.unitsFromName ? styles.warning : undefined}>
+                    {line.unitsFromName
+                      ? t("invoices.unitsFromName", { units: line.unitsPer })
+                      : t("invoices.unitsPerPackHint")}
+                  </Text>
+                )}
+                {!packField && canHavePackSize(source, line) && hasPrinted && (
+                  <BigButton
+                    variant="secondary"
+                    label={t("invoices.openPackSize")}
+                    disabled={saving}
+                    onPress={() => updateLine(index, { packOpen: true })}
                   />
                 )}
                 <InvoiceInput

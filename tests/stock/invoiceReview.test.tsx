@@ -720,6 +720,35 @@ describe("HT and TTC prices", () => {
     act(() => included.unmount());
   });
 
+  it("reads a pack count from the name and says so", async () => {
+    const tree = await render(
+      { totals: { price_basis: "ht" } },
+      {
+        ...htLine,
+        description: "COCA-COLA PET 45*12",
+        billed_quantity: "8",
+        billed_unit_cost: "50.50",
+      }
+    );
+    expect(field(tree, "invoices.unitsPerPack").props.value).toBe("12");
+    expect(field(tree, "invoices.quantity").props.value).toBe("96");
+    expect(content(tree)).toContain("invoices.unitsFromName");
+    act(() => tree.unmount());
+  });
+
+  it("lets the owner say a line is a pack when nothing printed says so", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    expect(field(tree, "invoices.unitsPerPack")).toBeUndefined();
+    const open = tree.root
+      .findAllByType(BigButton)
+      .find((button) => button.props.label === "invoices.openPackSize")!;
+    act(() => open.props.onPress());
+    expect(content(tree)).toContain("invoices.unitsPerPackHint");
+    act(() => field(tree, "invoices.unitsPerPack").props.onChangeText("6"));
+    expect(field(tree, "invoices.quantity").props.value).toBe("36");
+    act(() => tree.unmount());
+  });
+
   it("says when the invoice discount cannot be read", async () => {
     const tree = await render({ totals: { price_basis: "ht", global_discount_text: "spécial" } });
     expect(content(tree)).toContain("invoices.globalDiscountUnread");

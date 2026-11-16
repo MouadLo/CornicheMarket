@@ -58,9 +58,12 @@ describe("soda invoice: HT prices with a discount on each line", () => {
   const draft = draftOf(sodaInvoice);
   const review = initialReview(draft, true);
 
-  it("takes each line's discount off before TVA: 47,47 HT is 56,96 TTC", () => {
+  it("takes each line's discount off before TVA, then splits the pack of 12 read from the name", () => {
     expect(review.basis.printed).toBe("ht");
-    expect(review.lines.map((line) => line.unitCost)).toEqual(["56.96", "68.02"]);
+    // 47,47 HT = 56,964 TTC per pack of 12 = 4,75 a bottle; 56,68 HT = 68,016 TTC = 5,67
+    expect(review.lines.map((line) => line.unitCost)).toEqual(["4.75", "5.67"]);
+    expect(review.lines.map((line) => line.quantity)).toEqual(["96", "24"]);
+    expect(review.lines[0]).toMatchObject({ unitsPer: "12", unitsFromName: true });
     expect(review.lines[0]).toMatchObject({
       billedQuantity: "8",
       price: "50.50",
@@ -97,7 +100,7 @@ describe("soda invoice: HT prices with a discount on each line", () => {
       "differs"
     );
     const fixed = withPrinted(draft.source_lines[0], wrong, { price: "50,50" }, review.basis);
-    expect(fixed.unitCost).toBe("56.96");
+    expect(fixed.unitCost).toBe("4.75");
   });
 
   it("the printed total of line discounts, misread as an invoice discount, is not applied", () => {
@@ -105,7 +108,7 @@ describe("soda invoice: HT prices with a discount on each line", () => {
     const start = initialReview(misread, true);
     expect(start.totals.applyGlobal).toBe(false);
     expect(start.basis.global).toBeNull();
-    expect(start.lines.map((line) => line.unitCost)).toEqual(["56.96", "68.02"]);
+    expect(start.lines.map((line) => line.unitCost)).toEqual(["4.75", "5.67"]);
     const summary = invoiceSummary(misread.source_lines, start.lines, start.totals, "ht");
     expect(summary.globalIncluded).toBe(true);
   });

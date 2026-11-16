@@ -12,6 +12,7 @@ import {
   isWeightBillingUnit,
   parseUnitsPerBillingUnit,
   unitsFromBillingUnit,
+  unitsFromDescription,
 } from "@/src/lib/stock/packs";
 import { convertUnitCostCents, type GlobalDiscount, type LineDiscount } from "@/src/lib/stock/vat";
 import { supabase } from "@/src/lib/supabase/client";
@@ -77,6 +78,11 @@ export type InvoiceReviewLine = {
   unitCost: string;
   // Stock units in one billed carton or pack; "" when the line is not billed by pack.
   unitsPer: string;
+  // A line with no printed billing unit that is billed by pack all the same:
+  // the owner opened "pieces per pack", or the count was read from the name.
+  packOpen?: boolean;
+  // unitsPer was read from the product name ("45*12"): the owner checks it.
+  unitsFromName?: boolean;
   // The owner typed this cost: changing the HT/TTC basis must not overwrite it.
   costTouched?: boolean;
   // The invoice line as the owner confirmed it, per billed unit: quantity,
@@ -245,7 +251,24 @@ export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostB
 export function billedUnits(source: InvoiceSourceLine, line: InvoiceReviewLine): number | null {
   if (isWeightBillingUnit(source.billing_unit)) return line.product?.unit === "kg" ? 1 : null;
   if (isPackLine(source)) return parseUnitsPerBillingUnit(line.unitsPer);
-  return 1;
+  // No printed billing unit: a piece, unless the owner says it is a pack.
+  return line.unitsPer.trim() ? parseUnitsPerBillingUnit(line.unitsPer) : 1;
+}
+
+// Whether "pieces per pack" can apply: not to weights, and not when the
+// product is itself stocked by the pack.
+export function canHavePackSize(source: InvoiceSourceLine, line: InvoiceReviewLine): boolean {
+  if (isWeightBillingUnit(source.billing_unit)) return false;
+  return isPackLine(source) || line.product?.unit !== "pack";
+}
+
+// The field shows on a printed pack line, or once the owner opened it, or
+// when a count was found in the name.
+export function showsPackSize(source: InvoiceSourceLine, line: InvoiceReviewLine): boolean {
+  return (
+    canHavePackSize(source, line) &&
+    (isPackLine(source) || !!line.packOpen || line.unitsPer.trim() !== "")
+  );
 }
 
 // Fill quantity and unit cost from the printed values. Anything the app cannot
@@ -279,7 +302,11 @@ export function withUnitsPer(
   text: string,
   basis?: CostBasis
 ): InvoiceReviewLine {
-  return autoFill(source, { ...line, unitsPer: text, costTouched: false }, basis);
+  return autoFill(
+    source,
+    { ...line, unitsPer: text, costTouched: false, unitsFromName: false },
+    basis
+  );
 }
 
 // The owner corrected the invoice line (billed quantity, price or discount):
@@ -310,9 +337,25 @@ export function initialReviewLine(source: InvoiceSourceLine, basis?: CostBasis):
         }
       : {}),
   };
-  const printed = isPackLine(source) ? unitsFromBillingUnit(source.billing_unit) : null;
-  return printed
-    ? withUnitsPer(source, line, String(printed), basis)
+  if (isPackLine(source)) {
+    const printed = unitsFromBillingUnit(source.billing_unit);
+    return printed
+      ? withUnitsPer(source, line, String(printed), basis)
+      : autoFill(source, line, basis);
+  }
+  // No printed billing unit, but the name says "45*12": start as a pack of 12,
+  // flagged for the owner to check. Older drafts without printed values keep
+  // their lines as read.
+  const fromName =
+    !isWeightBillingUnit(source.billing_unit) && source.billed_unit_cost !== undefined
+      ? unitsFromDescription(source.description)
+      : null;
+  return fromName
+    ? {
+        ...withUnitsPer(source, line, String(fromName), basis),
+        packOpen: true,
+        unitsFromName: true,
+      }
     : autoFill(source, line, basis);
 }
 
@@ -328,6 +371,14 @@ export function withProduct(
   const previousUnit = line.product?.unit ?? source.unit;
   if (product?.unit === "kg" && isWeightBillingUnit(source.billing_unit))
     return autoFill(source, { ...line, product, unitsPer: "", costTouched: false }, basis);
+  // A product stocked by the pack, on a line with no printed billing unit: the
+  // billed pack is the stock unit, whatever its name says it holds.
+  if (product?.unit === "pack" && !isPackLine(source) && !isWeightBillingUnit(source.billing_unit))
+    return autoFill(
+      source,
+      { ...line, product, unitsPer: "", packOpen: false, unitsFromName: false, costTouched: false },
+      basis
+    );
   if ((product?.unit ?? source.unit) === previousUnit) return { ...line, product };
   return { ...line, product, quantity: "", unitCost: "", unitsPer: "", costTouched: false };
 }
@@ -347,10 +398,15 @@ export function withRememberedMatch(
     { kind: "existing", id: match.product_id, name: match.product_name, unit: match.product_unit },
     basis
   );
-  // The owner confirmed this count for this exact printed unit: it wins over the guess.
-  return isPackLine(source) && match.units_per_billing_unit
-    ? withUnitsPer(source, next, String(match.units_per_billing_unit), basis)
-    : next;
+  // The owner confirmed this count for this exact wording and printed unit: it
+  // wins over any guess, from the printed unit or from the name.
+  const remembered = match.units_per_billing_unit;
+  if (!remembered || !canHavePackSize(source, next)) return next;
+  if (isPackLine(source)) return withUnitsPer(source, next, String(remembered), basis);
+  // No printed unit: last time it was a pack of N, or a single piece (1).
+  return remembered > 1
+    ? { ...withUnitsPer(source, next, String(remembered), basis), packOpen: true }
+    : { ...withUnitsPer(source, next, "", basis), packOpen: false };
 }
 
 // The owner changed the printed or stored basis: every cost they did not type
