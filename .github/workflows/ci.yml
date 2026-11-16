@@ -92,7 +92,7 @@ jobs:
       # Each file is a transaction that raises on any broken rule and rolls back.
       - name: Database rule tests
         run: |
-          for f in tests/stock/invoiceApproval.sql tests/stock/invoiceCapture.sql tests/stock/invoiceMatching.sql; do
+          for f in tests/stock/invoiceApproval.sql tests/stock/invoiceCapture.sql tests/stock/invoiceMatching.sql tests/products/categoryCode.sql; do
             echo "== $f"
             psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
           done

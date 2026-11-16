@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { categoryLabel } from "@/src/lib/products/categoryCatalog";
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { applyPercent, formatMAD } from "@/src/lib/money";
 import {
@@ -27,7 +28,7 @@ type Props = {
 };
 
 export function BulkPriceModal({ visible, categories, onClose, onApplied }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [percent, setPercent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +36,10 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
   const percentValue = Number(percent.replace(",", "."));
   const valid = validBulkPercent(percentValue);
   const scope = categoryId
-    ? (categories.find((category) => category.id === categoryId)?.name ?? "")
+    ? categoryLabel(
+        categories.find((category) => category.id === categoryId) ?? { name: "" },
+        i18n?.language
+      )
     : t("products.bulkAll");
 
   // Changing prices touches every till at once and has no undo, so the owner
@@ -110,7 +114,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
             {categories.map((category) => (
               <Chip
                 key={category.id}
-                label={category.name}
+                label={categoryLabel(category, i18n?.language)}
                 selected={categoryId === category.id}
                 onPress={() => setCategoryId(category.id)}
               />

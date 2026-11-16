@@ -15,6 +15,13 @@ import {
 } from "@/src/lib/money";
 import { decideCategory, MAX_CATEGORY_NAME, withCategory } from "@/src/lib/products/categories";
 import {
+  catalogLang,
+  categoryLabel,
+  existingFor,
+  suggestionsFor,
+  type CatalogEntry,
+} from "@/src/lib/products/categoryCatalog";
+import {
   createCategory,
   findByBarcode,
   type Category,
@@ -40,7 +47,8 @@ export function ProductForm({
   submitLabel,
   onSubmit,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n?.language;
   // Categories made from this form join the loaded list (which can still be
   // arriving when the form opens), and the new one is selected.
   const [created, setCreated] = useState<Category[]>([]);
@@ -49,6 +57,8 @@ export function ProductForm({
     [loadedCategories, created]
   );
   const [addingCategory, setAddingCategory] = useState(false);
+  // "Other…": the owner types a name that is not in the starter list.
+  const [typingCategory, setTypingCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -91,8 +101,33 @@ export function ProductForm({
 
   const closeCategoryForm = () => {
     setAddingCategory(false);
+    setTypingCategory(false);
     setNewCategory("");
     setCategoryError(null);
+  };
+
+  // A category from the starter list: the one already in use for it, else made
+  // with its French name and stable code (shown in the language in use).
+  const handlePickSuggestion = async (entry: CatalogEntry) => {
+    if (creatingCategory) return;
+    setCreatingCategory(true);
+    setCategoryError(null);
+    try {
+      // Already in the shop (made elsewhere meanwhile): use it, never a twin.
+      const same = existingFor(entry, categories);
+      if (same) {
+        setCategoryId(same.id);
+      } else {
+        const category = await createCategory(entry.fr, entry.code);
+        setCreated((current) => [...current, category]);
+        setCategoryId(category.id);
+      }
+      closeCategoryForm();
+    } catch {
+      setCategoryError(t("products.formCategoryError"));
+    } finally {
+      setCreatingCategory(false);
+    }
   };
 
   const handleAddCategory = async () => {
@@ -192,7 +227,7 @@ export function ProductForm({
           {categories.map((category) => (
             <Chip
               key={category.id}
-              label={category.name}
+              label={categoryLabel(category, language)}
               selected={categoryId === category.id}
               onPress={() => setCategoryId(category.id)}
             />
@@ -205,22 +240,38 @@ export function ProductForm({
         </View>
         {addingCategory && (
           <View style={styles.newCategory}>
-            <TextInput
-              style={[styles.input, styles.flex]}
-              value={newCategory}
-              onChangeText={(value) => {
-                setNewCategory(value);
-                setCategoryError(null);
-              }}
-              placeholder={t("products.formCategoryName")}
-              accessibilityLabel={t("products.formCategoryName")}
-              maxLength={MAX_CATEGORY_NAME + 10}
-              autoFocus
-              onSubmitEditing={handleAddCategory}
-              returnKeyType="done"
-            />
-            <View style={styles.row}>
-              <View style={styles.flex}>
+            <Text style={styles.suggestTitle}>{t("products.formCategorySuggested")}</Text>
+            <View style={styles.chips}>
+              {suggestionsFor(categories).map((entry) => (
+                <Chip
+                  key={entry.code}
+                  label={entry[catalogLang(language)]}
+                  selected={false}
+                  onPress={() => handlePickSuggestion(entry)}
+                />
+              ))}
+              <Chip
+                label={t("products.formCategoryOther")}
+                selected={typingCategory}
+                onPress={() => setTypingCategory(true)}
+              />
+            </View>
+            {typingCategory && (
+              <>
+                <TextInput
+                  style={[styles.input, styles.flex]}
+                  value={newCategory}
+                  onChangeText={(value) => {
+                    setNewCategory(value);
+                    setCategoryError(null);
+                  }}
+                  placeholder={t("products.formCategoryName")}
+                  accessibilityLabel={t("products.formCategoryName")}
+                  maxLength={MAX_CATEGORY_NAME + 10}
+                  autoFocus
+                  onSubmitEditing={handleAddCategory}
+                  returnKeyType="done"
+                />
                 <BigButton
                   label={
                     creatingCategory ? t("products.formSaving") : t("products.formCategoryAdd")
@@ -228,16 +279,14 @@ export function ProductForm({
                   onPress={handleAddCategory}
                   disabled={creatingCategory || newCategory.trim() === ""}
                 />
-              </View>
-              <View style={styles.flex}>
-                <BigButton
-                  label={t("common.cancel")}
-                  variant="secondary"
-                  onPress={closeCategoryForm}
-                  disabled={creatingCategory}
-                />
-              </View>
-            </View>
+              </>
+            )}
+            <BigButton
+              label={t("common.cancel")}
+              variant="secondary"
+              onPress={closeCategoryForm}
+              disabled={creatingCategory}
+            />
             {categoryError && <Text style={styles.error}>{categoryError}</Text>}
           </View>
         )}
@@ -400,6 +449,7 @@ const styles = StyleSheet.create({
   scanButtonText: { color: colors.white, fontWeight: "600", fontSize: 16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   newCategory: { gap: 10, marginTop: 4 },
+  suggestTitle: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   chip: {
     paddingVertical: 10,
     paddingHorizontal: 16,

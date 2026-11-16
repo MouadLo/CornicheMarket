@@ -36,6 +36,7 @@ import {
   hasAnyProducts,
   type Product,
 } from "@/src/lib/products/queries";
+import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 import { rankBySearch } from "@/src/lib/products/search";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
@@ -64,7 +65,7 @@ import { colors } from "@/src/theme/tokens";
 
 export default function SellScreen() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
   const sync = useSaleSync();
   const accepting = useRef(false);
@@ -130,7 +131,10 @@ export default function SellScreen() {
         ? resolveGrid({
             tabs: cachedGrid.tabs,
             tiles: cachedGrid.tiles,
-            categories: cachedGrid.categories,
+            categories: cachedGrid.categories.map((category) => ({
+              ...category,
+              name: localizeCategoryName(category.name, i18n?.language),
+            })),
             favoritesLabel: t("sell.grid.favorites"),
             products: cachedGrid.products.map((p) => ({
               id: p.id,
@@ -145,7 +149,7 @@ export default function SellScreen() {
             })),
           })
         : [],
-    [cachedGrid, t]
+    [cachedGrid, t, i18n?.language]
   );
 
   const debounced = useDebouncedValue(search, 250);

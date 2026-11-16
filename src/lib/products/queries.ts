@@ -17,7 +17,9 @@ export type Product = {
   current_cost_cents: number | null;
 };
 
-export type Category = { id: string; name: string };
+// code: the stable identity of a catalogue category (migration 035); null for
+// one the owner typed himself.
+export type Category = { id: string; name: string; code?: string | null };
 
 export type ProductStatusFilter = "active" | "inactive" | "all";
 
@@ -87,22 +89,28 @@ export async function fetchProducts(
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const { data, error } = await supabase.from("categories").select("id, name").order("name");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Category[];
+  const { data, error } = await supabase.from("categories").select("id, name, code").order("name");
+  if (!error) return (data ?? []) as Category[];
+  // 42703: the code column does not exist yet (this app version reached a
+  // database that has not had migration 035). Categories still work without it.
+  if (error.code !== "42703") throw new Error(error.message);
+  const legacy = await supabase.from("categories").select("id, name").order("name");
+  if (legacy.error) throw new Error(legacy.error.message);
+  return (legacy.data ?? []) as Category[];
 }
 
 // Owner only (row-level security). The database also adds the category's tab
 // to the Sell screen. Callers check for an existing twin first (see
 // decideCategory): the server only treats exact spellings as duplicates.
-export async function createCategory(name: string): Promise<Category> {
+export async function createCategory(name: string, code: string | null = null): Promise<Category> {
   const { data, error } = await supabase
     .from("categories")
-    .insert({ name })
-    .select("id, name")
+    .insert(code ? { name, code } : { name })
+    .select()
     .single();
   if (error) throw new Error(error.message);
-  return data as Category;
+  const row = data as Category;
+  return { id: row.id, name: row.name, code: row.code ?? null };
 }
 
 export async function fetchProduct(id: string, isOwner: boolean): Promise<Product | null> {

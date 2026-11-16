@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
+
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
@@ -201,7 +203,7 @@ export default function ReportsScreen() {
       title: "By category",
       columns: ["Category", "Quantity", "Revenue", "Profit"],
       rows: categories.map((row) => [
-        row.category_name,
+        localizeCategoryName(row.category_name, i18n.language),
         row.quantity,
         centsToDisplay(row.revenue_cents),
         centsToDisplay(row.profit_cents),
@@ -371,7 +373,9 @@ export default function ReportsScreen() {
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
-                label: isolateBidi(row.category_name.slice(0, 10)),
+                label: isolateBidi(
+                  localizeCategoryName(row.category_name, i18n.language).slice(0, 10)
+                ),
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}

@@ -272,6 +272,8 @@ const fr = {
     formCategory: "Catégorie",
     formCategoryNone: "Sans catégorie",
     formNewCategory: "+ Nouvelle catégorie",
+    formCategorySuggested: "Catégories proposées",
+    formCategoryOther: "Autre…",
     formCategoryName: "Nom de la catégorie",
     formCategoryAdd: "Ajouter la catégorie",
     formCategoryInvalid: "Saisissez un nom de {{max}} caractères au plus.",
