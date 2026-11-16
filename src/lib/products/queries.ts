@@ -168,6 +168,19 @@ export async function batchUpdateSellingPrices(
   if (error) throw new Error(error.message);
 }
 
+// Every active product a bulk price change would touch, with its buying price,
+// so the owner can be shown the real result before it is applied. Walks the
+// pages: PostgREST caps the rows of one response.
+export async function fetchBulkPriceTargets(categoryId: string | null): Promise<Product[]> {
+  const all: Product[] = [];
+  const filters: ProductFilters = { search: "", categoryId, lowStockOnly: false, status: "active" };
+  for (let page = 0; ; page += 1) {
+    const batch = await fetchProducts(filters, page, true);
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) return all;
+  }
+}
+
 export async function bulkAdjustSellingPrice(
   categoryId: string | null,
   percent: number
