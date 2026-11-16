@@ -57,14 +57,14 @@ it("after a credit sale, the next sale opens on cash with no customer", () => {
   press("sell.payLater");
   press("Fatima Zahra");
   press("sell.completeSale");
-  expect(onConfirm).toHaveBeenLastCalledWith("credit", "c1");
+  expect(onConfirm).toHaveBeenLastCalledWith("credit", "c1", 0);
 
   // The sale completes: the sheet closes. The next customer opens it again.
   setVisible(false);
   setVisible(true);
 
   press("sell.completeSale");
-  expect(onConfirm).toHaveBeenLastCalledWith("cash", null);
+  expect(onConfirm).toHaveBeenLastCalledWith("cash", null, 0);
 });
 
 it("a stale customer cannot be put on credit by a single tap on the next sale", () => {
@@ -104,5 +104,26 @@ it("keeps the choices while the sheet stays open (saving flips, nothing else)", 
   setVisible(true, true);
   setVisible(true, false);
   press("sell.completeSale");
-  expect(onConfirm).toHaveBeenLastCalledWith("credit", "c2");
+  expect(onConfirm).toHaveBeenLastCalledWith("credit", "c2", 0);
+});
+
+describe("the change handed to the sale", () => {
+  const input = () => tree.root.findAllByType(TextInput)[0];
+
+  it("passes what to give back for a cash sale", () => {
+    // The sheet in this file is opened with a total of 8.00 DH: 100 given is 92.00 back.
+    act(() => input().props.onChangeText("100"));
+    press("sell.completeSale");
+    expect(onConfirm.mock.calls.at(-1)).toEqual(["cash", null, 9200]);
+  });
+
+  it("is 0 for an exact amount, an empty field, and any other method", () => {
+    press("sell.completeSale");
+    expect(onConfirm.mock.calls.at(-1)![2]).toBe(0);
+    act(() => input().props.onChangeText("100"));
+    press("sell.payLater");
+    press("Fatima Zahra");
+    press("sell.completeSale");
+    expect(onConfirm.mock.calls.at(-1)).toEqual(["credit", "c1", 0]);
+  });
 });

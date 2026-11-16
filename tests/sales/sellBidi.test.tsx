@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList, Text } from "react-native";
+import { FlatList, Text, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import SellScreen from "../../app/(app)/sell/index";
@@ -39,6 +39,7 @@ jest.mock("../../src/lib/products/offlineCache", () => ({
   refreshProductCache: async () => {},
   getProductCacheMeta: async () => null,
   findCachedByBarcode: async () => null,
+  searchCachedProducts: async () => [],
 }));
 jest.mock("../../src/lib/products/queries", () => ({
   fetchProducts: async () => [mockProduct()],
@@ -94,6 +95,10 @@ describe("product names are bidi-isolated in the Sell flow", () => {
     mockSearch = "حليب";
     await act(async () => {
       tree = create(<SellScreen />);
+    });
+    // The cashier types the query (the debounce is faked): results appear for it.
+    await act(async () => {
+      tree.root.findAllByType(TextInput)[0].props.onChangeText(mockSearch);
     });
     expect(allTexts(tree.root)).toContain(isolateBidi(NAME));
     expect(allTexts(tree.root)).not.toContain(NAME);
