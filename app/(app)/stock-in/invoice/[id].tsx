@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import { validInvoiceDate } from "@/supabase/functions/_shared/invoiceParse";
 import { InvoicePhotos } from "@/src/components/stock/InvoicePhotos";
-import { fetchSuppliers, type Supplier } from "@/src/lib/stock/queries";
+import { createSupplier, fetchSuppliers, type Supplier } from "@/src/lib/stock/queries";
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -44,6 +44,7 @@ import {
   canHavePackSize,
   isPackLine,
   showsPackSize,
+  supplierToCreate,
   lineCost,
   matchInvoiceLines,
   recostLines,
@@ -195,7 +196,10 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
   const [foundPostedPurchase, setFoundPostedPurchase] = useState(false);
   const { photos } = useLocalSearchParams<{ photos?: string }>();
   const [showPhotos, setShowPhotos] = useState(photos === "1");
-  const [headerOpen, setHeaderOpen] = useState(false);
+  // A supplier or number the scan could not settle: open the details at once.
+  const [headerOpen, setHeaderOpen] = useState(
+    () => !initialDraft.purchase_id && (!initialDraft.supplier_id || !initialDraft.invoice_number)
+  );
   const [confirmed, setConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -958,6 +962,28 @@ function InvoiceHeader({
     };
   }, []);
 
+  // A supplier seen for the first time: create it from the name on the
+  // invoice (or the one typed), then select it. Saving the header stays a
+  // separate step.
+  const toCreate = supplierToCreate(search, draft.extraction?.supplier_name, suppliers);
+  async function addSupplier() {
+    if (inFlight.current || !toCreate) return;
+    inFlight.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      const created = await createSupplier(toCreate, null);
+      setSuppliers((current) => [...current, created]);
+      setSupplier(created.id);
+      setSearch("");
+    } catch {
+      setError("invoices.supplierCreateError");
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  }
+
   async function save() {
     if (inFlight.current || !supplier || !number.trim()) return;
     if (date.trim() && !validInvoiceDate(date.trim())) {
@@ -1019,6 +1045,14 @@ function InvoiceHeader({
             <Text>{isolateBidi(row.name)}</Text>
           </Pressable>
         ))}
+      {!!toCreate && (
+        <BigButton
+          variant="secondary"
+          label={t("invoices.createSupplier", { name: isolateBidi(toCreate) })}
+          disabled={saving}
+          onPress={addSupplier}
+        />
+      )}
       <InvoiceInput
         label={t("invoices.invoiceNumber")}
         value={number}

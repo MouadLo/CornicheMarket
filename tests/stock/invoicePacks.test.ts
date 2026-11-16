@@ -1,6 +1,7 @@
 import {
   buildReviewedInvoiceLine,
   reviewLineIssues,
+  supplierToCreate,
   canHavePackSize,
   initialReviewLine,
   showsPackSize,
@@ -179,5 +180,31 @@ describe("what is left to do on a line", () => {
                 buildReviewedInvoiceLine(line) !== null,
               ]);
             }
+  });
+});
+
+describe("the supplier to create from an invoice", () => {
+  const suppliers = [
+    { name: "Distributeur Atlas" },
+    { name: "Société Centrale des Boissons Gazeuses " },
+  ];
+
+  it("offers the name read from the invoice, or the one typed", () => {
+    expect(supplierToCreate("", "Les Eaux Minerales dOulmes SA", suppliers)).toBe(
+      "Les Eaux Minerales dOulmes SA"
+    );
+    expect(supplierToCreate("  Oulmes   Bouskoura ", "Les Eaux", suppliers)).toBe(
+      "Oulmes Bouskoura"
+    );
+  });
+
+  it("offers nothing when that supplier exists already, ignoring case and spaces", () => {
+    expect(supplierToCreate("distributeur atlas", null, suppliers)).toBeNull();
+    expect(supplierToCreate("", "Société Centrale des Boissons Gazeuses", suppliers)).toBeNull();
+  });
+
+  it("offers nothing without a name, or with one too long", () => {
+    expect(supplierToCreate(" ", null, suppliers)).toBeNull();
+    expect(supplierToCreate("x".repeat(151), null, suppliers)).toBeNull();
   });
 });

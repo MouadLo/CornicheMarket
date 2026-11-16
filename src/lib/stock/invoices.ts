@@ -514,6 +514,20 @@ export function reviewLineIssues(source: InvoiceSourceLine, line: InvoiceReviewL
   return issues;
 }
 
+// The supplier the owner can create from the invoice screen: what they typed
+// in the search, else the name read from the invoice. Nothing when it is empty,
+// too long, or a supplier of that name already exists (choose it instead).
+export function supplierToCreate(
+  search: string,
+  extracted: string | null | undefined,
+  suppliers: { name: string }[]
+): string | null {
+  const name = (search.trim() || extracted?.trim() || "").replace(/\s+/g, " ");
+  if (!name || name.length > 150) return null;
+  const key = name.toLowerCase();
+  return suppliers.some((supplier) => supplier.name.trim().toLowerCase() === key) ? null : name;
+}
+
 const invoiceFields =
   "id, invoice_number, revision, purchase_id, supplier_id, invoice_date, status, flags, suppliers(name)";
 export type InvoiceSummary = Pick<
