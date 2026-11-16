@@ -601,6 +601,44 @@ describe("HT and TTC prices", () => {
     act(() => tree.unmount());
   });
 
+  it("takes a percentage discount off the price before converting, and shows price, discount and net", async () => {
+    const tree = await render(
+      { totals: { price_basis: "ht" } },
+      { ...htLine, discount_text: "10%", discount_percent: 10 }
+    );
+    // 8.50 HT less 10% = 7.65 HT, plus 20% TVA = 9.18 TTC
+    expect(field(tree, "invoices.unitCost").props.value).toBe("9.18");
+    const content = plain(JSON.stringify(tree.toJSON()));
+    expect(content).toContain("invoices.discountLine");
+    act(() => tree.unmount());
+  });
+
+  it("takes an amount discount off the whole line", async () => {
+    // 6 x 8.50 = 51.00, less 6.00 = 45.00, so 7.50 each
+    const tree = await render(
+      { totals: { price_basis: "ht" } },
+      { ...htLine, vat_percent: 0, discount_text: "6,00", discount_cents: 600 }
+    );
+    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("7.50");
+    act(() => tree.unmount());
+  });
+
+  it("warns when the discount could not be read or the line total does not match it", async () => {
+    const unread = await render(
+      { totals: { price_basis: "ht" } },
+      { ...htLine, discount_text: "spécial" }
+    );
+    expect(plain(JSON.stringify(unread.toJSON()))).toContain("invoices.discountUnread");
+    act(() => unread.unmount());
+    const mismatch = await render(
+      { totals: { price_basis: "ht" } },
+      { ...htLine, discount_text: "10%", discount_percent: 10, discount_check: true }
+    );
+    expect(plain(JSON.stringify(mismatch.toJSON()))).toContain("invoices.discountCheck");
+    act(() => mismatch.unmount());
+  });
+
   it("leaves the cost blank with a reason when a conversion needs a TVA rate that is missing", async () => {
     const tree = await render({ totals: { price_basis: "ht" } }, { ...htLine, vat_percent: null });
     expect(field(tree, "invoices.unitCost").props.value).toBe("");

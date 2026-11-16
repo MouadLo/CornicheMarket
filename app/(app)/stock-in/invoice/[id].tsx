@@ -17,6 +17,7 @@ import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { formatMAD, lineTotalCents } from "@/src/lib/money";
+import { convertUnitCostCents } from "@/src/lib/stock/vat";
 import { invoiceMoneyCents } from "@/supabase/functions/_shared/invoiceParse";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
@@ -24,6 +25,8 @@ import {
   approveInvoiceDraft,
   approvalErrorKey,
   buildReviewedInvoiceLine,
+  discountUnread,
+  sourceDiscount,
   billedUnits,
   fetchInvoiceDraft,
   extractInvoice,
@@ -403,11 +406,46 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                         rate: info.vat,
                       })
                     : null;
+            // Printed price, discount, and the price left after it (per billed unit).
+            const discount = sourceDiscount(source);
+            const netCents =
+              discount && printedCents !== null
+                ? convertUnitCostCents({
+                    billedCents: printedCents,
+                    unitsPer: 1,
+                    from: "ht",
+                    to: "ht",
+                    vatPercent: null,
+                    discount,
+                  })
+                : null;
+            const discountLabel = source.discount_percent
+              ? source.discount_percent + "%"
+              : formatMAD(source.discount_cents ?? 0);
             return (
               <View key={index} style={styles.card}>
                 <Text style={styles.heading}>
                   {isolateBidi(source.description || t("invoices.unknownLine"))}
                 </Text>
+                {netCents !== null && printedCents !== null && (
+                  <Text>
+                    {t("invoices.discountLine", {
+                      gross: isolateBidi(formatMAD(printedCents)),
+                      discount: isolateBidi(discountLabel),
+                      net: isolateBidi(formatMAD(netCents)),
+                    })}
+                  </Text>
+                )}
+                {discountUnread(source) && (
+                  <Text style={styles.warning}>
+                    {t("invoices.discountUnread", {
+                      text: isolateBidi(source.discount_text ?? ""),
+                    })}
+                  </Text>
+                )}
+                {!!discount && source.discount_check && (
+                  <Text style={styles.warning}>{t("invoices.discountCheck")}</Text>
+                )}
                 {!!source.billing_unit && (
                   <Text>
                     {t("invoices.billingUnit", { unit: isolateBidi(source.billing_unit) })}

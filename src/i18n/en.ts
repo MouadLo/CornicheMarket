@@ -361,6 +361,10 @@ const en: Translations = {
     vatMissing: "TVA rate unreadable: enter the cost yourself.",
     costConverted: "Printed price {{printed}} → cost {{cost}} (TVA {{rate}}%)",
     costTouched: "Cost typed by you: it is not converted.",
+    discountLine: "Printed price {{gross}} − discount {{discount}} = {{net}} per billed unit",
+    discountUnread: 'Printed discount "{{text}}" unreadable: check the cost yourself.',
+    discountCheck:
+      "The printed line total does not match price less discount: the discount may already be in the price. Check it.",
     unitsPer: "Pieces per {{unit}}",
     suggestion: "Suggestion: {{name}}",
     remembered: "Matched like this supplier’s last invoice. Please check.",

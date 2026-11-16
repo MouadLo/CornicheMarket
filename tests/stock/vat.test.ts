@@ -62,3 +62,69 @@ it("converts no price into a negative one or one from impossible inputs", () => 
   expect(convert(850, "ht", "ttc", 20, 10001)).toBeNull();
   expect(convert(0, "ht", "ttc", 20)).toBe(0);
 });
+
+describe("line discounts", () => {
+  const base = { unitsPer: 1, from: "ht", to: "ht", vatPercent: null } as const;
+
+  it("takes a percentage off the printed price", () => {
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        discount: { kind: "percent", hundredths: 1000 },
+      })
+    ).toBe(900);
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        discount: { kind: "percent", hundredths: 750 },
+      })
+    ).toBe(925);
+  });
+
+  it("takes an amount off the whole line, spread over its quantity", () => {
+    // 10 x 10.00 DH less 5.00 DH = 9.50 DH each
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        discount: { kind: "amount", cents: 500, quantityMilli: 10000 },
+      })
+    ).toBe(950);
+  });
+
+  it("discounts before TVA and pack division, rounding once", () => {
+    // carton of 12 at 102.00 HT, 10% off, to TTC at 20%: 102*.9*1.2/12 = 9.18
+    expect(
+      convertUnitCostCents({
+        billedCents: 10200,
+        unitsPer: 12,
+        from: "ht",
+        to: "ttc",
+        vatPercent: 20,
+        discount: { kind: "percent", hundredths: 1000 },
+      })
+    ).toBe(918);
+  });
+
+  it("a full discount is a free item; no discount changes nothing", () => {
+    expect(
+      convertUnitCostCents({
+        ...base,
+        billedCents: 1000,
+        discount: { kind: "percent", hundredths: 10000 },
+      })
+    ).toBe(0);
+    expect(convertUnitCostCents({ ...base, billedCents: 1000, discount: null })).toBe(1000);
+  });
+
+  it.each([
+    [{ kind: "percent", hundredths: 10001 }],
+    [{ kind: "percent", hundredths: -1 }],
+    [{ kind: "amount", cents: 20000, quantityMilli: 10000 }],
+    [{ kind: "amount", cents: 100, quantityMilli: 0 }],
+  ] as const)("refuses the impossible discount %j", (discount) => {
+    expect(convertUnitCostCents({ ...base, billedCents: 1000, discount })).toBeNull();
+  });
+});

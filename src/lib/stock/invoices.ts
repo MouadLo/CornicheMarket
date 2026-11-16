@@ -12,7 +12,7 @@ import {
   parseUnitsPerBillingUnit,
   unitsFromBillingUnit,
 } from "@/src/lib/stock/packs";
-import { convertUnitCostCents } from "@/src/lib/stock/vat";
+import { convertUnitCostCents, type LineDiscount } from "@/src/lib/stock/vat";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type InvoiceSourceLine = {
@@ -24,6 +24,14 @@ export type InvoiceSourceLine = {
   billed_unit_cost?: string;
   // TVA rate printed for the line (or the invoice's single rate); absent on older drafts.
   vat_percent?: number | null;
+  // Line discount (remise) as printed, and as read: a percentage of the line or
+  // an amount off the whole line. Absent on older drafts. discount_text without
+  // a value could not be read; discount_check means the printed line total does
+  // not match price less discount.
+  discount_text?: string | null;
+  discount_percent?: number | null;
+  discount_cents?: number | null;
+  discount_check?: boolean;
   quantity: string;
   unit: ProductUnit;
   unit_cost: string;
@@ -74,7 +82,33 @@ type ReviewedLine = {
   printed_basis?: PriceBasis | null;
   cost_basis?: PriceBasis;
   vat_percent?: number | null;
+  // The discount taken off the printed price to reach the cost, when there was one.
+  discount_percent?: number | null;
+  discount_cents?: number | null;
 };
+
+// The discount to take off the printed price, or null. A percentage needs no
+// quantity; an amount is per whole line and needs the billed quantity.
+export function sourceDiscount(source: InvoiceSourceLine): LineDiscount | null {
+  if (source.discount_percent)
+    return { kind: "percent", hundredths: Math.round(source.discount_percent * 100) };
+  if (source.discount_cents) {
+    const quantity = invoiceQuantity(source.billed_quantity ?? "");
+    if (quantity === null) return null;
+    return {
+      kind: "amount",
+      cents: source.discount_cents,
+      quantityMilli: Math.round(quantity * 1000),
+    };
+  }
+  return null;
+}
+
+// A discount was printed on the line but the app could not use it: the owner
+// must check the cost by hand.
+export function discountUnread(source: InvoiceSourceLine): boolean {
+  return !!source.discount_text && !sourceDiscount(source);
+}
 
 // A line billed by carton or pack: the owner says how many stock units one
 // billed unit holds, and quantity and cost follow. Weight lines are not packs.
@@ -104,6 +138,7 @@ export type LineCost = {
 // in a carton, in one rounding step.
 export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostBasis): LineCost {
   const billed = invoiceMoneyCents(source.billed_unit_cost ?? "");
+  const discount = sourceDiscount(source);
   const none = { cents: null, reason: null, vat: null, converted: false } as const;
   if (billed === null) return none;
   if (!basis)
@@ -115,6 +150,7 @@ export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostB
         from: "ht",
         to: "ht",
         vatPercent: null,
+        discount,
       }),
     };
   if (!basis.printed) return { ...none, reason: "basis_unknown" };
@@ -128,6 +164,7 @@ export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostB
       from: basis.printed,
       to: basis.store,
       vatPercent: vat,
+      discount,
     }),
     reason: null,
     vat,
@@ -281,6 +318,12 @@ export function buildReviewedInvoiceLine(
           printed_basis: audit.basis.printed,
           cost_basis: audit.basis.store,
           vat_percent: audit.source.vat_percent ?? null,
+          ...(sourceDiscount(audit.source)
+            ? {
+                discount_percent: audit.source.discount_percent ?? null,
+                discount_cents: audit.source.discount_cents ?? null,
+              }
+            : {}),
         }
       : {}),
   };
