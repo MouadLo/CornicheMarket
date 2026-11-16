@@ -2,7 +2,7 @@ import { normalizeSearch } from "@/src/lib/products/search";
 
 export const MAX_CATEGORY_NAME = 60;
 
-export type CategoryRef = { id: string; name: string };
+export type CategoryRef = { id: string; name: string; code?: string | null };
 
 // What the owner typed, tidied: trimmed, inner runs of spaces collapsed.
 export function cleanCategoryName(raw: string): string {

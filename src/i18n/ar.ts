@@ -272,6 +272,8 @@ const ar: Translations = {
     formCategory: "الفئة",
     formCategoryNone: "بدون فئة",
     formNewCategory: "+ فئة جديدة",
+    formCategorySuggested: "فئات مقترحة",
+    formCategoryOther: "أخرى…",
     formCategoryName: "اسم الفئة",
     formCategoryAdd: "إضافة الفئة",
     formCategoryInvalid: "أدخل اسماً لا يتجاوز {{max}} حرفاً.",

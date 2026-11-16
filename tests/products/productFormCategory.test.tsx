@@ -6,8 +6,9 @@ import { BigButton } from "../../src/components/BigButton";
 import { ProductForm } from "../../src/components/products/ProductForm";
 import { createCategory } from "../../src/lib/products/queries";
 
+let mockLanguage = "fr";
 jest.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: mockLanguage } }),
 }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("../../src/components/products/BarcodeScannerModal", () => ({
@@ -25,7 +26,9 @@ const categories = [
 const onSubmit = jest.fn(async () => {});
 
 let tree: ReactTestRenderer;
-const render = async (loaded = categories) => {
+const render = async (
+  loaded: { id: string; name: string; code?: string | null }[] = categories
+) => {
   await act(async () => {
     tree = create(<ProductForm categories={loaded} submitLabel="save" onSubmit={onSubmit} />);
   });
@@ -69,22 +72,84 @@ beforeEach(() => {
 });
 afterEach(() => act(() => tree?.unmount()));
 
-it("offers a New category chip that opens a name field", async () => {
+it("offers a New category chip that opens the suggestions, with Other… for a typed name", async () => {
   await render();
   expect(chip("products.formNewCategory")).toBeDefined();
+  expect(chip("Boulangerie et pâtisserie")).toBeUndefined();
+  press("products.formNewCategory");
+  expect(has("products.formCategorySuggested")).toBe(true);
+  expect(chip("Boulangerie et pâtisserie")).toBeDefined();
+  expect(chip("products.formCategoryOther")).toBeDefined();
   expect(
     tree.root
       .findAllByType(TextInput)
       .some((i) => i.props.accessibilityLabel === "products.formCategoryName")
   ).toBe(false);
-  press("products.formNewCategory");
+  press("products.formCategoryOther");
   expect(categoryInput()).toBeDefined();
   expect(button("products.formCategoryAdd").props.disabled).toBe(true);
+});
+
+describe("the starter list", () => {
+  const pick = (label: string) =>
+    act(async () => {
+      await chip(label)!.props.onPress();
+    });
+
+  it("creates a category from the list with its French name and stable code, and selects it", async () => {
+    await render();
+    press("products.formNewCategory");
+    await pick("Boulangerie et pâtisserie");
+    expect(createCategory).toHaveBeenCalledWith("Boulangerie et pâtisserie", "bakery");
+    expect(selected("Boulangerie et pâtisserie")).toBe(true);
+  });
+
+  it("does not offer what the shop already has, by code or by the same name", async () => {
+    await render([
+      { id: "c1", name: "Boissons", code: "beverages" },
+      { id: "c2", name: "Fruits et légumes" },
+    ]);
+    press("products.formNewCategory");
+    expect(chip("Boulangerie et pâtisserie")).toBeDefined();
+    // They are chips of the list above, not suggestions: one each.
+    const boissons = tree.root.findAllByType(Pressable).filter((n) => textIn(n) === "Boissons");
+    expect(boissons).toHaveLength(1);
+    const produce = tree.root
+      .findAllByType(Pressable)
+      .filter((n) => textIn(n) === "Fruits et légumes");
+    expect(produce).toHaveLength(1);
+  });
+
+  it("shows list names in the language in use, and a coded category in that language too", async () => {
+    mockLanguage = "en";
+    await render([{ id: "c1", name: "Boissons", code: "beverages" }]);
+    expect(chip("Beverages")).toBeDefined();
+    press("products.formNewCategory");
+    expect(chip("Bakery & pastry")).toBeDefined();
+    mockLanguage = "fr";
+  });
+
+  it("shows a category the owner typed exactly as typed", async () => {
+    mockLanguage = "ar";
+    await render([{ id: "c9", name: "Phone accessories" }]);
+    expect(chip("Phone accessories")).toBeDefined();
+    mockLanguage = "fr";
+  });
+
+  it("shows an error and creates nothing when the server refuses", async () => {
+    jest.mocked(createCategory).mockRejectedValueOnce(new Error("permission denied"));
+    await render();
+    press("products.formNewCategory");
+    await pick("Boulangerie et pâtisserie");
+    expect(has("products.formCategoryError")).toBe(true);
+    expect(chip("Boulangerie et pâtisserie")).toBeDefined(); // still offered
+  });
 });
 
 it("creates the category with a tidy name, adds it to the chips, and selects it", async () => {
   await render();
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("  Produits   ménagers ");
   await add();
 
@@ -109,6 +174,7 @@ it("saves the product with the new category", async () => {
       .props.onChangeText("12")
   );
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("Hygiène");
   await add();
   await act(async () => {
@@ -122,6 +188,7 @@ it("saves the product with the new category", async () => {
 it("uses the existing category instead of creating a twin, whatever the case or accents", async () => {
   await render();
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("epicerie");
   await add();
   expect(createCategory).not.toHaveBeenCalled();
@@ -131,6 +198,7 @@ it("uses the existing category instead of creating a twin, whatever the case or 
 it("refuses a name that is too long, without calling the server", async () => {
   await render();
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("x".repeat(80));
   await add();
   expect(createCategory).not.toHaveBeenCalled();
@@ -141,6 +209,7 @@ it("shows an error and selects nothing when creating fails", async () => {
   jest.mocked(createCategory).mockRejectedValueOnce(new Error("permission denied"));
   await render();
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("Snacks");
   await add();
   expect(has("products.formCategoryError")).toBe(true);
@@ -154,6 +223,7 @@ it("shows an error and selects nothing when creating fails", async () => {
 it("cancel closes the field and creates nothing", async () => {
   await render();
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("Snacks");
   act(() => button("common.cancel").props.onPress());
   expect(createCategory).not.toHaveBeenCalled();
@@ -167,6 +237,7 @@ it("cancel closes the field and creates nothing", async () => {
 it("keeps a category created here when the loaded list arrives or changes afterwards", async () => {
   await render([]);
   press("products.formNewCategory");
+  press("products.formCategoryOther");
   type("Snacks");
   await add();
   await act(async () => {

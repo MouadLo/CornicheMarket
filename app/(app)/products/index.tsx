@@ -26,11 +26,12 @@ import {
   type ProductFilters,
   type ProductStatusFilter,
 } from "@/src/lib/products/queries";
+import { categoryLabel } from "@/src/lib/products/categoryCatalog";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
 export default function ProductsScreen() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [search, setSearch] = useState("");
@@ -135,7 +136,7 @@ export default function ProductsScreen() {
           {categories.map((category) => (
             <FilterChip
               key={category.id}
-              label={category.name}
+              label={categoryLabel(category, i18n?.language)}
               selected={categoryId === category.id}
               onPress={() => setCategoryId(category.id === categoryId ? null : category.id)}
             />

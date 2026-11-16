@@ -273,6 +273,8 @@ const en: Translations = {
     formCategory: "Category",
     formCategoryNone: "None",
     formNewCategory: "+ New category",
+    formCategorySuggested: "Suggested categories",
+    formCategoryOther: "Other…",
     formCategoryName: "Category name",
     formCategoryAdd: "Add category",
     formCategoryInvalid: "Enter a name of at most {{max}} characters.",
