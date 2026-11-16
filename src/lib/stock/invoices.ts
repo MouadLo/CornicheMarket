@@ -1,11 +1,12 @@
 import {
+  invoiceDiscount,
   invoiceMoneyCents,
   invoiceQuantity,
   needsUnitConversion,
   type InvoiceFlag,
   type PriceBasis,
 } from "@/supabase/functions/_shared/invoiceParse";
-import { centsToDisplay } from "@/src/lib/money";
+import { centsToDisplay, lineTotalCents } from "@/src/lib/money";
 import type { ProductUnit } from "@/src/lib/products/queries";
 import {
   isWeightBillingUnit,
@@ -24,30 +25,28 @@ export type InvoiceSourceLine = {
   billed_unit_cost?: string;
   // TVA rate printed for the line (or the invoice's single rate); absent on older drafts.
   vat_percent?: number | null;
-  // Line discount (remise) as printed, and as read: a percentage of the line or
-  // an amount off the whole line. Absent on older drafts. discount_text without
-  // a value could not be read; discount_check means the printed line total does
-  // not match price less discount.
+  // The line's discount (remise) as printed: "10%" off the line or "24,24-"
+  // off the whole line. And the printed line total, after that discount.
+  // Both absent on older drafts.
   discount_text?: string | null;
-  discount_percent?: number | null;
-  discount_cents?: number | null;
-  discount_check?: boolean;
+  line_total?: string;
   quantity: string;
   unit: ProductUnit;
   unit_cost: string;
 };
 
-// What the parser kept of the invoice's printed totals (all optional: older drafts).
+// What the parser kept of the invoice's printed totals, in centimes (all
+// optional: older drafts lack the newer ones).
 export type InvoiceTotals = {
+  subtotal_ht?: number | null;
+  vat_total?: number | null;
+  total_ttc?: number | null;
+  stamp_duty?: number | null;
+  net_to_pay?: number | null;
   price_basis?: PriceBasis | null;
   vat_percent?: number | null;
-  // Discount on the whole invoice (remise globale): as printed, as read, and the
-  // lines' sum an amount comes off. check: printed totals do not match it.
+  // Discount on the whole invoice (remise globale), as printed.
   global_discount_text?: string | null;
-  global_discount_percent?: number | null;
-  global_discount_cents?: number | null;
-  lines_total_cents?: number | null;
-  global_discount_check?: boolean;
 };
 
 export type InvoiceDraft = {
@@ -80,6 +79,11 @@ export type InvoiceReviewLine = {
   unitsPer: string;
   // The owner typed this cost: changing the HT/TTC basis must not overwrite it.
   costTouched?: boolean;
+  // The invoice line as the owner confirmed it, per billed unit: quantity,
+  // price and discount, starting from what was read. Absent: as read.
+  billedQuantity?: string;
+  price?: string;
+  discount?: string;
 };
 
 type ReviewedLine = {
@@ -104,27 +108,66 @@ type ReviewedLine = {
   lines_total_cents?: number | null;
 };
 
+// The invoice line with the owner's corrections in place of what was read.
+export function confirmedSource(
+  source: InvoiceSourceLine,
+  line: InvoiceReviewLine
+): InvoiceSourceLine {
+  return {
+    ...source,
+    billed_quantity: line.billedQuantity ?? source.billed_quantity,
+    billed_unit_cost: line.price ?? source.billed_unit_cost,
+    discount_text:
+      line.discount !== undefined ? line.discount.trim() || null : source.discount_text,
+  };
+}
+
+// What one invoice line comes to on its printed basis, in centimes: quantity
+// times price, less its discount. Null when the quantity or price cannot be
+// read, or the discount is unreadable or larger than the line.
+export function lineAmounts(
+  source: InvoiceSourceLine
+): { gross: number; discount: number; net: number } | null {
+  const quantity = invoiceQuantity(source.billed_quantity ?? "");
+  const price = invoiceMoneyCents(source.billed_unit_cost ?? "");
+  if (quantity === null || price === null) return null;
+  const gross = lineTotalCents(quantity, price);
+  if (!source.discount_text) return { gross, discount: 0, net: gross };
+  const printed = invoiceDiscount(source.discount_text);
+  if (!printed) return null;
+  const discount =
+    printed.percent !== null
+      ? Math.round((gross * Math.round(printed.percent * 100)) / 10000)
+      : printed.cents;
+  return discount <= gross ? { gross, discount, net: gross - discount } : null;
+}
+
 // The discount to take off the printed price, or null. A percentage needs no
 // quantity; an amount is per whole line and needs the billed quantity.
 export function sourceDiscount(source: InvoiceSourceLine): LineDiscount | null {
-  if (source.discount_percent)
-    return { kind: "percent", hundredths: Math.round(source.discount_percent * 100) };
-  if (source.discount_cents) {
-    const quantity = invoiceQuantity(source.billed_quantity ?? "");
-    if (quantity === null) return null;
-    return {
-      kind: "amount",
-      cents: source.discount_cents,
-      quantityMilli: Math.round(quantity * 1000),
-    };
-  }
-  return null;
+  const printed = invoiceDiscount(source.discount_text);
+  if (!printed || !lineAmounts(source)) return null;
+  if (printed.percent !== null)
+    return { kind: "percent", hundredths: Math.round(printed.percent * 100) };
+  const quantity = invoiceQuantity(source.billed_quantity ?? "");
+  return quantity === null
+    ? null
+    : { kind: "amount", cents: printed.cents, quantityMilli: Math.round(quantity * 1000) };
 }
 
-// A discount was printed on the line but the app could not use it: the owner
-// must check the cost by hand.
+// A discount is printed on the line but cannot be used (unreadable, or larger
+// than the line): the owner corrects it.
 export function discountUnread(source: InvoiceSourceLine): boolean {
   return !!source.discount_text && !sourceDiscount(source);
+}
+
+// The printed line total against quantity × price − discount: null when there
+// is nothing to compare, else whether they agree within 1 DH.
+export function lineTotalAgrees(source: InvoiceSourceLine): boolean | null {
+  const printed = invoiceMoneyCents(source.line_total ?? "");
+  const amounts = lineAmounts(source);
+  if (printed === null || !amounts) return null;
+  return Math.abs(amounts.net - printed) <= 100;
 }
 
 // A line billed by carton or pack: the owner says how many stock units one
@@ -142,38 +185,15 @@ export type CostBasis = {
   global?: GlobalDiscount | null;
 };
 
-export function totalsGlobalDiscount(
-  totals: InvoiceTotals | null | undefined
-): GlobalDiscount | null {
-  if (totals?.global_discount_percent)
-    return { kind: "percent", hundredths: Math.round(totals.global_discount_percent * 100) };
-  if (totals?.global_discount_cents && totals.lines_total_cents)
-    return {
-      kind: "amount",
-      cents: totals.global_discount_cents,
-      linesTotalCents: totals.lines_total_cents,
-    };
-  return null;
-}
-
-// A discount on the whole invoice was printed but could not be used.
-export function globalDiscountUnread(totals: InvoiceTotals | null | undefined): boolean {
-  return !!totals?.global_discount_text && !totalsGlobalDiscount(totals);
-}
-
 // A new review defaults to TTC: what the shop really pays per unit.
 export function initialCostBasis(draft: Pick<InvoiceDraft, "totals">): CostBasis {
-  return {
-    printed: draft.totals?.price_basis ?? null,
-    store: "ttc",
-    global: totalsGlobalDiscount(draft.totals),
-  };
+  return { printed: draft.totals?.price_basis ?? null, store: "ttc", global: null };
 }
 
 export type LineCost = {
   cents: number | null;
   // Why no cost was filled in, for the owner to see.
-  reason: "basis_unknown" | "vat_missing" | null;
+  reason: "basis_unknown" | "vat_missing" | "discount_unread" | null;
   vat: number | null;
   converted: boolean;
 };
@@ -186,6 +206,8 @@ export function lineCost(source: InvoiceSourceLine, units: number, basis?: CostB
   const discount = sourceDiscount(source);
   const none = { cents: null, reason: null, vat: null, converted: false } as const;
   if (billed === null) return none;
+  // Never a cost without a discount the invoice printed: the owner corrects it first.
+  if (source.discount_text && !discount) return { ...none, reason: "discount_unread" };
   if (!basis)
     return {
       ...none,
@@ -237,10 +259,11 @@ function autoFill(
 ): InvoiceReviewLine {
   const units = billedUnits(source, line);
   if (units === null || source.billed_unit_cost === undefined) return line;
-  const cost = lineCost(source, units, basis);
+  const printed = confirmedSource(source, line);
+  const cost = lineCost(printed, units, basis);
   const unitCost = cost.cents !== null ? centsToDisplay(cost.cents) : "";
   if (costOnly) return { ...line, unitCost };
-  const billedQuantity = invoiceQuantity(source.billed_quantity ?? "");
+  const billedQuantity = invoiceQuantity(printed.billed_quantity ?? "");
   const quantity =
     billedQuantity === null
       ? line.quantity
@@ -259,14 +282,33 @@ export function withUnitsPer(
   return autoFill(source, { ...line, unitsPer: text, costTouched: false }, basis);
 }
 
+// The owner corrected the invoice line (billed quantity, price or discount):
+// stock quantity and cost follow, as when it was first read.
+export function withPrinted(
+  source: InvoiceSourceLine,
+  line: InvoiceReviewLine,
+  changes: Pick<InvoiceReviewLine, "billedQuantity" | "price" | "discount">,
+  basis?: CostBasis
+): InvoiceReviewLine {
+  return autoFill(source, { ...line, ...changes, costTouched: false }, basis);
+}
+
 // A review line as first shown. A pack line whose printed unit names its count
 // ("carton de 12") starts converted with that count; the owner can change it.
 export function initialReviewLine(source: InvoiceSourceLine, basis?: CostBasis): InvoiceReviewLine {
-  const line = {
+  const line: InvoiceReviewLine = {
     product: null,
     quantity: source.quantity,
     unitCost: source.unit_cost,
     unitsPer: "",
+    // The invoice line as read, for the owner to confirm or correct.
+    ...(source.billed_unit_cost !== undefined
+      ? {
+          billedQuantity: source.billed_quantity ?? "",
+          price: source.billed_unit_cost,
+          discount: source.discount_text ?? "",
+        }
+      : {}),
   };
   const printed = isPackLine(source) ? unitsFromBillingUnit(source.billing_unit) : null;
   return printed
@@ -350,7 +392,11 @@ export function buildReviewedInvoiceLine(
     newProduct = { name, selling_price_cents: price };
   }
 
-  const printedCost = audit ? invoiceMoneyCents(audit.source.billed_unit_cost ?? "") : null;
+  // The audit records the invoice line as the owner confirmed it.
+  const printed = audit ? confirmedSource(audit.source, line) : null;
+  const printedCost = printed ? invoiceMoneyCents(printed.billed_unit_cost ?? "") : null;
+  const discount = printed ? sourceDiscount(printed) : null;
+  const global = audit?.basis.global ?? null;
   return {
     product_id: product.kind === "existing" ? product.id : null,
     new_product: newProduct,
@@ -358,28 +404,23 @@ export function buildReviewedInvoiceLine(
     quantity,
     unit_cost_cents: cost,
     units_per_billing_unit: unitsPer,
-    ...(audit && printedCost !== null
+    ...(audit && printed && printedCost !== null
       ? {
           printed_unit_cost_cents: printedCost,
           printed_basis: audit.basis.printed,
           cost_basis: audit.basis.store,
-          vat_percent: audit.source.vat_percent ?? null,
-          ...(audit.basis.global
+          vat_percent: printed.vat_percent ?? null,
+          ...(discount
             ? {
-                global_discount_percent:
-                  audit.basis.global.kind === "percent"
-                    ? audit.basis.global.hundredths / 100
-                    : null,
-                global_discount_cents:
-                  audit.basis.global.kind === "amount" ? audit.basis.global.cents : null,
-                lines_total_cents:
-                  audit.basis.global.kind === "amount" ? audit.basis.global.linesTotalCents : null,
+                discount_percent: discount.kind === "percent" ? discount.hundredths / 100 : null,
+                discount_cents: discount.kind === "amount" ? discount.cents : null,
               }
             : {}),
-          ...(sourceDiscount(audit.source)
+          ...(global
             ? {
-                discount_percent: audit.source.discount_percent ?? null,
-                discount_cents: audit.source.discount_cents ?? null,
+                global_discount_percent: global.kind === "percent" ? global.hundredths / 100 : null,
+                global_discount_cents: global.kind === "amount" ? global.cents : null,
+                lines_total_cents: global.kind === "amount" ? global.linesTotalCents : null,
               }
             : {}),
         }

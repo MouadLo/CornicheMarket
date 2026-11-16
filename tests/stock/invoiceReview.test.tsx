@@ -398,8 +398,15 @@ it("pre-fills the product and pack size remembered for this supplier", async () 
   const content = plain(JSON.stringify(tree.toJSON()));
   expect(content).toContain("invoices.matched Eau Sidi Ali 1.5L");
   expect(content).toContain("invoices.remembered");
-  const values = tree.root.findAllByType(TextInput).map((f) => f.props.value);
-  expect(values).toEqual(["6", "12", "5.00"]);
+  const value = (label: string) =>
+    tree.root
+      .findAllByType(TextInput)
+      .find((f) => plain(String(f.props.accessibilityLabel)).startsWith(label))!.props.value;
+  expect([
+    value("invoices.unitsPer"),
+    value("invoices.quantity"),
+    value("invoices.unitCost"),
+  ]).toEqual(["6", "12", "5.00"]);
   act(() => tree.unmount());
 });
 
@@ -601,68 +608,122 @@ describe("HT and TTC prices", () => {
     act(() => tree.unmount());
   });
 
-  it("takes a percentage discount off the price before converting, and shows price, discount and net", async () => {
+  const content = (tree: ReactTestRenderer) => plain(JSON.stringify(tree.toJSON()));
+
+  it("shows the invoice line as read, and takes its discount off before converting", async () => {
     const tree = await render(
       { totals: { price_basis: "ht" } },
-      { ...htLine, discount_text: "10%", discount_percent: 10 }
+      { ...htLine, discount_text: "10%" }
     );
+    expect(field(tree, "invoices.billedQuantity").props.value).toBe("6");
+    expect(field(tree, "invoices.printedPrice").props.value).toBe("8.50");
+    expect(field(tree, "invoices.lineDiscount").props.value).toBe("10%");
     // 8.50 HT less 10% = 7.65 HT, plus 20% TVA = 9.18 TTC
     expect(field(tree, "invoices.unitCost").props.value).toBe("9.18");
-    const content = plain(JSON.stringify(tree.toJSON()));
-    expect(content).toContain("invoices.discountLine");
+    expect(content(tree)).toContain("invoices.lineAmounts");
+    // The note says the discount went into the cost, not just TVA.
+    expect(content(tree)).toContain("invoices.costConvertedDiscounted");
+    expect(content(tree)).not.toContain("invoices.costConverted ");
     act(() => tree.unmount());
   });
 
-  it("takes an amount discount off the whole line", async () => {
-    // 6 x 8.50 = 51.00, less 6.00 = 45.00, so 7.50 each
-    const tree = await render(
+  it("recomputes quantity and cost when the owner corrects the invoice line", async () => {
+    const tree = await render({ totals: { price_basis: "ht" } });
+    act(() => field(tree, "invoices.lineDiscount").props.onChangeText("24,24-"));
+    // 6 x 8.50 = 51.00 less 24.24 = 26.76 HT, so 4.46 each HT, 5.35 TTC
+    expect(field(tree, "invoices.unitCost").props.value).toBe("5.35");
+    act(() => field(tree, "invoices.billedQuantity").props.onChangeText("5"));
+    expect(field(tree, "invoices.quantity").props.value).toBe("5");
+    act(() => field(tree, "invoices.lineDiscount").props.onChangeText(""));
+    act(() => field(tree, "invoices.printedPrice").props.onChangeText("9,00"));
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.80");
+    act(() => tree.unmount());
+  });
+
+  it("checks each line against its printed total", async () => {
+    const good = await render(
       { totals: { price_basis: "ht" } },
-      { ...htLine, vat_percent: 0, discount_text: "6,00", discount_cents: 600 }
+      { ...htLine, line_total: "51.00" }
     );
-    act(() => radio(tree, "invoices.costBasis invoices.basisHT").props.onPress());
-    expect(field(tree, "invoices.unitCost").props.value).toBe("7.50");
-    act(() => tree.unmount());
+    expect(content(good)).toContain("invoices.lineTotalMatches");
+    act(() => good.unmount());
+    const bad = await render({ totals: { price_basis: "ht" } }, { ...htLine, line_total: "45.00" });
+    expect(content(bad)).toContain("invoices.lineTotalDiffers");
+    act(() => bad.unmount());
   });
 
-  it("warns when the discount could not be read or the line total does not match it", async () => {
-    const unread = await render(
+  it("leaves the cost blank while the discount cannot be read", async () => {
+    const tree = await render(
       { totals: { price_basis: "ht" } },
       { ...htLine, discount_text: "spécial" }
     );
-    expect(plain(JSON.stringify(unread.toJSON()))).toContain("invoices.discountUnread");
-    act(() => unread.unmount());
-    const mismatch = await render(
-      { totals: { price_basis: "ht" } },
-      { ...htLine, discount_text: "10%", discount_percent: 10, discount_check: true }
-    );
-    expect(plain(JSON.stringify(mismatch.toJSON()))).toContain("invoices.discountCheck");
-    act(() => mismatch.unmount());
-  });
-
-  it("takes the invoice discount off every line cost, after the line discount", async () => {
-    // 8.50 HT less 10% line = 7.65, less 5% invoice = 7.2675, +20% TVA = 8.72 TTC
-    const tree = await render(
-      { totals: { price_basis: "ht", global_discount_text: "5%", global_discount_percent: 5 } },
-      { ...htLine, discount_text: "10%", discount_percent: 10 }
-    );
-    expect(field(tree, "invoices.unitCost").props.value).toBe("8.72");
-    expect(plain(JSON.stringify(tree.toJSON()))).toContain("invoices.globalDiscount");
+    expect(content(tree)).toContain("invoices.discountUnread");
+    expect(field(tree, "invoices.unitCost").props.value).toBe("");
+    act(() => field(tree, "invoices.lineDiscount").props.onChangeText("5%"));
+    expect(field(tree, "invoices.unitCost").props.value).not.toBe("");
     act(() => tree.unmount());
   });
 
-  it("warns when the invoice discount could not be read or the totals do not match it", async () => {
-    const unread = await render({ totals: { price_basis: "ht", global_discount_text: "spécial" } });
-    expect(plain(JSON.stringify(unread.toJSON()))).toContain("invoices.globalDiscountUnread");
-    act(() => unread.unmount());
-    const mismatch = await render({
-      totals: {
-        price_basis: "ht",
-        global_discount_percent: 5,
-        global_discount_check: true,
-      },
+  it("shows the invoice totals, editable, and whether the lines match them", async () => {
+    const tree = await render({
+      totals: { price_basis: "ht", subtotal_ht: 5100, vat_total: 1020, total_ttc: 6120 },
     });
-    expect(plain(JSON.stringify(mismatch.toJSON()))).toContain("invoices.globalDiscountCheck");
-    act(() => mismatch.unmount());
+    expect(content(tree)).toContain("invoices.totalsTitle");
+    expect(field(tree, "invoices.totalHT").props.value).toBe("51.00");
+    expect(content(tree)).toContain("invoices.totalsMatch");
+    act(() => field(tree, "invoices.totalHT").props.onChangeText("60,00"));
+    expect(content(tree)).toContain("invoices.totalsDiffer");
+    expect(content(tree)).toContain("invoices.vatOff");
+    act(() => tree.unmount());
+  });
+
+  it("applies a discount on the whole invoice the totals confirm, and lets the owner switch it off", async () => {
+    // 51.00 HT less 5% = 48.45, the printed HT total
+    const tree = await render({
+      totals: { price_basis: "ht", subtotal_ht: 4845, global_discount_text: "5%" },
+    });
+    expect(field(tree, "invoices.globalDiscountLabel").props.value).toBe("5%");
+    expect(content(tree)).toContain("invoices.afterGlobal");
+    expect(content(tree)).toContain("invoices.totalsMatch");
+    // 8.50 less 5% = 8.075 HT, 9.69 TTC
+    expect(field(tree, "invoices.unitCost").props.value).toBe("9.69");
+    const toggle = tree.root
+      .findAllByType(Pressable)
+      .find(
+        (p) => p.props.accessibilityRole === "checkbox" && p.props.accessibilityState?.checked
+      )!;
+    act(() => toggle.props.onPress());
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    expect(content(tree)).toContain("invoices.totalsDiffer");
+    act(() => tree.unmount());
+  });
+
+  it("does not apply an invoice discount the lines already include", async () => {
+    const tree = await render({
+      totals: { price_basis: "ht", subtotal_ht: 5100, global_discount_text: "5%" },
+    });
+    expect(content(tree)).toContain("invoices.globalIncluded");
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    act(() => tree.unmount());
+  });
+
+  it("applies an invoice discount the owner types when the totals confirm it, not one they already include", async () => {
+    const tree = await render({ totals: { price_basis: "ht", subtotal_ht: 4845 } });
+    expect(field(tree, "invoices.unitCost").props.value).toBe("10.20");
+    act(() => field(tree, "invoices.globalDiscountLabel").props.onChangeText("5%"));
+    expect(field(tree, "invoices.unitCost").props.value).toBe("9.69");
+    act(() => tree.unmount());
+    const included = await render({ totals: { price_basis: "ht", subtotal_ht: 5100 } });
+    act(() => field(included, "invoices.globalDiscountLabel").props.onChangeText("5%"));
+    expect(field(included, "invoices.unitCost").props.value).toBe("10.20");
+    expect(content(included)).toContain("invoices.globalIncluded");
+    act(() => included.unmount());
+  });
+
+  it("says when the invoice discount cannot be read", async () => {
+    const tree = await render({ totals: { price_basis: "ht", global_discount_text: "spécial" } });
+    expect(content(tree)).toContain("invoices.globalDiscountUnread");
+    act(() => tree.unmount());
   });
 
   it("leaves the cost blank with a reason when a conversion needs a TVA rate that is missing", async () => {
