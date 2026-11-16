@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +13,9 @@ import {
   parseMoneyToCents,
   parseQuantity,
 } from "@/src/lib/money";
+import { decideCategory, MAX_CATEGORY_NAME, withCategory } from "@/src/lib/products/categories";
 import {
+  createCategory,
   findByBarcode,
   type Category,
   type Product,
@@ -32,8 +34,24 @@ type Props = {
   onSubmit: (input: ProductInput) => Promise<void>;
 };
 
-export function ProductForm({ categories, initial, submitLabel, onSubmit }: Props) {
+export function ProductForm({
+  categories: loadedCategories,
+  initial,
+  submitLabel,
+  onSubmit,
+}: Props) {
   const { t } = useTranslation();
+  // Categories made from this form join the loaded list (which can still be
+  // arriving when the form opens), and the new one is selected.
+  const [created, setCreated] = useState<Category[]>([]);
+  const categories = useMemo(
+    () => created.reduce(withCategory, [...loadedCategories]),
+    [loadedCategories, created]
+  );
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [name, setName] = useState(initial?.name ?? "");
   const [barcode, setBarcode] = useState(initial?.barcode ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.category_id ?? null);
@@ -70,6 +88,39 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
       clearTimeout(timer);
     };
   }, [barcode, initial?.barcode, initial?.id]);
+
+  const closeCategoryForm = () => {
+    setAddingCategory(false);
+    setNewCategory("");
+    setCategoryError(null);
+  };
+
+  const handleAddCategory = async () => {
+    if (creatingCategory) return;
+    const decision = decideCategory(newCategory, categories);
+    if (decision.kind === "invalid") {
+      setCategoryError(t("products.formCategoryInvalid", { max: MAX_CATEGORY_NAME }));
+      return;
+    }
+    // It exists already: use it rather than creating a twin.
+    if (decision.kind === "existing") {
+      setCategoryId(decision.category.id);
+      closeCategoryForm();
+      return;
+    }
+    setCreatingCategory(true);
+    setCategoryError(null);
+    try {
+      const category = await createCategory(decision.name);
+      setCreated((current) => [...current, category]);
+      setCategoryId(category.id);
+      closeCategoryForm();
+    } catch {
+      setCategoryError(t("products.formCategoryError"));
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -146,7 +197,50 @@ export function ProductForm({ categories, initial, submitLabel, onSubmit }: Prop
               onPress={() => setCategoryId(category.id)}
             />
           ))}
+          <Chip
+            label={t("products.formNewCategory")}
+            selected={false}
+            onPress={() => setAddingCategory(true)}
+          />
         </View>
+        {addingCategory && (
+          <View style={styles.newCategory}>
+            <TextInput
+              style={[styles.input, styles.flex]}
+              value={newCategory}
+              onChangeText={(value) => {
+                setNewCategory(value);
+                setCategoryError(null);
+              }}
+              placeholder={t("products.formCategoryName")}
+              accessibilityLabel={t("products.formCategoryName")}
+              maxLength={MAX_CATEGORY_NAME + 10}
+              autoFocus
+              onSubmitEditing={handleAddCategory}
+              returnKeyType="done"
+            />
+            <View style={styles.row}>
+              <View style={styles.flex}>
+                <BigButton
+                  label={
+                    creatingCategory ? t("products.formSaving") : t("products.formCategoryAdd")
+                  }
+                  onPress={handleAddCategory}
+                  disabled={creatingCategory || newCategory.trim() === ""}
+                />
+              </View>
+              <View style={styles.flex}>
+                <BigButton
+                  label={t("common.cancel")}
+                  variant="secondary"
+                  onPress={closeCategoryForm}
+                  disabled={creatingCategory}
+                />
+              </View>
+            </View>
+            {categoryError && <Text style={styles.error}>{categoryError}</Text>}
+          </View>
+        )}
       </Field>
 
       <Field label={t("products.formUnit")}>
@@ -305,6 +399,7 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: colors.white, fontWeight: "600", fontSize: 16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  newCategory: { gap: 10, marginTop: 4 },
   chip: {
     paddingVertical: 10,
     paddingHorizontal: 16,
