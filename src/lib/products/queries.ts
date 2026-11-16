@@ -92,6 +92,19 @@ export async function fetchCategories(): Promise<Category[]> {
   return (data ?? []) as Category[];
 }
 
+// Owner only (row-level security). The database also adds the category's tab
+// to the Sell screen. Callers check for an existing twin first (see
+// decideCategory): the server only treats exact spellings as duplicates.
+export async function createCategory(name: string): Promise<Category> {
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({ name })
+    .select("id, name")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Category;
+}
+
 export async function fetchProduct(id: string, isOwner: boolean): Promise<Product | null> {
   const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -55,11 +55,15 @@ export default function ProductsScreen() {
     [debouncedSearch, categoryId, lowStockOnly, status]
   );
 
-  useEffect(() => {
-    fetchCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }, []);
+  // Re-read on every return to this screen: a category may have been created
+  // in the product form since.
+  useFocusEffect(
+    useCallback(() => {
+      fetchCategories()
+        .then(setCategories)
+        .catch(() => setCategories([]));
+    }, [])
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
