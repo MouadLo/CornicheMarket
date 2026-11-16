@@ -397,6 +397,11 @@ const fr = {
     stampNote: "Le timbre n'est pas ajouté au coût des produits.",
     discountLine: "Prix imprimé {{gross}} − remise {{discount}} = {{net}} par unité facturée",
     unitsPer: "Pièces par {{unit}}",
+    unitsPerPack: "Pièces par pack ou carton",
+    unitsPerPackHint: "Laissez vide si la ligne compte des pièces.",
+    unitsFromName:
+      "{{units}} pièces par pack, lu dans le nom du produit : vérifiez. Videz le champ si la ligne compte des pièces.",
+    openPackSize: "Facturé par pack ou carton ?",
     suggestion: "Suggestion : {{name}}",
     remembered: "Associé comme lors de la dernière facture de ce fournisseur. Vérifiez.",
     futureDate: "La date de facture est dans le futur. Corrigez les détails de la facture.",

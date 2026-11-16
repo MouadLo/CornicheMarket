@@ -60,3 +60,32 @@ export function unitsFromBillingUnit(unit: string | null | undefined): number | 
   const units = Number(numbers[0]);
   return units >= 2 && units <= 1000 ? units : null;
 }
+
+// A pack count written in the product name, when no billing unit is printed:
+// "COCA-COLA PET 45*12" (45 cl × 12), "6x1,5L", "Eau x24", "pack de 6",
+// "carton 12". Only a starting value the owner confirms: a whole number from 2
+// to 1 000, or nothing when the name does not say clearly.
+export function unitsFromDescription(description: string | null | undefined): number | null {
+  if (!description) return null;
+  const text = description
+    .replace(/[٠-٩۰-۹]/g, (digit) => String(digit.charCodeAt(0) & 0xf))
+    .toLowerCase();
+  const valid = (value: string | undefined) => {
+    const units = Number(value);
+    return Number.isInteger(units) && units >= 2 && units <= 1000 ? units : null;
+  };
+  const size = "(?:[.,]\\d+)?\\s*(?:cl|ml|l|lt|g|gr|kg)\\b";
+  // "6x1,5L", "12 x 33cl": the count comes before a size.
+  const before = text.match(new RegExp(`(?:^|[^\\d.,])(\\d{1,4})\\s*[*x×]\\s*\\d+${size}`, "u"));
+  if (before) return valid(before[1]);
+  // "45*12", "1.5L x 6", "33cl*24": the count comes after a size or a number.
+  const after = text.match(
+    /\d(?:[.,]\d+)?\s*(?:cl|ml|l|lt|g|gr|kg)?\s*[*x×]\s*(\d{1,4})(?![\d.,]|\s*(?:cl|ml|l|lt|g|gr|kg)\b)/u
+  );
+  if (after) return valid(after[1]);
+  // "x24", "pack de 6", "carton 12", "lot de 4", "fardeau 6", "علبة 12".
+  const word = text.match(
+    /(?:^|\s)(?:x|pack|carton|lot|fardeau|paquet|boite|boîte|colis|علبة|كرتون)\s*(?:de\s*)?(\d{1,4})(?![\d.,]|\s*(?:cl|ml|l|lt|g|gr|kg)\b)/u
+  );
+  return word ? valid(word[1]) : null;
+}
