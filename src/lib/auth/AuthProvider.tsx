@@ -41,15 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileRetry, setProfileRetry] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
 
-  useEffect(() => {
-    // Re-runs on profileRetry too, so clicking Retry gives the next
-    // attempt its own fresh LOAD_TIMEOUT_MS window instead of immediately
-    // re-showing the timeout error from the previous attempt.
-    setTimedOut(false);
-    const timer = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [profileRetry]);
-
   // Re-runs on profileRetry too: the hang that needs retrying might be
   // getSession() itself (e.g. a Supabase URL that can't be reached at
   // all), not just the profile fetch below, so Retry has to be able to
@@ -78,8 +69,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [profileRetry]);
 
+  // The profile depends on who is signed in, not on the session object: the
+  // auth library hands out a new session for the same user whenever it
+  // refreshes the token (on a timer, and each time a browser tab becomes
+  // visible again). Re-fetching then would flip `loading` on and off for
+  // nothing; see the timeout below for why that used to wipe the screen.
+  const userId = session?.user.id ?? null;
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setProfile(null);
       setProfileError(null);
       setProfileLoaded(true);
@@ -93,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase
       .from("profiles")
       .select("id, full_name, role")
-      .eq("id", session.user.id)
+      .eq("id", userId)
       .single()
       .then(({ data, error }) => {
         if (mounted) {
@@ -110,9 +107,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [session, profileRetry]);
+  }, [userId, profileRetry]);
 
   const loading = !sessionLoaded || !profileLoaded;
+
+  // Counts only while loading. It used to start once at mount and stay "timed
+  // out" for good after ten seconds, so any later moment of loading (such as
+  // returning to the tab) replaced the whole app with the timeout screen,
+  // throwing away whatever the owner had typed. Re-runs on profileRetry too,
+  // so Retry gives the next attempt its own fresh window.
+  useEffect(() => {
+    setTimedOut(false);
+    if (!loading) return;
+    const timer = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [loading, profileRetry]);
   const loadTimedOut = loading && timedOut;
 
   const signIn = async (email: string, password: string) => {
