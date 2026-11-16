@@ -362,6 +362,10 @@ const fr = {
     vatMissing: "Taux de TVA illisible : saisissez le coût vous-même.",
     costConverted: "Prix imprimé {{printed}} → coût {{cost}} (TVA {{rate}} %)",
     costTouched: "Coût saisi à la main : il n’est pas converti.",
+    discountLine: "Prix imprimé {{gross}} − remise {{discount}} = {{net}} par unité facturée",
+    discountUnread: "Remise imprimée « {{text}} » illisible : vérifiez le coût vous-même.",
+    discountCheck:
+      "Le total imprimé de la ligne ne correspond pas au prix moins la remise : la remise est peut-être déjà dans le prix. Vérifiez.",
     unitsPer: "Pièces par {{unit}}",
     suggestion: "Suggestion : {{name}}",
     remembered: "Associé comme lors de la dernière facture de ce fournisseur. Vérifiez.",

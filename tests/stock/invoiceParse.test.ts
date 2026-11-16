@@ -1,5 +1,6 @@
 import {
   isInvoiceExtraction,
+  invoiceDiscount,
   invoiceMoneyCents,
   invoiceQuantity,
   invoiceVatPercent,
@@ -259,4 +260,78 @@ it("accepts an extraction saved before price_basis_text existed", () => {
   expect(isInvoiceExtraction(invoice)).toBe(true);
   expect(isInvoiceExtraction({ ...invoice, price_basis_text: "PU HT" })).toBe(true);
   expect(isInvoiceExtraction({ ...invoice, price_basis_text: 5 })).toBe(false);
+});
+
+it.each([
+  ["10%", { percent: 10, cents: null }],
+  ["-10 %", { percent: 10, cents: null }],
+  ["7,5%", { percent: 7.5, cents: null }],
+  ["٢٠٪", { percent: 20, cents: null }],
+  ["5,00", { percent: null, cents: 500 }],
+  ["- 12.50 DH", { percent: null, cents: 1250 }],
+  ["0", null],
+  ["0%", null],
+  ["101%", null],
+  ["", null],
+  [null, null],
+  ["remise spéciale", null],
+])("reads the line discount %j as %j", (text, expected) => {
+  expect(invoiceDiscount(text)).toEqual(expected);
+});
+
+describe("line discounts in normalizeInvoice", () => {
+  const line = {
+    description: "Huile 5L",
+    billed_text: "10 x 100,00",
+    quantity_billed: "10",
+    billing_unit: null,
+    unit_price_text: "100,00",
+    line_total_text: "900,00",
+    vat_rate: null,
+  };
+  const head = {
+    supplier_name: "S",
+    invoice_number: "1",
+    invoice_date: "2026-11-01",
+    subtotal_ht: null,
+    vat_total: null,
+    total_ttc: null,
+  };
+  const run = (changes: Partial<typeof line> & { discount_text?: string | null }) =>
+    normalizeInvoice({ ...head, lines: [{ ...line, ...changes }] }).sourceLines[0];
+
+  it("keeps the printed price and reads a percentage discount", () => {
+    const result = run({ discount_text: "10%" });
+    expect(result.billed_unit_cost).toBe("100.00");
+    expect(result.discount_percent).toBe(10);
+    expect(result.discount_check).toBe(false);
+  });
+
+  it("reads an amount discount off the whole line", () => {
+    const result = run({ discount_text: "100,00" });
+    expect(result.discount_cents).toBe(10000);
+    expect(result.discount_check).toBe(false);
+  });
+
+  it("warns when the printed total ignores the discount (maybe already in the price)", () => {
+    expect(run({ discount_text: "10%", line_total_text: "1 000,00" }).discount_check).toBe(true);
+  });
+
+  it("does not apply a discount larger than the line, and keeps its text", () => {
+    const result = run({ discount_text: "5 000,00" });
+    expect(result.discount_cents).toBeNull();
+    expect(result.discount_text).toBe("5 000,00");
+  });
+
+  it("no discount printed: nothing to apply", () => {
+    const result = run({ discount_text: null });
+    expect(result.discount_percent).toBeNull();
+    expect(result.discount_text).toBeNull();
+  });
+});
+
+it("accepts lines saved before discount_text existed", () => {
+  expect(isInvoiceExtraction(invoice)).toBe(true);
+  const [first] = invoice.lines;
+  expect(isInvoiceExtraction({ ...invoice, lines: [{ ...first, discount_text: 5 }] })).toBe(false);
 });

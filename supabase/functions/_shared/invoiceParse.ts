@@ -37,15 +37,19 @@ export function validInvoiceDate(date: string): boolean {
 
 const lineKeys = [
   "description", "billed_text", "quantity_billed", "billing_unit",
-  "unit_price_text", "line_total_text", "vat_rate",
+  "unit_price_text", "line_total_text", "vat_rate", "discount_text",
 ] as const;
+// Drafts read before discount_text existed lack it: absent counts as null.
+const optionalLineKeys = ["discount_text"] as const;
 const headerKeys = [
   "supplier_name", "invoice_number", "invoice_date", "subtotal_ht", "vat_total", "total_ttc",
   "price_basis_text",
 ] as const;
 // Drafts read before price_basis_text existed lack it: absent counts as null.
 const optionalHeaderKeys = ["price_basis_text"] as const;
-type ExtractedLine = Record<(typeof lineKeys)[number], string | null>;
+type ExtractedLine =
+  & Record<Exclude<(typeof lineKeys)[number], "discount_text">, string | null>
+  & { discount_text?: string | null };
 export type InvoiceExtraction = Record<Exclude<(typeof headerKeys)[number], "price_basis_text">, string | null> & {
   price_basis_text?: string | null;
   lines: ExtractedLine[];
@@ -84,8 +88,13 @@ export function isInvoiceExtraction(value: unknown): value is InvoiceExtraction 
   const optional = (value as Record<string, unknown>).price_basis_text;
   if (optional !== undefined && optional !== null && typeof optional !== "string") return false;
   if (!("lines" in value)) return false;
+  const requiredLine = lineKeys.filter((key) => !(optionalLineKeys as readonly string[]).includes(key));
+  const optionalText = (line: object) => {
+    const text = (line as Record<string, unknown>).discount_text;
+    return text === undefined || text === null || typeof text === "string";
+  };
   return Array.isArray(value.lines) && value.lines.length <= 500 &&
-    value.lines.every((line) => hasTexts(line, lineKeys));
+    value.lines.every((line) => hasTexts(line, requiredLine) && optionalText(line));
 }
 
 export type PriceBasis = "ht" | "ttc";
@@ -118,6 +127,24 @@ export function priceBasisFromTotals(
   const ttc = near(totals.total_ttc);
   if (ht && ttc) return totals.vat_total === 0 ? "ht" : null;
   return ht ? "ht" : ttc ? "ttc" : null;
+}
+
+export type LineDiscountPrinted =
+  | { percent: number; cents: null }
+  | { percent: null; cents: number };
+
+// "10%", "-5 %", "٢٠٪", "7,5%" (a percentage of the line) or "5,00", "- 12.50 DH"
+// (an amount off the line). Zero, empty or unreadable text is no discount (null).
+export function invoiceDiscount(text: string | null | undefined): LineDiscountPrinted | null {
+  const clean = normalizeInvoiceDigits((text ?? "").trim()).replace(/^[-−–]\s*/u, "").trim();
+  if (!clean) return null;
+  const percent = clean.match(/^(\d{1,3}(?:[.,٫]\d{1,2})?)\s*[%٪]$/u);
+  if (percent) {
+    const value = Number(percent[1].replace(/[,٫]/, "."));
+    return value > 0 && value <= 100 ? { percent: value, cents: null } : null;
+  }
+  const cents = invoiceMoneyCents(clean);
+  return cents !== null && cents > 0 ? { percent: null, cents } : null;
 }
 
 export type InvoiceFlag = "totals_mismatch" | "duplicate_invoice" | "unreadable_lines" | "unit_check";
@@ -177,12 +204,29 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
     const billingUnit = line.billing_unit?.trim() || null;
     const needsConversion = needsUnitConversion(billingUnit);
     unitCheck ||= needsConversion;
+    const discountText = line.discount_text?.trim() || null;
+    const discount = invoiceDiscount(discountText);
+    const grossTotal = quantity !== null && cost !== null ? Math.round(quantity * cost) : null;
+    // An amount larger than the line itself is a misreading.
+    const usable = discount && !(discount.cents !== null && grossTotal !== null && discount.cents > grossTotal)
+      ? discount : null;
+    // The printed line total shows which price it was worked from: it should
+    // match the price less the discount. Otherwise the discount may already be
+    // inside the unit price, and applying it again would cost too little.
+    const printedTotal = invoiceMoneyCents(line.line_total_text);
+    let discountCheck = false;
+    if (usable && grossTotal !== null && printedTotal !== null) {
+      const net = usable.percent !== null
+        ? Math.round((grossTotal * (10000 - Math.round(usable.percent * 100))) / 10000)
+        : grossTotal - usable.cents;
+      discountCheck = Math.abs(net - printedTotal) > 100;
+    }
     const billedQuantity = quantity !== null ? String(quantity) : "";
     const billedCost = cost !== null && cost <= 100000000
       ? String(Math.floor(cost / 100)) + "." + String(cost % 100).padStart(2, "0") : "";
     return {
       description: line.description?.trim() ?? "",
-      billed: [line.billed_text, line.unit_price_text, line.line_total_text]
+      billed: [line.billed_text, line.unit_price_text, discountText, line.line_total_text]
         .filter(Boolean).join(" · "),
       billing_unit: billingUnit,
       // As printed, per billed unit (carton, kg…): the review converts them.
@@ -190,6 +234,13 @@ export function normalizeInvoice(extraction: InvoiceExtraction) {
       billed_unit_cost: billedCost,
       // The rate printed for this line, else the invoice's single rate.
       vat_percent: lineRates[index] ?? invoiceVat,
+      // The discount as printed, and as the app uses it: a percentage of the
+      // line, or an amount off the whole line, both on the printed price basis.
+      // discount_text without either value could not be read: the owner checks.
+      discount_text: discountText,
+      discount_percent: usable?.percent ?? null,
+      discount_cents: usable?.cents ?? null,
+      discount_check: discountCheck,
       quantity: needsConversion ? "" : billedQuantity,
       unit: "piece" as const,
       unit_cost: needsConversion ? "" : billedCost,
