@@ -7,6 +7,8 @@ import {
   priceBasisFromLabel,
   priceBasisFromTotals,
   normalizeInvoice,
+  blanksToNull,
+  invoiceSchema,
   sameInvoiceHeader,
   totalTargets,
   matchedTotal,
@@ -419,5 +421,78 @@ describe("real invoices", () => {
     expect(
       normalizeInvoice({ ...sodaInvoice, subtotal_ht: "450,00", total_ttc: "540,00" }).flags
     ).toContain("totals_mismatch");
+  });
+});
+
+describe("the schema sent to the API", () => {
+  // The API refuses a schema with more than 16 parameters typed as a union
+  // (anyOf or a type array such as ["string", "null"]) or more than 24 optional
+  // parameters: every scan then fails with "Schema is too complex".
+  type Node = {
+    type?: unknown;
+    anyOf?: unknown;
+    properties?: Record<string, Node>;
+    required?: string[];
+    items?: Node;
+  };
+  const count = (node: Node): { unions: number; optional: number } => {
+    const children = Object.entries(node.properties ?? {});
+    const below = [...children.map(([, child]) => child), ...(node.items ? [node.items] : [])].map(
+      count
+    );
+    return {
+      unions:
+        children.filter(([, child]) => Array.isArray(child.type) || child.anyOf).length +
+        below.reduce((sum, child) => sum + child.unions, 0),
+      optional:
+        children.filter(([key]) => !(node.required ?? []).includes(key)).length +
+        below.reduce((sum, child) => sum + child.optional, 0),
+    };
+  };
+
+  it("has no union-typed and no optional parameters", () => {
+    expect(count(invoiceSchema as Node)).toEqual({ unions: 0, optional: 0 });
+  });
+
+  it("would have caught the nullable schema that broke scanning (18 unions)", () => {
+    const nullable = JSON.parse(
+      JSON.stringify(invoiceSchema).replace(/"type":"string"/g, '"type":["string","null"]')
+    );
+    expect(count(nullable).unions).toBe(18);
+  });
+});
+
+describe("blank answers become null", () => {
+  it("turns blank header and line values into null, keeping everything else", () => {
+    expect(
+      blanksToNull({
+        supplier_name: "S",
+        total_ttc: "",
+        stamp_duty_text: "  ",
+        lines: [{ description: "Lait", billing_unit: "", discount_text: "10%" }],
+      })
+    ).toEqual({
+      supplier_name: "S",
+      total_ttc: null,
+      stamp_duty_text: null,
+      lines: [{ description: "Lait", billing_unit: null, discount_text: "10%" }],
+    });
+  });
+
+  it("an answer of blanks reads exactly like one of nulls", () => {
+    const blanks = (fields: object) =>
+      Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [key, value === null ? "" : value])
+      );
+    const blank = { ...blanks(sodaInvoice), lines: sodaInvoice.lines.map(blanks) };
+    const cleaned = blanksToNull(blank);
+    expect(isInvoiceExtraction(cleaned)).toBe(true);
+    expect(cleaned).toEqual(sodaInvoice);
+  });
+
+  it("leaves what is not an object for the validator to refuse", () => {
+    expect(blanksToNull("text")).toBe("text");
+    expect(blanksToNull(null)).toBeNull();
+    expect(isInvoiceExtraction(blanksToNull([]))).toBe(false);
   });
 });

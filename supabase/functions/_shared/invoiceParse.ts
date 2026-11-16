@@ -61,22 +61,26 @@ export type InvoiceExtraction = Record<
   lines: ExtractedLine[];
 };
 
-const nullableStrings = (keys: readonly string[]) =>
-  Object.fromEntries(keys.map((key) => [key, { type: ["string", "null"] }]));
+// Every field is a plain string, "" when absent: a nullable type
+// (["string", "null"]) counts toward the API's limit of 16 union-typed
+// parameters per request, and this schema has more fields than that. Blanks
+// become null again in blanksToNull, before anything reads them.
+const plainStrings = (keys: readonly string[]) =>
+  Object.fromEntries(keys.map((key) => [key, { type: "string" }]));
 
 export const invoiceSchema = {
   type: "object",
   additionalProperties: false,
   required: [...headerKeys, "lines"],
   properties: {
-    ...nullableStrings(headerKeys),
+    ...plainStrings(headerKeys),
     lines: {
       type: "array",
       items: {
         type: "object",
         additionalProperties: false,
         required: [...lineKeys],
-        properties: nullableStrings(lineKeys),
+        properties: plainStrings(lineKeys),
       },
     },
   },
@@ -86,6 +90,25 @@ function hasTexts<K extends string>(value: unknown, keys: readonly K[]): value i
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const fields = value as Record<string, unknown>;
   return keys.every((key) => fields[key] === null || typeof fields[key] === "string");
+}
+
+// The model answers "" for a value that is not printed: store null instead,
+// as drafts read before this did. Anything that is not an object is left as is
+// for isInvoiceExtraction to refuse.
+export function blanksToNull(value: unknown): unknown {
+  const clean = (fields: unknown) => {
+    if (typeof fields !== "object" || fields === null || Array.isArray(fields)) return fields;
+    return Object.fromEntries(
+      Object.entries(fields).map(([key, field]) => [
+        key,
+        typeof field === "string" && field.trim() === "" ? null : field,
+      ]),
+    );
+  };
+  const header = clean(value);
+  if (typeof header !== "object" || header === null || Array.isArray(header)) return header;
+  const lines = (header as Record<string, unknown>).lines;
+  return Array.isArray(lines) ? { ...header, lines: lines.map(clean) } : header;
 }
 
 export function isInvoiceExtraction(value: unknown): value is InvoiceExtraction {

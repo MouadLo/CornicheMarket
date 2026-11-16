@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
-import { isInvoiceExtraction, normalizeInvoice, sameInvoiceHeader, validInvoiceDate } from "../_shared/invoiceParse.ts";
+import { blanksToNull, isInvoiceExtraction, normalizeInvoice, sameInvoiceHeader, validInvoiceDate } from "../_shared/invoiceParse.ts";
 import { claudeExtractor, ExtractionFailure } from "./claude.ts";
 
 const cors = {
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     }));
     const result = await claudeExtractor(key, model)(pages);
     usage = result.usage;
-    extraction = JSON.parse(result.text);
+    extraction = blanksToNull(JSON.parse(result.text));
     if (!isInvoiceExtraction(extraction)) throw new ExtractionFailure("invalid_output");
     const { flags, totals, sourceLines } = normalizeInvoice(extraction);
 
@@ -92,6 +92,13 @@ Deno.serve(async (req) => {
     return response(200, { status: "ready" });
   } catch (error) {
     const reason = error instanceof ExtractionFailure ? error.reason : "extraction_failed";
+    // Unexpected failures (an API error, unreadable output) are otherwise
+    // invisible: log the error type, status and message, never invoice content.
+    if (!(error instanceof ExtractionFailure)) {
+      const status = (error as { status?: unknown })?.status;
+      const message = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+      console.error("extract-invoice failed", { draft: draftId, status, name: (error as Error)?.name, message });
+    }
     const { error: saveError } = await save({
       status: "failed", extraction_error: reason, extraction_usage: usage,
       extraction: isInvoiceExtraction(extraction) ? extraction : null,
