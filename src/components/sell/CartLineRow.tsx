@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   main: { flexDirection: "row", alignItems: "center", gap: 10 },
-  info: { flex: 1, minHeight: 48, justifyContent: "center", minWidth: 90 },
+  info: { flex: 1, minHeight: 48, justifyContent: "center", minWidth: 70 },
   details: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   name: { fontSize: 16, fontWeight: "600" },
   total: { fontSize: 16, fontWeight: "700", minWidth: 72, textAlign: "right" },
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   weightBox: { flexDirection: "row", alignItems: "center", gap: 6 },
   weightInput: {
     minHeight: 48,
-    minWidth: 92,
+    width: 72,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.ink400,
