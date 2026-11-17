@@ -76,6 +76,7 @@ export default function SellScreen() {
 
   // Kept above the screen: leaving Sell mid-sale must not lose the basket.
   const { lines, setLines, saleDiscount, setSaleDiscount } = useBasket(profile?.id ?? null);
+  const [discountOpen, setDiscountOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   // The query the current results belong to. Results of an older query are
@@ -374,6 +375,7 @@ export default function SellScreen() {
 
       setLines([]);
       setSaleDiscount("");
+      setDiscountOpen(false);
       setPaymentOpen(false);
       showFlash(t("sell.recorded", { amount: formatMAD(total) }));
       setChangeDue(method === "cash" && change > 0 ? change : null);
@@ -412,6 +414,7 @@ export default function SellScreen() {
       if (JSON.stringify(lines) === JSON.stringify(attempt.lines)) {
         setLines([]);
         setSaleDiscount("");
+        setDiscountOpen(false);
         setPaymentOpen(false);
       }
       showFlash(t("sell.recorded", { amount: formatMAD(attempt.total_cents) }));
@@ -547,16 +550,27 @@ export default function SellScreen() {
 
       {lines.length > 0 && (
         <View style={styles.footer}>
-          <View style={styles.discountRow}>
-            <Text style={styles.footerLabel}>{t("sell.saleDiscount")}</Text>
-            <TextInput
-              style={[styles.discountInput, saleDiscountTooHigh && styles.discountInputInvalid]}
-              value={saleDiscount}
-              onChangeText={setSaleDiscount}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-            />
-          </View>
+          {saleDiscount.trim() !== "" || discountOpen || saleDiscountTooHigh ? (
+            <View style={styles.discountRow}>
+              <Text style={styles.footerLabel}>{t("sell.saleDiscount")}</Text>
+              <TextInput
+                style={[styles.discountInput, saleDiscountTooHigh && styles.discountInputInvalid]}
+                value={saleDiscount}
+                onChangeText={setSaleDiscount}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                autoFocus={discountOpen && saleDiscount.trim() === ""}
+              />
+            </View>
+          ) : (
+            <Pressable
+              style={styles.discountLink}
+              onPress={() => setDiscountOpen(true)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.discountLinkText}>{t("sell.saleDiscount")}</Text>
+            </Pressable>
+          )}
 
           {saleDiscountTooHigh && (
             <Text style={styles.discountError}>{t("sell.saleDiscountTooHigh")}</Text>
@@ -788,6 +802,8 @@ const styles = StyleSheet.create({
   },
   discountInputInvalid: { borderColor: "#b3261e" },
   discountError: { color: "#b3261e", fontSize: 13 },
+  discountLink: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
+  discountLinkText: { fontSize: 15, color: "#1a5fb4", fontWeight: "600" },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   totalValue: { fontSize: 30, fontWeight: "800" },
 });

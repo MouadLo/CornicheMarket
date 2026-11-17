@@ -33,16 +33,30 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
     onChange({ ...line, quantity: next });
   };
 
+  // The line is one compact row (UX C4). Discount and remove sit behind a tap
+  // on the name (C5); they open by themselves when something needs fixing.
+  const [expanded, setExpanded] = useState(false);
+  const needsAttention = discountTooHigh || (weighted && !(line.quantity > 0));
+  const open = expanded || needsAttention;
+
   return (
     <View style={styles.row}>
-      <View style={styles.header}>
-        <Text style={styles.name} numberOfLines={1}>
-          {isolateBidi(line.name)}
-        </Text>
-        <Text style={styles.total}>{formatMAD(lineTotal(line))}</Text>
-      </View>
+      <View style={styles.main}>
+        <Pressable
+          style={styles.info}
+          onPress={() => setExpanded((value) => !value)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+        >
+          <Text style={styles.name} numberOfLines={1}>
+            {isolateBidi(line.name)}
+          </Text>
+          <Text style={styles.unitPrice} numberOfLines={1}>
+            {formatMAD(line.unit_price_cents)} / {unitLabel(line.unit, 1, t)}
+            {line.discount_cents > 0 ? ` · −${formatMAD(line.discount_cents)}` : ""}
+          </Text>
+        </Pressable>
 
-      <View style={styles.controls}>
         {weighted ? (
           <WeightField
             quantity={line.quantity}
@@ -60,28 +74,29 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
           </View>
         )}
 
-        <View style={styles.discountBox}>
-          <Text style={styles.label}>{t("sell.discount")}</Text>
-          <DiscountField
-            cents={line.discount_cents}
-            invalid={discountTooHigh}
-            onCents={(discount_cents) => onChange({ ...line, discount_cents })}
-          />
-        </View>
-
-        <Pressable onPress={onRemove} style={styles.removeButton}>
-          <Text style={styles.remove}>{t("sell.remove")}</Text>
-        </Pressable>
+        <Text style={styles.total}>{formatMAD(lineTotal(line))}</Text>
       </View>
+
+      {open && (
+        <View style={styles.details}>
+          <View style={styles.discountBox}>
+            <Text style={styles.label}>{t("sell.discount")}</Text>
+            <DiscountField
+              cents={line.discount_cents}
+              invalid={discountTooHigh}
+              onCents={(discount_cents) => onChange({ ...line, discount_cents })}
+            />
+          </View>
+          <Pressable onPress={onRemove} style={styles.removeButton}>
+            <Text style={styles.remove}>{t("sell.remove")}</Text>
+          </Pressable>
+        </View>
+      )}
 
       {discountTooHigh && <Text style={styles.discountError}>{t("sell.lineDiscountTooHigh")}</Text>}
       {weighted && !(line.quantity > 0) && (
         <Text style={styles.discountError}>{t("sell.weightRequired")}</Text>
       )}
-
-      <Text style={styles.unitPrice}>
-        {formatMAD(line.unit_price_cents)} / {unitLabel(line.unit, 1, t)}
-      </Text>
     </View>
   );
 }
@@ -136,7 +151,6 @@ function WeightField({
 
   return (
     <View style={styles.weightBox}>
-      <Text style={styles.label}>{unitLabel("kg", quantity, t)}</Text>
       <TextInput
         style={[styles.weightInput, !(quantity > 0) && styles.weightInputInvalid]}
         value={shown}
@@ -146,24 +160,27 @@ function WeightField({
         }}
         keyboardType="decimal-pad"
         selectTextOnFocus
+        accessibilityLabel={unitLabel("kg", quantity, t)}
       />
+      <Text style={styles.label}>{unitLabel("kg", quantity, t)}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    paddingVertical: 12,
+    paddingVertical: 6,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
-    gap: 8,
+    gap: 4,
   },
-  header: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  name: { fontSize: 16, fontWeight: "600", flex: 1 },
-  total: { fontSize: 16, fontWeight: "700" },
-  controls: { flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" },
-  stepper: { flexDirection: "row", alignItems: "center", gap: 10 },
+  main: { flexDirection: "row", alignItems: "center", gap: 10 },
+  info: { flex: 1, minHeight: 48, justifyContent: "center", minWidth: 70 },
+  details: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  name: { fontSize: 16, fontWeight: "600" },
+  total: { fontSize: 16, fontWeight: "700", minWidth: 72, textAlign: "right" },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 4 },
   stepButton: {
     width: 48,
     height: 48,
@@ -173,11 +190,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stepText: { fontSize: 24, fontWeight: "700", color: colors.ink900 },
-  quantity: { fontSize: 18, fontWeight: "700", minWidth: 32, textAlign: "center" },
-  weightBox: { gap: 4 },
+  quantity: { fontSize: 18, fontWeight: "700", minWidth: 28, textAlign: "center" },
+  weightBox: { flexDirection: "row", alignItems: "center", gap: 6 },
   weightInput: {
     minHeight: 48,
-    minWidth: 92,
+    width: 72,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.ink400,
@@ -197,7 +214,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, color: colors.ink600 },
   removeButton: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   remove: { color: colors.danger600, fontWeight: "600", fontSize: 14 },
-  unitPrice: { fontSize: 13, color: colors.ink600 },
+  unitPrice: { fontSize: 12, color: colors.ink600 },
   discountInputInvalid: { borderColor: colors.danger600 },
   weightInputInvalid: { borderColor: colors.danger600 },
   discountError: { color: colors.danger600, fontSize: 12 },
