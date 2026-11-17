@@ -178,6 +178,10 @@ export default function ProductsScreen() {
             />
             <ActionButton label={t("products.exportCsv")} onPress={handleExport} />
             <ActionButton label={t("products.bulkPrice")} onPress={() => setBulkOpen(true)} />
+            <ActionButton
+              label={t("products.manageCategories")}
+              onPress={() => router.push("/(app)/products/categories")}
+            />
           </View>
         )}
       </View>
