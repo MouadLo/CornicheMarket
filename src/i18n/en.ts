@@ -528,8 +528,12 @@ const en: Translations = {
     saveSupplier: "Save supplier",
     productsReceived: "Products received",
     deliveryTotal: "Delivery total",
-    incomplete:
-      "Lines without a quantity or buying price, or with an invalid date, will not be saved.",
+    incomplete: "Fix or remove {{count}} line(s) before saving:",
+    problem: {
+      quantity: "quantity missing",
+      cost: "buying price missing",
+      expiry: "invalid date",
+    },
     expiryInvalid: "Invalid date: DD/MM/YYYY or YYYY-MM-DD",
     alreadySaved:
       "This delivery was already saved (the reply was lost). Check purchase history before entering it again. To start a new delivery, remove all lines.",

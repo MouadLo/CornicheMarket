@@ -201,6 +201,28 @@ describe("Stock In save", () => {
     expect(texts()).toContain("stockIn.incomplete");
   });
 
+  it("will not save part of a delivery: an incomplete line blocks saving and is named (O3)", async () => {
+    await addLine({ quantity: "6", unitCost: "4.50" });
+    await addLine({ quantity: "0", unitCost: "" }, bread);
+
+    expect(saveButton().props.disabled).toBe(true);
+    await pressSave();
+    expect(mockReceiveDelivery).not.toHaveBeenCalled();
+    const shown = texts().flat(Infinity).join("|");
+    expect(shown).toContain("stockIn.incomplete");
+    expect(shown).toContain("Bread");
+    expect(shown).toContain("stockIn.problem.quantity");
+    expect(shown).toContain("stockIn.problem.cost");
+
+    const lines = tree.root.findAllByType(StockInLine);
+    act(() => lines[1].props.onRemove());
+    expect(saveButton().props.disabled).toBe(false);
+    mockReceiveDelivery.mockResolvedValue(undefined);
+    await pressSave();
+    expect(mockReceiveDelivery).toHaveBeenCalledTimes(1);
+    expect(mockReceiveDelivery.mock.calls[0][1].lines).toHaveLength(1);
+  });
+
   it("explains when the server says this delivery was already saved", async () => {
     const { ReceiveDeliveryError } = jest.requireMock("../../src/lib/stock/queries");
     mockReceiveDelivery.mockRejectedValue(new ReceiveDeliveryError("dup", "already_saved"));
