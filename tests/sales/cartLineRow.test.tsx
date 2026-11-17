@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TextInput } from "react-native";
+import { Pressable, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import { CartLineRow } from "../../src/components/sell/CartLineRow";
@@ -98,11 +98,20 @@ describe("line discount field", () => {
     unit_price_cents: 1000,
   };
   // The weight field is first on a kg line; on a piece line the discount is the only input.
+  // The discount sits behind a tap on the line (C5).
+  const openDetails = () => {
+    if (tree.root.findAllByType(TextInput).length > 0) return;
+    act(() => {
+      tree.root.findAllByType(Pressable)[0].props.onPress();
+    });
+  };
   const discountInput = () => tree.root.findAllByType(TextInput).at(-1)!;
-  const typeDiscount = (text: string) =>
+  const typeDiscount = (text: string) => {
+    openDetails();
     act(() => {
       discountInput().props.onChangeText(text);
     });
+  };
 
   it("keeps what is typed: 12 is twelve dirhams, not one", () => {
     act(() => {
@@ -141,6 +150,7 @@ describe("line discount field", () => {
     act(() => {
       tree = create(<Harness initial={{ ...pieceLine, discount_cents: 300 }} />);
     });
+    openDetails();
     expect(discountInput().props.value).toBe("3.00");
     typeDiscount("");
     expect(discountInput().props.value).toBe("");
@@ -160,5 +170,34 @@ describe("line discount field", () => {
     typeDiscount("1");
     act(() => setExternal({ ...pieceLine, discount_cents: 450 }));
     expect(discountInput().props.value).toBe("4.50");
+  });
+});
+
+describe("compact line (C4, C5)", () => {
+  const pieceLine: CartLine = { ...kgLine, product_id: "eau", name: "Eau", unit: "piece" };
+
+  it("hides the discount and remove until the line is tapped", () => {
+    act(() => {
+      tree = create(<Harness initial={pieceLine} />);
+    });
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+    act(() => tree.root.findAllByType(Pressable)[0].props.onPress());
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(1);
+    act(() => tree.root.findAllByType(Pressable)[0].props.onPress());
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+  });
+
+  it("shows an applied discount on the closed line", () => {
+    act(() => {
+      tree = create(<Harness initial={{ ...pieceLine, discount_cents: 100 }} />);
+    });
+    expect(JSON.stringify(tree.toJSON())).toContain("−1.00 DH");
+  });
+
+  it("opens by itself when the discount is too high", () => {
+    act(() => {
+      tree = create(<Harness initial={{ ...pieceLine, discount_cents: 99999 }} />);
+    });
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(1);
   });
 });

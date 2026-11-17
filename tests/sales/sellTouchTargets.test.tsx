@@ -1,4 +1,5 @@
 import React from "react";
+import { Pressable } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import SellScreen from "../../app/(app)/sell/index";
@@ -77,6 +78,7 @@ describe("touch targets are at least 48dp", () => {
           <CartLineRow line={{ ...line, unit }} onChange={() => {}} onRemove={() => {}} />
         );
       });
+      act(() => tree.root.findAllByType(Pressable)[0].props.onPress());
       const size = sizeOf(pressableByText(tree.root, "sell.remove"));
       expect(size.minHeight).toBeGreaterThanOrEqual(MIN);
       expect(size.minWidth).toBeGreaterThanOrEqual(MIN);
