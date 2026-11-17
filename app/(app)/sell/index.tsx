@@ -14,6 +14,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Banner } from "@/src/components/ui/Banner";
+import { useTodayClosed } from "@/src/lib/day/useTodayClosed";
 import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { EmptyStorePrompt } from "@/src/components/sell/EmptyStorePrompt";
@@ -77,6 +79,7 @@ export default function SellScreen() {
   // Kept above the screen: leaving Sell mid-sale must not lose the basket.
   const { lines, setLines, saleDiscount, setSaleDiscount } = useBasket(profile?.id ?? null);
   const [discountOpen, setDiscountOpen] = useState(false);
+  const todayClosed = useTodayClosed();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   // The query the current results belong to. Results of an older query are
@@ -456,6 +459,9 @@ export default function SellScreen() {
           <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
             <Text style={styles.link}>{t("sell.history")}</Text>
           </Pressable>
+          <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/day")}>
+            <Text style={styles.link}>{t("day.link")}</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -498,6 +504,7 @@ export default function SellScreen() {
   );
   const noticesNode = (
     <>
+      {todayClosed && <Banner tone="warn" text={t("day.todayClosed")} />}
       {changeDue !== null && (
         <View style={styles.changeCard} accessibilityRole="alert">
           <View style={styles.changeText}>
@@ -587,7 +594,7 @@ export default function SellScreen() {
             label={t("sell.charge")}
             variant="pay"
             onPress={() => setPaymentOpen(true)}
-            disabled={discountInvalid || quantityInvalid}
+            disabled={discountInvalid || quantityInvalid || todayClosed}
           />
         </View>
       )}
