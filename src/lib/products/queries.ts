@@ -113,6 +113,53 @@ export async function createCategory(name: string, code: string | null = null): 
   return { id: row.id, name: row.name, code: row.code ?? null };
 }
 
+export type CategoryWithCount = Category & { productCount: number };
+
+// Owner only. Counts every product, active or not: they all keep the category.
+export async function fetchCategoriesWithCounts(): Promise<CategoryWithCount[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, code, products(count)")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => {
+    const counts = (row as { products?: { count: number }[] }).products;
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      code: (row.code as string | null) ?? null,
+      productCount: counts?.[0]?.count ?? 0,
+    };
+  });
+}
+
+export async function renameCategory(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("categories").update({ name }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function linkCategoryToCatalog(id: string, name: string, code: string): Promise<void> {
+  const { error } = await supabase.from("categories").update({ name, code }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Moves the products, then deletes the emptied category (its Sell tab goes
+// with it; the target keeps its own). If the delete fails the source is just
+// left empty, and the owner can delete it.
+export async function mergeCategory(fromId: string, intoId: string): Promise<void> {
+  const moved = await supabase
+    .from("products")
+    .update({ category_id: intoId })
+    .eq("category_id", fromId);
+  if (moved.error) throw new Error(moved.error.message);
+  await deleteCategory(fromId);
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from("categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function fetchProduct(id: string, isOwner: boolean): Promise<Product | null> {
   const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
   const { data, error } = await supabase
