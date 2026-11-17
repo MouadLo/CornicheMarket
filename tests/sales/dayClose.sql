@@ -2,6 +2,9 @@
 -- Every write is rolled back.
 begin;
 
+-- Start from no closed day (a developer's local database may have one).
+delete from public.day_closes;
+
 insert into public.customers (id, name) values ('00000000-0000-0000-0000-0000000000d7', 'Day test client');
 
 -- 2020-03-10: the owner rang cash 1000 + card 500; the cashier rang cash 400
