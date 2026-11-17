@@ -13,6 +13,7 @@ export default function SellLayout() {
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="history" options={{ title: t("sell.history") }} />
+      <Stack.Screen name="day" options={{ title: t("day.title") }} />
     </Stack>
   );
 }

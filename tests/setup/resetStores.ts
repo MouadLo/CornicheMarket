@@ -9,3 +9,7 @@ afterEach(async () => {
   const { __resetBasketForTests } = require("@/src/lib/sales/basketStore");
   await __resetBasketForTests();
 });
+
+// Sell asks the server whether today is closed (migration 037); tests never
+// reach a server, and an unreachable one means "not closed".
+jest.mock("@/src/lib/day/queries", () => ({ fetchTodayClosed: async () => false }));
