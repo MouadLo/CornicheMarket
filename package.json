@@ -18,7 +18,10 @@
     "prepare": "husky"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup/resetStores.ts"
+    ]
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-sans": "0.2.3",

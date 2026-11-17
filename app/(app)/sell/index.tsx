@@ -52,12 +52,12 @@ import {
   hasInvalidQuantity,
   saleTotal,
   validateSaleDiscounts,
-  type CartLine,
 } from "@/src/lib/sales/totals";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { ProductGrid } from "@/src/components/sell/ProductGrid";
+import { useBasket } from "@/src/lib/sales/basketStore";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -74,14 +74,14 @@ export default function SellScreen() {
   // The same attempt, for display: shown whenever its outcome is not known.
   const [unconfirmed, setUnconfirmed] = useState<PendingSale | null>(null);
 
-  const [lines, setLines] = useState<CartLine[]>([]);
+  // Kept above the screen: leaving Sell mid-sale must not lose the basket.
+  const { lines, setLines, saleDiscount, setSaleDiscount } = useBasket(profile?.id ?? null);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   // The query the current results belong to. Results of an older query are
   // never shown: a fast tap on a stale list adds the wrong product.
   const [resultsFor, setResultsFor] = useState("");
   const [searchSlow, setSearchSlow] = useState(false);
-  const [saleDiscount, setSaleDiscount] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   // A weighed (kg) product waiting for its weight on the keypad.
   const [weighing, setWeighing] = useState<Product | null>(null);
@@ -232,21 +232,24 @@ export default function SellScreen() {
   }, [searchPending, query]);
   const shownResults = query !== "" && resultsFor === query ? results : [];
 
-  const addLine = useCallback((product: Product, quantity: number) => {
-    setChangeDue(null);
-    setLines((current) => {
-      const existing = current.findIndex((line) => line.product_id === product.id);
-      if (existing >= 0) {
-        const next = [...current];
-        next[existing] = {
-          ...next[existing],
-          quantity: Number((next[existing].quantity + quantity).toFixed(3)),
-        };
-        return next;
-      }
-      return [...current, cartLineFrom(product, quantity)];
-    });
-  }, []);
+  const addLine = useCallback(
+    (product: Product, quantity: number) => {
+      setChangeDue(null);
+      setLines((current) => {
+        const existing = current.findIndex((line) => line.product_id === product.id);
+        if (existing >= 0) {
+          const next = [...current];
+          next[existing] = {
+            ...next[existing],
+            quantity: Number((next[existing].quantity + quantity).toFixed(3)),
+          };
+          return next;
+        }
+        return [...current, cartLineFrom(product, quantity)];
+      });
+    },
+    [setLines]
+  );
 
   // Returns false when nothing was added yet because the product is sold by
   // weight: the keypad opens and the line is added once a weight is entered,
