@@ -269,3 +269,32 @@ describe("priceFontSize (a tile price never loses its digits or its DH)", () => 
     }
   });
 });
+
+describe("resolveGrid with sub-categories", () => {
+  const categories = [
+    { id: "bev", name: "Boissons", parent_id: null },
+    { id: "water", name: "Eaux", parent_id: "bev" },
+  ];
+
+  it("shows a sub-category's products in the parent's tab", () => {
+    const grid = resolveGrid({
+      tabs: [tab("t-bev", "category", "bev", 1)],
+      tiles: [],
+      products: [product("p1", "Coca", "bev"), product("p2", "Sidi Ali", "water")],
+      categories,
+      favoritesLabel: "Favoris",
+    });
+    expect(grid[0].tiles.map((t) => t.product.name)).toEqual(["Coca", "Sidi Ali"]);
+  });
+
+  it("keeps the owner's overrides on a sub-category product", () => {
+    const grid = resolveGrid({
+      tabs: [tab("t-bev", "category", "bev", 1)],
+      tiles: [tile("t-bev", "p2", 1, { pinned: true })],
+      products: [product("p1", "Coca", "bev"), product("p2", "Sidi Ali", "water")],
+      categories,
+      favoritesLabel: "Favoris",
+    });
+    expect(grid[0].tiles.map((t) => t.product.name)).toEqual(["Sidi Ali", "Coca"]);
+  });
+});

@@ -20,7 +20,16 @@ export async function fetchGridLayout(): Promise<{ tabs: GridTab[]; tiles: GridT
 }
 
 export async function fetchGridCategories(): Promise<GridCategory[]> {
-  const { data, error } = await supabase.from("categories").select("id, name").order("name");
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, parent_id")
+    .order("name");
+  // 42703: a database without migration 036 has no parent_id; every category is a main one.
+  if (error?.code === "42703") {
+    const legacy = await supabase.from("categories").select("id, name").order("name");
+    if (legacy.error) throw new Error(legacy.error.message);
+    return (legacy.data ?? []) as GridCategory[];
+  }
   if (error) throw new Error(error.message);
   return (data ?? []) as GridCategory[];
 }

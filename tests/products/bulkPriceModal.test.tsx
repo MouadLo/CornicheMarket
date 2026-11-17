@@ -63,7 +63,7 @@ it("asks first, with the real number of products and before/after prices, and se
   type("-20");
   await apply();
 
-  expect(fetchBulkPriceTargets).toHaveBeenCalledWith(null);
+  expect(fetchBulkPriceTargets).toHaveBeenCalledWith(null, undefined);
   const options = jest.mocked(confirm).mock.calls[0][0];
   expect(options.tone).toBe("danger");
   expect(options.title).toContain('"count":3');

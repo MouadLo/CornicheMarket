@@ -1,9 +1,11 @@
 import {
   CATEGORY_CATALOG,
   categoryLabel,
+  categoryPathLabel,
   existingFor,
   findCatalogEntry,
   localizeCategoryName,
+  subSuggestionsFor,
   suggestionsFor,
 } from "@/src/lib/products/categoryCatalog";
 
@@ -94,5 +96,42 @@ describe("existingFor and suggestionsFor", () => {
     expect(codes).not.toContain("snacks_sweets");
     expect(codes).toContain("bakery");
     expect(suggestionsFor([])).toHaveLength(CATEGORY_CATALOG.length);
+  });
+});
+
+describe("standard sub-categories", () => {
+  it("gives every sub-category a code under its parent's, unique and well-formed", () => {
+    const codes = CATEGORY_CATALOG.flatMap((entry) =>
+      (entry.subs ?? []).map((sub) => {
+        expect(sub.code.startsWith(`${entry.code}.`)).toBe(true);
+        expect(sub.code).toMatch(/^[a-z][a-z0-9_.]{0,59}$/);
+        expect(sub.fr && sub.en && sub.ar).toBeTruthy();
+        return sub.code;
+      })
+    );
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+
+  it("finds and labels a sub-category by code", () => {
+    expect(findCatalogEntry("beverages.water")?.fr).toBe("Eaux");
+    expect(categoryLabel({ name: "Eaux", code: "beverages.water" }, "ar")).toBe("المياه");
+  });
+
+  it("suggests only the standard parent's missing subs", () => {
+    const parent = { id: "b", name: "Boissons", code: "beverages" };
+    const existing = [parent, { id: "w", name: "Eaux", code: "beverages.water", parent_id: "b" }];
+    const codes = subSuggestionsFor(parent, existing).map((sub) => sub.code);
+    expect(codes).not.toContain("beverages.water");
+    expect(codes).toContain("beverages.juice");
+    expect(subSuggestionsFor({ id: "x", name: "Divers maison", code: null }, existing)).toEqual([]);
+  });
+
+  it("labels a sub-category with its parent", () => {
+    const all = [
+      { id: "b", name: "Boissons", code: "beverages" },
+      { id: "w", name: "Eaux", code: "beverages.water", parent_id: "b" },
+    ];
+    expect(categoryPathLabel(all[1], all, "en")).toBe("Beverages › Water");
+    expect(categoryPathLabel(all[0], all, "en")).toBe("Beverages");
   });
 });

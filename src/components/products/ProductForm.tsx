@@ -13,7 +13,14 @@ import {
   parseMoneyToCents,
   parseQuantity,
 } from "@/src/lib/money";
-import { decideCategory, MAX_CATEGORY_NAME, withCategory } from "@/src/lib/products/categories";
+import {
+  decideCategory,
+  mainCategories,
+  mainCategoryId,
+  MAX_CATEGORY_NAME,
+  subCategoriesOf,
+  withCategory,
+} from "@/src/lib/products/categories";
 import {
   catalogLang,
   categoryLabel,
@@ -65,6 +72,8 @@ export function ProductForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [barcode, setBarcode] = useState(initial?.barcode ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.category_id ?? null);
+  const selectedMain = mainCategoryId(categories, categoryId);
+  const subs = selectedMain ? subCategoriesOf(categories, selectedMain) : [];
   const [unit, setUnit] = useState<ProductUnit>(initial?.unit ?? "piece");
   const [price, setPrice] = useState(initial ? centsToDisplay(initial.selling_price_cents) : "");
   const [threshold, setThreshold] = useState(String(initial?.low_stock_threshold ?? 0));
@@ -224,11 +233,11 @@ export function ProductForm({
             selected={categoryId === null}
             onPress={() => setCategoryId(null)}
           />
-          {categories.map((category) => (
+          {mainCategories(categories).map((category) => (
             <Chip
               key={category.id}
               label={categoryLabel(category, language)}
-              selected={categoryId === category.id}
+              selected={selectedMain === category.id}
               onPress={() => setCategoryId(category.id)}
             />
           ))}
@@ -238,6 +247,26 @@ export function ProductForm({
             onPress={() => setAddingCategory(true)}
           />
         </View>
+        {selectedMain && subs.length > 0 && (
+          <View style={styles.subRow}>
+            <Text style={styles.suggestTitle}>{t("products.formSubCategory")}</Text>
+            <View style={styles.chips}>
+              <Chip
+                label={t("products.formCategoryNone")}
+                selected={categoryId === selectedMain}
+                onPress={() => setCategoryId(selectedMain)}
+              />
+              {subs.map((sub) => (
+                <Chip
+                  key={sub.id}
+                  label={categoryLabel(sub, language)}
+                  selected={categoryId === sub.id}
+                  onPress={() => setCategoryId(sub.id)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
         {addingCategory && (
           <View style={styles.newCategory}>
             <Text style={styles.suggestTitle}>{t("products.formCategorySuggested")}</Text>
@@ -448,6 +477,7 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: colors.white, fontWeight: "600", fontSize: 16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  subRow: { marginTop: 10, gap: 6 },
   newCategory: { gap: 10, marginTop: 4 },
   suggestTitle: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   chip: {

@@ -27,6 +27,7 @@ import {
   type ProductStatusFilter,
 } from "@/src/lib/products/queries";
 import { categoryLabel } from "@/src/lib/products/categoryCatalog";
+import { familyIds, mainCategories, subCategoriesOf } from "@/src/lib/products/categories";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
 export default function ProductsScreen() {
@@ -36,6 +37,7 @@ export default function ProductsScreen() {
 
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [subCategoryId, setSubCategoryId] = useState<string | null>(null);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [status, setStatus] = useState<ProductStatusFilter>("active");
 
@@ -52,8 +54,18 @@ export default function ProductsScreen() {
   const debouncedSearch = useDebouncedValue(search, 300);
 
   const filters = useMemo<ProductFilters>(
-    () => ({ search: debouncedSearch, categoryId, lowStockOnly, status }),
-    [debouncedSearch, categoryId, lowStockOnly, status]
+    () => ({
+      search: debouncedSearch,
+      categoryId,
+      categoryIds: subCategoryId
+        ? [subCategoryId]
+        : categoryId
+          ? familyIds(categories, categoryId)
+          : undefined,
+      lowStockOnly,
+      status,
+    }),
+    [debouncedSearch, categoryId, subCategoryId, categories, lowStockOnly, status]
   );
 
   // Re-read on every return to this screen: a category may have been created
@@ -131,17 +143,41 @@ export default function ProductsScreen() {
           <FilterChip
             label={t("products.allCategories")}
             selected={categoryId === null}
-            onPress={() => setCategoryId(null)}
+            onPress={() => {
+              setCategoryId(null);
+              setSubCategoryId(null);
+            }}
           />
-          {categories.map((category) => (
+          {mainCategories(categories).map((category) => (
             <FilterChip
               key={category.id}
               label={categoryLabel(category, i18n?.language)}
               selected={categoryId === category.id}
-              onPress={() => setCategoryId(category.id === categoryId ? null : category.id)}
+              onPress={() => {
+                setCategoryId(category.id === categoryId ? null : category.id);
+                setSubCategoryId(null);
+              }}
             />
           ))}
         </View>
+
+        {categoryId && subCategoriesOf(categories, categoryId).length > 0 && (
+          <View style={styles.filterRow}>
+            <FilterChip
+              label={t("products.catAllSubs")}
+              selected={subCategoryId === null}
+              onPress={() => setSubCategoryId(null)}
+            />
+            {subCategoriesOf(categories, categoryId).map((sub) => (
+              <FilterChip
+                key={sub.id}
+                label={categoryLabel(sub, i18n?.language)}
+                selected={subCategoryId === sub.id}
+                onPress={() => setSubCategoryId(sub.id === subCategoryId ? null : sub.id)}
+              />
+            ))}
+          </View>
+        )}
 
         <View style={styles.filterRow}>
           <FilterChip

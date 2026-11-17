@@ -1,6 +1,11 @@
 import {
   cleanCategoryName,
   decideCategory,
+  familyIds,
+  inTreeOrder,
+  mainCategories,
+  mainCategoryId,
+  subCategoriesOf,
   findSameCategory,
   MAX_CATEGORY_NAME,
   withCategory,
@@ -67,5 +72,42 @@ describe("withCategory", () => {
       "Produits laitiers",
     ]);
     expect(withCategory(next, { id: "9", name: "Hygiène" })).toHaveLength(4);
+  });
+});
+
+describe("sub-category helpers", () => {
+  const all = [
+    { id: "bev", name: "Boissons", parent_id: null },
+    { id: "water", name: "Eaux", parent_id: "bev" },
+    { id: "juice", name: "Jus", parent_id: "bev" },
+    { id: "bread", name: "Pain", parent_id: null },
+  ];
+
+  it("splits main categories from sub-categories", () => {
+    expect(mainCategories(all).map((c) => c.id)).toEqual(["bev", "bread"]);
+    expect(subCategoriesOf(all, "bev").map((c) => c.id)).toEqual(["water", "juice"]);
+    expect(subCategoriesOf(all, "bread")).toEqual([]);
+  });
+
+  it("covers a main category and its subs in a filter", () => {
+    expect(familyIds(all, "bev")).toEqual(["bev", "water", "juice"]);
+    expect(familyIds(all, "water")).toEqual(["water"]);
+  });
+
+  it("finds the main category of any category", () => {
+    expect(mainCategoryId(all, "water")).toBe("bev");
+    expect(mainCategoryId(all, "bev")).toBe("bev");
+    expect(mainCategoryId(all, null)).toBeNull();
+  });
+});
+
+describe("inTreeOrder", () => {
+  it("puts each sub-category right after its parent", () => {
+    const all = [
+      { id: "bev", name: "Boissons", parent_id: null },
+      { id: "bread", name: "Pain", parent_id: null },
+      { id: "water", name: "Eaux", parent_id: "bev" },
+    ];
+    expect(inTreeOrder(all).map((c) => c.id)).toEqual(["bev", "water", "bread"]);
   });
 });
