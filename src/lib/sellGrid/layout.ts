@@ -37,7 +37,8 @@ export type GridProduct = {
   active: boolean;
 };
 
-export type GridCategory = { id: string; name: string };
+// parent_id: set on a sub-category (migration 036); its products show in the parent's tab.
+export type GridCategory = { id: string; name: string; parent_id?: string | null };
 
 export type ResolvedTile = {
   key: string;
@@ -76,6 +77,9 @@ export function resolveGrid(input: {
   const active = input.products.filter((p) => p.active);
   const productById = new Map(active.map((p) => [p.id, p]));
   const categoryName = new Map(input.categories.map((c) => [c.id, c.name]));
+  const parentOf = new Map(input.categories.map((c) => [c.id, c.parent_id ?? null]));
+  const tabCategoryOf = (p: GridProduct) =>
+    p.category_id ? (parentOf.get(p.category_id) ?? p.category_id) : null;
   const rowsByTab = new Map<string, GridTile[]>();
   for (const row of input.tiles) {
     const list = rowsByTab.get(row.tab_id) ?? [];
@@ -103,10 +107,13 @@ export function resolveGrid(input: {
     } else {
       // Auto-filled from the category. Overrides for products that have since
       // moved to another category no longer apply.
-      const inCategory = active.filter((p) => p.category_id === tab.category_id);
+      const inCategory = active.filter((p) => tabCategoryOf(p) === tab.category_id);
       const own = new Map(
         rows
-          .filter((r) => productById.get(r.product_id)?.category_id === tab.category_id)
+          .filter((r) => {
+            const product = productById.get(r.product_id);
+            return product !== undefined && tabCategoryOf(product) === tab.category_id;
+          })
           .map((r) => [r.product_id, r])
       );
       const hidden = new Set([...own.values()].filter((r) => r.hidden).map((r) => r.product_id));

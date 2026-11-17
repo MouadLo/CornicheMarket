@@ -1,9 +1,11 @@
 import { findCatalogEntry } from "@/src/lib/products/categoryCatalog";
 import {
   canDelete,
+  canMergeOrMove,
   decideLink,
   decideRename,
   mergeTargets,
+  moveTargets,
 } from "@/src/lib/products/categoryManage";
 
 const drink = { id: "1", name: "Drink", code: null };
@@ -84,7 +86,24 @@ describe("mergeTargets and canDelete", () => {
   });
 
   it("deletes only empty categories", () => {
-    expect(canDelete({ ...drink, productCount: 0 })).toBe(true);
-    expect(canDelete({ ...drink, productCount: 3 })).toBe(false);
+    expect(canDelete({ ...drink, productCount: 0 }, all)).toBe(true);
+    expect(canDelete({ ...drink, productCount: 3 }, all)).toBe(false);
+  });
+});
+
+describe("sub-category rules", () => {
+  const water = { id: "w", name: "Eaux", code: null, parent_id: "1" };
+  const tree = [...all, water];
+
+  it("keeps a parent until its sub-categories are gone", () => {
+    expect(canDelete({ ...drink, productCount: 0 }, tree)).toBe(false);
+    expect(canMergeOrMove(drink, tree)).toBe(false);
+    expect(canMergeOrMove(water, tree)).toBe(true);
+  });
+
+  it("moves only under another main category", () => {
+    expect(moveTargets(snacks, tree).map((c) => c.id)).toEqual(["1", "3"]);
+    expect(moveTargets(water, tree).map((c) => c.id)).toEqual(["2", "3"]);
+    expect(moveTargets(drink, tree)).toEqual([]);
   });
 });

@@ -27,7 +27,12 @@ const onSubmit = jest.fn(async () => {});
 
 let tree: ReactTestRenderer;
 const render = async (
-  loaded: { id: string; name: string; code?: string | null }[] = categories
+  loaded: {
+    id: string;
+    name: string;
+    code?: string | null;
+    parent_id?: string | null;
+  }[] = categories
 ) => {
   await act(async () => {
     tree = create(<ProductForm categories={loaded} submitLabel="save" onSubmit={onSubmit} />);
@@ -246,4 +251,20 @@ it("keeps a category created here when the loaded list arrives or changes afterw
   expect(chip("Snacks")).toBeDefined();
   expect(chip("Boissons")).toBeDefined();
   expect(selected("Snacks")).toBe(true);
+});
+
+it("shows the sub-categories of the chosen main category, and keeps the main one selectable", async () => {
+  await render([
+    { id: "c1", name: "Boissons" },
+    { id: "c2", name: "Épicerie" },
+    { id: "s1", name: "Eaux", parent_id: "c1" },
+  ]);
+  expect(chip("Eaux")).toBeUndefined();
+  press("Boissons");
+  expect(has("products.formSubCategory")).toBe(true);
+  press("Eaux");
+  expect(selected("Eaux")).toBe(true);
+  expect(selected("Boissons")).toBe(true);
+  press("Épicerie");
+  expect(chip("Eaux")).toBeUndefined();
 });

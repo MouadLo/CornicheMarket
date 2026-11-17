@@ -3,7 +3,8 @@ import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
-import { categoryLabel } from "@/src/lib/products/categoryCatalog";
+import { categoryPathLabel } from "@/src/lib/products/categoryCatalog";
+import { familyIds, inTreeOrder } from "@/src/lib/products/categories";
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { applyPercent, formatMAD } from "@/src/lib/money";
 import {
@@ -36,8 +37,9 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
   const percentValue = Number(percent.replace(",", "."));
   const valid = validBulkPercent(percentValue);
   const scope = categoryId
-    ? categoryLabel(
-        categories.find((category) => category.id === categoryId) ?? { name: "" },
+    ? categoryPathLabel(
+        categories.find((category) => category.id === categoryId) ?? { id: "", name: "" },
+        categories,
         i18n?.language
       )
     : t("products.bulkAll");
@@ -50,7 +52,10 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
     setError(null);
     setSubmitting(true);
     try {
-      const targets = await fetchBulkPriceTargets(categoryId);
+      const targets = await fetchBulkPriceTargets(
+        categoryId,
+        categoryId ? familyIds(categories, categoryId) : undefined
+      );
       if (targets.length === 0) {
         setError(t("products.bulkNone"));
         return;
@@ -111,10 +116,10 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
               selected={categoryId === null}
               onPress={() => setCategoryId(null)}
             />
-            {categories.map((category) => (
+            {inTreeOrder(categories).map((category) => (
               <Chip
                 key={category.id}
-                label={categoryLabel(category, i18n?.language)}
+                label={categoryPathLabel(category, categories, i18n?.language)}
                 selected={categoryId === category.id}
                 onPress={() => setCategoryId(category.id)}
               />

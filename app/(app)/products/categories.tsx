@@ -12,31 +12,38 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirm, showToast } from "@/src/lib/dialog/store";
-import { MAX_CATEGORY_NAME } from "@/src/lib/products/categories";
+import { decideCategory, inTreeOrder, MAX_CATEGORY_NAME } from "@/src/lib/products/categories";
 import {
   CATEGORY_CATALOG,
   categoryLabel,
+  categoryPathLabel,
+  existingFor,
   findCatalogEntry,
-  type CatalogEntry,
+  subSuggestionsFor,
+  type CatalogSub,
 } from "@/src/lib/products/categoryCatalog";
 import {
   canDelete,
+  canMergeOrMove,
   decideLink,
   decideRename,
   mergeTargets,
+  moveTargets,
 } from "@/src/lib/products/categoryManage";
 import {
+  createCategory,
   deleteCategory,
   fetchCategoriesWithCounts,
   linkCategoryToCatalog,
   mergeCategory,
   renameCategory,
+  setCategoryParent,
   type CategoryWithCount,
 } from "@/src/lib/products/queries";
 import { Text } from "@/src/theme/Text";
 import { colors, radius } from "@/src/theme/tokens";
 
-type Mode = "rename" | "link" | "merge" | null;
+type Mode = "rename" | "link" | "merge" | "addSub" | "move" | null;
 
 export default function CategoriesScreen() {
   const { profile } = useAuth();
@@ -72,14 +79,30 @@ export default function CategoriesScreen() {
 
   const label = (category: { name: string; code?: string | null }) => categoryLabel(category, lang);
 
-  // The stored name is French for standard categories; sort by what is shown.
+  const pathLabel = (category: CategoryWithCount) => categoryPathLabel(category, categories, lang);
+
+  // The stored name is French for standard categories; sort by what is shown,
+  // each main category followed by its sub-categories.
   const sorted = useMemo(
     () =>
-      [...categories].sort((a, b) =>
-        categoryLabel(a, lang).localeCompare(categoryLabel(b, lang), lang)
+      inTreeOrder(
+        [...categories].sort((a, b) =>
+          categoryLabel(a, lang).localeCompare(categoryLabel(b, lang), lang)
+        )
       ),
     [categories, lang]
   );
+
+  const parentOf = (category: CategoryWithCount) =>
+    categories.find((other) => other.id === category.parent_id);
+
+  // The standard entries this category can be linked to: main ones for a main
+  // category, the standard parent's subs for a sub-category.
+  const linkOptions = (category: CategoryWithCount): readonly CatalogSub[] => {
+    if (!category.parent_id) return CATEGORY_CATALOG;
+    const parent = CATEGORY_CATALOG.find((entry) => entry.code === parentOf(category)?.code);
+    return parent?.subs ?? [];
+  };
 
   const close = () => {
     setOpenId(null);
@@ -126,22 +149,25 @@ export default function CategoriesScreen() {
   const handleMerge = async (source: CategoryWithCount, target: CategoryWithCount) => {
     const ok = await confirm({
       tone: "danger",
-      title: t("products.catMergeConfirmTitle", { from: label(source), into: label(target) }),
+      title: t("products.catMergeConfirmTitle", {
+        from: pathLabel(source),
+        into: pathLabel(target),
+      }),
       message: t("products.catMergeMessage", {
         count: source.productCount,
-        from: label(source),
-        into: label(target),
+        from: pathLabel(source),
+        into: pathLabel(target),
       }),
       confirmLabel: t("products.catMergeConfirm"),
     });
     if (!ok) return;
     void run(
       () => mergeCategory(source.id, target.id),
-      t("products.catMerged", { name: label(target) })
+      t("products.catMerged", { name: pathLabel(target) })
     );
   };
 
-  const handleLink = (category: CategoryWithCount, entry: CatalogEntry) => {
+  const handleLink = (category: CategoryWithCount, entry: CatalogSub) => {
     const decision = decideLink(category, entry, categories);
     if (decision.kind === "already") return setNote(t("products.catAlreadyStandard"));
     if (decision.kind === "merge") {
@@ -154,6 +180,35 @@ export default function CategoriesScreen() {
       t("products.catLinked", { name: entry[lang === "ar" || lang === "en" ? lang : "fr"] })
     );
   };
+
+  const addSub = (parent: CategoryWithCount, name: string, code: string | null) =>
+    run(
+      () => createCategory(name, code, parent.id).then(() => undefined),
+      t("products.catSubAdded", { name: code ? label({ name, code }) : name })
+    );
+
+  const handleAddSubTyped = (parent: CategoryWithCount) => {
+    const decision = decideCategory(draft, categories);
+    if (decision.kind === "invalid") {
+      return setNote(t("products.formCategoryInvalid", { max: MAX_CATEGORY_NAME }));
+    }
+    if (decision.kind === "existing") {
+      return setNote(t("products.catClash", { name: label(decision.category) }));
+    }
+    void addSub(parent, decision.name, null);
+  };
+
+  const handleAddSubStandard = (parent: CategoryWithCount, entry: CatalogSub) => {
+    const same = existingFor(entry, categories);
+    if (same) return setNote(t("products.catClash", { name: label(same) }));
+    void addSub(parent, entry.fr, entry.code);
+  };
+
+  const handleMove = (category: CategoryWithCount, parent: CategoryWithCount | null) =>
+    void run(
+      () => setCategoryParent(category.id, parent?.id ?? null),
+      parent ? t("products.catMoved", { name: label(parent) }) : t("products.catMadeMain")
+    );
 
   const handleDelete = async (category: CategoryWithCount) => {
     const ok = await confirm({
@@ -179,8 +234,14 @@ export default function CategoriesScreen() {
       {sorted.map((category) => {
         const open = openId === category.id;
         const standard = Boolean(findCatalogEntry(category.code));
+        const isSub = Boolean(category.parent_id);
+        const subCount = categories.filter((other) => other.parent_id === category.id).length;
+        const free = canMergeOrMove(category, categories);
         return (
-          <View key={category.id} style={[styles.card, open && styles.cardOpen]}>
+          <View
+            key={category.id}
+            style={[styles.card, isSub && styles.subCard, open && styles.cardOpen]}
+          >
             <Pressable
               style={styles.row}
               onPress={() => toggle(category)}
@@ -191,6 +252,7 @@ export default function CategoriesScreen() {
                 <Text style={styles.name}>{label(category)}</Text>
                 <Text style={styles.muted}>
                   {t("products.catProducts", { count: category.productCount })}
+                  {subCount > 0 ? ` · ${t("products.catSubCount", { count: subCount })}` : ""}
                 </Text>
               </View>
               {standard && (
@@ -207,19 +269,41 @@ export default function CategoriesScreen() {
                     {!standard && (
                       <Action label={t("products.catRename")} onPress={() => setMode("rename")} />
                     )}
-                    {!standard && (
+                    {!standard && linkOptions(category).length > 0 && (
                       <Action label={t("products.catLink")} onPress={() => setMode("link")} />
                     )}
-                    {categories.length > 1 && (
+                    {!isSub && (
+                      <Action
+                        label={t("products.catAddSub")}
+                        onPress={() => {
+                          setDraft("");
+                          setMode("addSub");
+                        }}
+                      />
+                    )}
+                    {free && moveTargets(category, categories).length > 0 && (
+                      <Action label={t("products.catMove")} onPress={() => setMode("move")} />
+                    )}
+                    {isSub && (
+                      <Action
+                        label={t("products.catMakeMain")}
+                        onPress={() => handleMove(category, null)}
+                      />
+                    )}
+                    {free && categories.length > 1 && (
                       <Action label={t("products.catMerge")} onPress={() => setMode("merge")} />
                     )}
                     <Action
                       label={t("products.catDelete")}
                       danger
                       onPress={() =>
-                        canDelete(category)
+                        canDelete(category, categories)
                           ? void handleDelete(category)
-                          : setNote(t("products.catDeleteBlocked"))
+                          : setNote(
+                              subCount > 0
+                                ? t("products.catHasSubs")
+                                : t("products.catDeleteBlocked")
+                            )
                       }
                     />
                   </View>
@@ -249,11 +333,62 @@ export default function CategoriesScreen() {
                       {t("products.catLinkTitle", { name: label(category) })}
                     </Text>
                     <View style={styles.chips}>
-                      {CATEGORY_CATALOG.map((entry) => (
+                      {linkOptions(category).map((entry) => (
                         <Action
                           key={entry.code}
                           label={categoryLabel({ name: entry.fr, code: entry.code }, lang)}
                           onPress={() => handleLink(category, entry)}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {mode === "addSub" && (
+                  <>
+                    {subSuggestionsFor(category, categories).length > 0 && (
+                      <>
+                        <Text style={styles.muted}>{t("products.catSubSuggested")}</Text>
+                        <View style={styles.chips}>
+                          {subSuggestionsFor(category, categories).map((entry) => (
+                            <Action
+                              key={entry.code}
+                              label={categoryLabel({ name: entry.fr, code: entry.code }, lang)}
+                              onPress={() => handleAddSubStandard(category, entry)}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    )}
+                    <View style={styles.renameRow}>
+                      <TextInput
+                        style={styles.input}
+                        value={draft}
+                        onChangeText={setDraft}
+                        placeholder={t("products.catSubName")}
+                        maxLength={MAX_CATEGORY_NAME + 10}
+                        onSubmitEditing={() => handleAddSubTyped(category)}
+                      />
+                      <Action
+                        label={t("products.catSubAdd")}
+                        primary
+                        onPress={() => handleAddSubTyped(category)}
+                      />
+                    </View>
+                  </>
+                )}
+
+                {mode === "move" && (
+                  <>
+                    <Text style={styles.muted}>
+                      {t("products.catMoveTitle", { name: label(category) })}
+                    </Text>
+                    <View style={styles.chips}>
+                      {moveTargets(category, sorted).map((target) => (
+                        <Action
+                          key={target.id}
+                          label={label(target)}
+                          onPress={() => handleMove(category, target)}
                         />
                       ))}
                     </View>
@@ -269,7 +404,7 @@ export default function CategoriesScreen() {
                       {mergeTargets(category, sorted).map((target) => (
                         <Action
                           key={target.id}
-                          label={label(target)}
+                          label={pathLabel(target)}
                           onPress={() => void handleMerge(category, target)}
                         />
                       ))}
@@ -340,6 +475,7 @@ const styles = StyleSheet.create({
     borderColor: colors.divider,
   },
   cardOpen: { borderColor: colors.brand600 },
+  subCard: { marginStart: 28 },
   row: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12, minHeight: 56 },
   rowText: { flex: 1, gap: 2 },
   name: { fontSize: 17, fontWeight: "600", color: colors.ink900 },

@@ -18,14 +18,21 @@ export type Product = {
 };
 
 // code: the stable identity of a catalogue category (migration 035); null for
-// one the owner typed himself.
-export type Category = { id: string; name: string; code?: string | null };
+// one the owner typed himself. parent_id: set on a sub-category (migration 036).
+export type Category = {
+  id: string;
+  name: string;
+  code?: string | null;
+  parent_id?: string | null;
+};
 
 export type ProductStatusFilter = "active" | "inactive" | "all";
 
 export type ProductFilters = {
   search: string;
   categoryId: string | null;
+  // A main category and its sub-categories (see familyIds); wins over categoryId.
+  categoryIds?: string[];
   lowStockOnly: boolean;
   status: ProductStatusFilter;
 };
@@ -68,7 +75,9 @@ export async function fetchProducts(
   if (term) {
     query = query.or(`name.ilike.*${term}*,barcode.ilike.${term}*`);
   }
-  if (filters.categoryId) {
+  if (filters.categoryIds && filters.categoryIds.length > 0) {
+    query = query.in("category_id", filters.categoryIds);
+  } else if (filters.categoryId) {
     query = query.eq("category_id", filters.categoryId);
   }
   if (filters.lowStockOnly) {
@@ -88,29 +97,35 @@ export async function fetchProducts(
   })) as Product[];
 }
 
+// 42703: a column does not exist yet (this app version reached a database
+// without migration 035 or 036). Fall back to the columns that do.
+const CATEGORY_COLUMNS = ["id, name, code, parent_id", "id, name, code", "id, name"];
+
 export async function fetchCategories(): Promise<Category[]> {
-  const { data, error } = await supabase.from("categories").select("id, name, code").order("name");
-  if (!error) return (data ?? []) as Category[];
-  // 42703: the code column does not exist yet (this app version reached a
-  // database that has not had migration 035). Categories still work without it.
-  if (error.code !== "42703") throw new Error(error.message);
-  const legacy = await supabase.from("categories").select("id, name").order("name");
-  if (legacy.error) throw new Error(legacy.error.message);
-  return (legacy.data ?? []) as Category[];
+  for (const columns of CATEGORY_COLUMNS) {
+    const { data, error } = await supabase.from("categories").select(columns).order("name");
+    if (!error) return (data ?? []) as unknown as Category[];
+    if (error.code !== "42703") throw new Error(error.message);
+  }
+  return [];
 }
 
 // Owner only (row-level security). The database also adds the category's tab
 // to the Sell screen. Callers check for an existing twin first (see
 // decideCategory): the server only treats exact spellings as duplicates.
-export async function createCategory(name: string, code: string | null = null): Promise<Category> {
+export async function createCategory(
+  name: string,
+  code: string | null = null,
+  parentId: string | null = null
+): Promise<Category> {
   const { data, error } = await supabase
     .from("categories")
-    .insert(code ? { name, code } : { name })
+    .insert({ name, ...(code ? { code } : {}), ...(parentId ? { parent_id: parentId } : {}) })
     .select()
     .single();
   if (error) throw new Error(error.message);
   const row = data as Category;
-  return { id: row.id, name: row.name, code: row.code ?? null };
+  return { id: row.id, name: row.name, code: row.code ?? null, parent_id: row.parent_id ?? null };
 }
 
 export type CategoryWithCount = Category & { productCount: number };
@@ -119,7 +134,7 @@ export type CategoryWithCount = Category & { productCount: number };
 export async function fetchCategoriesWithCounts(): Promise<CategoryWithCount[]> {
   const { data, error } = await supabase
     .from("categories")
-    .select("id, name, code, products(count)")
+    .select("id, name, code, parent_id, products(count)")
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => {
@@ -128,6 +143,7 @@ export async function fetchCategoriesWithCounts(): Promise<CategoryWithCount[]> 
       id: row.id as string,
       name: row.name as string,
       code: (row.code as string | null) ?? null,
+      parent_id: (row.parent_id as string | null) ?? null,
       productCount: counts?.[0]?.count ?? 0,
     };
   });
@@ -153,6 +169,12 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
     .eq("category_id", fromId);
   if (moved.error) throw new Error(moved.error.message);
   await deleteCategory(fromId);
+}
+
+// null makes it a main category again. The database refuses a second level.
+export async function setCategoryParent(id: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase.from("categories").update({ parent_id: parentId }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteCategory(id: string): Promise<void> {
@@ -239,9 +261,19 @@ export async function batchUpdateSellingPrices(
 // Every active product a bulk price change would touch, with its buying price,
 // so the owner can be shown the real result before it is applied. Walks the
 // pages: PostgREST caps the rows of one response.
-export async function fetchBulkPriceTargets(categoryId: string | null): Promise<Product[]> {
+// categoryIds: the main category and its subs, as the server's bulk change counts them.
+export async function fetchBulkPriceTargets(
+  categoryId: string | null,
+  categoryIds?: string[]
+): Promise<Product[]> {
   const all: Product[] = [];
-  const filters: ProductFilters = { search: "", categoryId, lowStockOnly: false, status: "active" };
+  const filters: ProductFilters = {
+    search: "",
+    categoryId,
+    categoryIds,
+    lowStockOnly: false,
+    status: "active",
+  };
   for (let page = 0; ; page += 1) {
     const batch = await fetchProducts(filters, page, true);
     all.push(...batch);

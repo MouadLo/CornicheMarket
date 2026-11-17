@@ -4,11 +4,7 @@ import {
   MAX_CATEGORY_NAME,
   type CategoryRef,
 } from "@/src/lib/products/categories";
-import {
-  existingFor,
-  findCatalogEntry,
-  type CatalogEntry,
-} from "@/src/lib/products/categoryCatalog";
+import { existingFor, findCatalogEntry, type CatalogSub } from "@/src/lib/products/categoryCatalog";
 
 export type ManagedCategory = CategoryRef & { productCount: number };
 
@@ -45,7 +41,7 @@ export type LinkDecision =
 
 export function decideLink(
   category: CategoryRef,
-  entry: CatalogEntry,
+  entry: CatalogSub,
   all: CategoryRef[]
 ): LinkDecision {
   if (category.code === entry.code) return { kind: "already" };
@@ -62,8 +58,25 @@ export function mergeTargets<T extends CategoryRef>(source: CategoryRef, all: T[
   return all.filter((other) => other.id !== source.id);
 }
 
+function hasSubs(category: CategoryRef, all: CategoryRef[]): boolean {
+  return all.some((other) => other.parent_id === category.id);
+}
+
 // Deleting a category with products would leave them uncategorised without a
-// word; the owner merges them somewhere first.
-export function canDelete(category: ManagedCategory): boolean {
-  return category.productCount === 0;
+// word; the owner merges them somewhere first. Its sub-categories go first too.
+export function canDelete(category: ManagedCategory, all: CategoryRef[]): boolean {
+  return category.productCount === 0 && !hasSubs(category, all);
+}
+
+// Merging or moving a main category would strand its sub-categories.
+export function canMergeOrMove(category: CategoryRef, all: CategoryRef[]): boolean {
+  return !hasSubs(category, all);
+}
+
+// The main categories this one can go under (one level only).
+export function moveTargets<T extends CategoryRef>(category: CategoryRef, all: T[]): T[] {
+  if (hasSubs(category, all)) return [];
+  return all.filter(
+    (other) => !other.parent_id && other.id !== category.id && other.id !== category.parent_id
+  );
 }
