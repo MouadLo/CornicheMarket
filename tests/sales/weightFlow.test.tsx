@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList } from "react-native";
+import { Dimensions, FlatList } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import SellScreen from "../../app/(app)/sell/index";
@@ -71,6 +71,14 @@ const press = (key: string) =>
   act(() => {
     tree.root.findByProps({ testID: `weight-key-${key}` }).props.onPress();
   });
+
+// Tablet width: the basket list sits beside the grid, so these logic tests can read it.
+beforeAll(() => {
+  jest
+    .spyOn(Dimensions, "get")
+    .mockImplementation(() => ({ width: 1280, height: 800, scale: 1, fontScale: 1 }));
+});
+afterAll(() => jest.restoreAllMocks());
 
 beforeEach(async () => {
   await act(async () => {

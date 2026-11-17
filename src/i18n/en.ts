@@ -142,6 +142,9 @@ const en: Translations = {
     exportDone: "Export done.",
   },
   sell: {
+    basketItems: "{{count}} item(s)",
+    viewBasket: "View basket ›",
+    backToProducts: "‹ Products",
     searchPlaceholder: "Scan or search a product",
     scan: "Scan",
     credit: "Credit",

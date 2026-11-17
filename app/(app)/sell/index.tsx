@@ -116,6 +116,8 @@ export default function SellScreen() {
   // The Sell grid: tabs of tiles resolved from the cached layout and products.
   const { width } = useWindowDimensions();
   const split = sellLayoutFor(width) === "split";
+  // Phones show the grid or the basket, never both (C14).
+  const [phoneView, setPhoneView] = useState<"grid" | "basket">("grid");
   // Load the cached layout once (and again after each refresh); resolve it with
   // useMemo so a changing translation function can never retrigger the load.
   const [cachedGrid, setCachedGrid] = useState<Awaited<ReturnType<typeof getCachedGrid>>>(null);
@@ -488,7 +490,7 @@ export default function SellScreen() {
       ))}
     </View>
   );
-  const cartNode = (
+  const noticesNode = (
     <>
       {changeDue !== null && (
         <View style={styles.changeCard} accessibilityRole="alert">
@@ -515,7 +517,10 @@ export default function SellScreen() {
           onDiscard={discardAttempt}
         />
       )}
-
+    </>
+  );
+  const cartListNode = (
+    <>
       <FlatList
         data={lines}
         keyExtractor={(line) => line.product_id}
@@ -572,27 +577,69 @@ export default function SellScreen() {
     </>
   );
 
+  const cartNode = (
+    <>
+      {noticesNode}
+      {cartListNode}
+    </>
+  );
+  const gridNode =
+    shownResults.length === 0 && !query ? (
+      <ProductGrid
+        tabs={gridTabs}
+        inCart={inCart}
+        // The cache rows and live rows share the fields addProduct reads.
+        onAdd={(product) => addProduct(product as unknown as Product)}
+      />
+    ) : null;
+  const showBasket = phoneView === "basket" && lines.length > 0;
+
   return (
     <View style={styles.container}>
       {split ? (
         <View style={styles.split}>
           <View style={styles.gridPane}>
             {headerNode}
-            {shownResults.length === 0 && !query ? (
-              <ProductGrid
-                tabs={gridTabs}
-                inCart={inCart}
-                // The cache rows and live rows share the fields addProduct reads.
-                onAdd={(product) => addProduct(product as unknown as Product)}
-              />
-            ) : null}
+            {gridNode}
           </View>
           <View style={styles.cartPane}>{cartNode}</View>
         </View>
+      ) : showBasket ? (
+        <>
+          <Pressable
+            style={styles.backBar}
+            accessibilityRole="button"
+            onPress={() => setPhoneView("grid")}
+          >
+            <Text style={styles.link}>{t("sell.backToProducts")}</Text>
+          </Pressable>
+          {cartNode}
+        </>
       ) : (
         <>
           {headerNode}
-          {cartNode}
+          {noticesNode}
+          {gridNode ?? <View style={styles.flex} />}
+          {lines.length > 0 ? (
+            <Pressable
+              style={styles.basketBar}
+              accessibilityRole="button"
+              accessibilityLabel={t("sell.viewBasket")}
+              onPress={() => setPhoneView("basket")}
+            >
+              <View style={styles.flex}>
+                <Text style={styles.basketCount}>
+                  {t("sell.basketItems", { count: lines.length })}
+                </Text>
+                <Text style={styles.basketTotal}>{formatMAD(total)}</Text>
+              </View>
+              <Text style={styles.basketAction}>{t("sell.viewBasket")}</Text>
+            </Pressable>
+          ) : isOwner && storeIsEmpty ? (
+            <EmptyStorePrompt />
+          ) : (
+            <Text style={styles.empty}>{t("sell.empty")}</Text>
+          )}
         </>
       )}
 
@@ -643,6 +690,25 @@ const styles = StyleSheet.create({
   split: { flex: 1, flexDirection: "row" },
   gridPane: { flex: 1, minWidth: 0 },
   cartPane: { width: 420, borderStartWidth: 1, borderStartColor: "#e7ebee" },
+  backBar: {
+    minHeight: 52,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  basketBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.success600,
+  },
+  basketCount: { color: colors.white, fontSize: 14, fontWeight: "600" },
+  basketTotal: { color: colors.white, fontSize: 22, fontWeight: "800" },
+  basketAction: { color: colors.white, fontSize: 16, fontWeight: "700" },
   header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 8 },
