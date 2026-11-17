@@ -141,6 +141,9 @@ const fr = {
     exportDone: "Export terminé.",
   },
   sell: {
+    basketItems: "{{count}} article(s)",
+    viewBasket: "Voir le panier ›",
+    backToProducts: "‹ Produits",
     searchPlaceholder: "Scanner ou chercher un produit",
     scan: "Scanner",
     credit: "Crédit",

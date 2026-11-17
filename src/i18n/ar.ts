@@ -141,6 +141,9 @@ const ar: Translations = {
     exportDone: "اكتمل التصدير.",
   },
   sell: {
+    basketItems: "{{count}} منتج",
+    viewBasket: "عرض السلة ‹",
+    backToProducts: "› المنتجات",
     searchPlaceholder: "مسح أو البحث عن منتج",
     scan: "مسح",
     credit: "كريدي",

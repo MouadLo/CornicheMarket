@@ -1,5 +1,5 @@
 import React from "react";
-import { Dimensions } from "react-native";
+import { Dimensions, FlatList } from "react-native";
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 
 import SellScreen from "../../app/(app)/sell/index";
@@ -320,13 +320,34 @@ describe("Sell with the grid", () => {
     expect(allTexts(tree.root)).not.toContain("×1");
   });
 
-  it("on a phone (< 900 dp) Sell keeps its single-column layout: no grid yet", async () => {
+  it("on a phone (< 900 dp) the grid shows, with the basket behind a bottom bar", async () => {
     mockWidth = 390;
     await render();
-    expect(
-      tiles(tree.root).filter(
+    const pain = () =>
+      tiles(tree.root).find(
         (n) => labelOf(n).startsWith("sell.grid.tileLabel") && nameOf(n) === "Pain"
-      )
-    ).toHaveLength(0);
+      );
+    expect(pain()).toBeDefined();
+    expect(tree.root.findAllByType(FlatList)).toHaveLength(0);
+
+    await act(async () => pain()!.props.onPress());
+    const bar = () =>
+      tree.root.findAll(
+        (n) =>
+          n.props.accessibilityLabel === "sell.viewBasket" && typeof n.props.onPress === "function"
+      )[0];
+    expect(allTexts(tree.root).join("|")).toContain("sell.basketItems");
+
+    await act(async () => bar().props.onPress());
+    expect(tree.root.findByType(FlatList).props.data).toHaveLength(1);
+    expect(pain()).toBeUndefined();
+
+    const back = tree.root.findAll(
+      (n) =>
+        typeof n.props.onPress === "function" &&
+        allTexts(n).some((t) => t.includes("sell.backToProducts"))
+    )[0];
+    await act(async () => back.props.onPress());
+    expect(pain()).toBeDefined();
   });
 });
