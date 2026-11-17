@@ -136,3 +136,49 @@ describe("buildReceivePayload", () => {
     expect(priceUpdates).toEqual([{ product_id: "a", selling_price_cents: 800 }]);
   });
 });
+
+describe("buildReceivePayload names the lines it cannot save (O3)", () => {
+  it("reports each incomplete line with every reason", () => {
+    const { lines, invalid } = buildReceivePayload([
+      {
+        product: { id: "a", name: "Sidi Ali 1.5L" },
+        quantity: "6",
+        unitCost: "4.50",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+      {
+        product: { id: "b", name: "Lait Centrale" },
+        quantity: "0",
+        unitCost: "",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+      {
+        product: { id: "c", name: "Danone" },
+        quantity: "12",
+        unitCost: "2",
+        expiryDate: "31/02/2027",
+        newSellingPriceCents: null,
+      },
+    ]);
+    expect(lines.map((line) => line.product_id)).toEqual(["a"]);
+    expect(invalid).toEqual([
+      { productId: "b", name: "Lait Centrale", problems: ["quantity", "cost"] },
+      { productId: "c", name: "Danone", problems: ["expiry"] },
+    ]);
+  });
+
+  it("reports nothing when every line is complete", () => {
+    const { invalid } = buildReceivePayload([
+      {
+        product: { id: "a", name: "Sidi Ali 1.5L" },
+        quantity: "6",
+        unitCost: "4.50",
+        expiryDate: "",
+        newSellingPriceCents: null,
+      },
+    ]);
+    expect(invalid).toEqual([]);
+  });
+});

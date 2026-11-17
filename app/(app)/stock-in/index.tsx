@@ -3,6 +3,8 @@ import * as Crypto from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { isolateBidi } from "@/src/lib/text/bidi";
+import { colors } from "@/src/theme/tokens";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -98,16 +100,18 @@ export default function StockInScreen() {
     }
   };
 
-  const { lines: validLines, priceUpdates, invalidCount } = buildReceivePayload(lines);
+  const { lines: validLines, priceUpdates, invalid } = buildReceivePayload(lines);
 
   const total = validLines.reduce(
     (sum, line) => sum + lineTotalCents(line.quantity, line.unit_cost_cents),
     0
   );
-  const incomplete = invalidCount > 0;
+  // A delivery is saved whole or not at all: goods that arrived must never be
+  // left out of stock silently (UX O3).
+  const incomplete = invalid.length > 0;
 
   const handleSave = async () => {
-    if (!profile || validLines.length === 0 || savingNow.current) return;
+    if (!profile || validLines.length === 0 || incomplete || savingNow.current) return;
 
     savingNow.current = true;
     operationId.current ??= Crypto.randomUUID();
@@ -256,7 +260,20 @@ export default function StockInScreen() {
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
           </View>
 
-          {incomplete && <Text style={styles.warning}>{t("stockIn.incomplete")}</Text>}
+          {incomplete && (
+            <View style={styles.incompleteBox} accessibilityRole="alert">
+              <Text style={styles.warning}>
+                {t("stockIn.incomplete", { count: invalid.length })}
+              </Text>
+              {invalid.map((line) => (
+                <Text key={line.productId} style={styles.incompleteLine}>
+                  {`• ${isolateBidi(line.name)}: ${line.problems
+                    .map((problem) => t(`stockIn.problem.${problem}`))
+                    .join(", ")}`}
+                </Text>
+              ))}
+            </View>
+          )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
@@ -267,7 +284,7 @@ export default function StockInScreen() {
                 : t("stockIn.recordDelivery", { count: validLines.length })
             }
             onPress={handleSave}
-            disabled={saving || validLines.length === 0}
+            disabled={saving || validLines.length === 0 || incomplete}
           />
           <Text style={styles.note}>{t("stockIn.stockNote")}</Text>
         </>
@@ -347,6 +364,13 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 22, fontWeight: "800" },
   note: { fontSize: 13, color: "#666", fontStyle: "italic" },
   warning: { color: "#b36b00", fontSize: 14 },
+  incompleteBox: {
+    gap: 4,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.warning100,
+  },
+  incompleteLine: { fontSize: 14, color: colors.ink900 },
   error: { color: "#b3261e", fontSize: 14 },
   success: { color: "#1d7a46", fontSize: 15, fontWeight: "600" },
   blocked: { flex: 1, justifyContent: "center", padding: 32 },

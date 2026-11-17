@@ -35,17 +35,23 @@ export function normalizeExpiryDate(input: string): ExpiryResult {
 }
 
 export type DraftLineInput = {
-  product: { id: string };
+  product: { id: string; name?: string };
   quantity: string;
   unitCost: string;
   expiryDate: string;
   newSellingPriceCents: number | null;
 };
 
+export type LineProblem = "quantity" | "cost" | "expiry";
+
+// A line that cannot be saved as typed, and every reason why.
+export type InvalidLine = { productId: string; name: string; problems: LineProblem[] };
+
 export type ReceivePayload = {
   lines: ReceiveLine[];
   priceUpdates: PriceUpdate[];
   invalidCount: number;
+  invalid: InvalidLine[];
 };
 
 // Turns the screen's text fields into what receive_delivery expects. Lines
@@ -53,14 +59,18 @@ export type ReceivePayload = {
 export function buildReceivePayload(draft: DraftLineInput[]): ReceivePayload {
   const lines: ReceiveLine[] = [];
   const priceUpdates: PriceUpdate[] = [];
-  let invalidCount = 0;
+  const invalid: InvalidLine[] = [];
 
   for (const line of draft) {
     const quantity = parseQuantity(line.quantity);
     const cost = parseMoneyToCents(line.unitCost);
     const expiry = normalizeExpiryDate(line.expiryDate);
-    if (quantity === null || quantity <= 0 || cost === null || !expiry.ok) {
-      invalidCount += 1;
+    const problems: LineProblem[] = [];
+    if (quantity === null || quantity <= 0) problems.push("quantity");
+    if (cost === null) problems.push("cost");
+    if (!expiry.ok) problems.push("expiry");
+    if (quantity === null || cost === null || !expiry.ok || problems.length > 0) {
+      invalid.push({ productId: line.product.id, name: line.product.name ?? "", problems });
       continue;
     }
 
@@ -78,5 +88,5 @@ export function buildReceivePayload(draft: DraftLineInput[]): ReceivePayload {
     }
   }
 
-  return { lines, priceUpdates, invalidCount };
+  return { lines, priceUpdates, invalidCount: invalid.length, invalid };
 }
