@@ -14,7 +14,6 @@ import {
   countProgress,
   countedQuantity,
   hasUnsavedWork,
-  isApplied,
   isEligible,
   mergeProducts,
   runInBatches,

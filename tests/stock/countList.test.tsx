@@ -4,7 +4,6 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import Screen from "../../app/(app)/stock-in/count";
 import { BigButton } from "../../src/components/BigButton";
-import { ProductSearchPicker } from "../../src/components/stock/ProductSearchPicker";
 
 const mockApply = jest.fn();
 const mockLowStock = jest.fn();
