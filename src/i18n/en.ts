@@ -32,6 +32,11 @@ const en: Translations = {
     offlineNeeded: "A connection is needed to {{action}}. Your entry is kept on this device.",
   },
   errors: {
+    accountDeactivated: "This account has been deactivated. Ask the owner.",
+    staffPartial:
+      "The account is already blocked, but the last step failed. Try again to finish it.",
+    staffProtected: "You cannot deactivate your own account or an owner's.",
+    inviteAccepted: "This person has already accepted the invitation.",
     network: "No connection to the server.",
     tryAgainOnline: "What you entered is still here: try again when the network is back.",
     offlineExplain:
@@ -144,6 +149,7 @@ const en: Translations = {
     settings: "Settings",
   },
   auth: {
+    accountDeactivated: "This account has been deactivated. Ask the owner.",
     title: "Corniche Market",
     email: "Email",
     password: "Password",
@@ -157,6 +163,28 @@ const en: Translations = {
     language: "Language",
   },
   settings: {
+    staffTitle: "Staff",
+    staffHint: "Deactivated people can no longer sign in. Their past sales stay in your records.",
+    staffLoadError: "Could not load the staff.",
+    staffYou: "You",
+    statusActive: "Active",
+    statusPending: "Invitation pending",
+    statusDeactivated: "Deactivated",
+    lastSignIn: "Last sign-in: {{when}}",
+    neverSignedIn: "Never signed in",
+    deactivate: "Deactivate",
+    reactivate: "Reactivate",
+    resendInvite: "Resend invite",
+    deactivateTitle: "Deactivate {{name}}?",
+    deactivateMessage:
+      "{{name}} will no longer be able to sign in or use the app. Their past sales stay in your records.",
+    deactivateConfirm: "Deactivate",
+    reactivateTitle: "Reactivate {{name}}?",
+    reactivateMessage: "{{name}} will be able to sign in again.",
+    reactivateConfirm: "Reactivate",
+    staffDeactivatedDone: "{{name}} has been deactivated.",
+    staffReactivatedDone: "{{name}} can sign in again.",
+    inviteResent: "Invitation sent again to {{email}}.",
     timezoneLoadError: "Could not load the store time zone.",
     title: "Settings",
     account: "Account",
@@ -1026,6 +1054,8 @@ const en: Translations = {
     screenTitle: "Set your password",
   },
   startup: {
+    deactivatedTitle: "Account deactivated",
+    deactivatedMessage: "This account has been deactivated. Ask the owner.",
     slowTitle: "Loading is taking too long",
     slowMessage: "Cannot reach the server. Check your internet connection, then try again.",
     profileTitle: "Cannot load the profile",

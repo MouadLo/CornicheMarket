@@ -30,6 +30,11 @@ const fr = {
     offlineNeeded: "Connexion requise pour {{action}}. Votre saisie est gardée sur l'appareil.",
   },
   errors: {
+    accountDeactivated: "Ce compte a été désactivé. Demandez au propriétaire.",
+    staffPartial:
+      "Le compte est déjà bloqué, mais la dernière étape a échoué. Réessayez pour la terminer.",
+    staffProtected: "Vous ne pouvez pas désactiver votre propre compte ni celui d'un propriétaire.",
+    inviteAccepted: "Cette personne a déjà accepté l'invitation.",
     network: "Pas de connexion au serveur.",
     tryAgainOnline: "Votre saisie est toujours là : réessayez au retour du réseau.",
     offlineExplain:
@@ -144,6 +149,7 @@ const fr = {
     settings: "Paramètres",
   },
   auth: {
+    accountDeactivated: "Ce compte a été désactivé. Demandez au propriétaire.",
     title: "Corniche Market",
     email: "Email",
     password: "Mot de passe",
@@ -158,6 +164,29 @@ const fr = {
     language: "Langue",
   },
   settings: {
+    staffTitle: "Équipe",
+    staffHint:
+      "Les personnes désactivées ne peuvent plus se connecter. Leurs ventes passées restent dans vos registres.",
+    staffLoadError: "Impossible de charger l'équipe.",
+    staffYou: "Vous",
+    statusActive: "Actif",
+    statusPending: "Invitation en attente",
+    statusDeactivated: "Désactivé",
+    lastSignIn: "Dernière connexion : {{when}}",
+    neverSignedIn: "Jamais connecté",
+    deactivate: "Désactiver",
+    reactivate: "Réactiver",
+    resendInvite: "Renvoyer l'invitation",
+    deactivateTitle: "Désactiver {{name}} ?",
+    deactivateMessage:
+      "{{name}} ne pourra plus se connecter ni utiliser l'application. Ses ventes passées restent dans vos registres.",
+    deactivateConfirm: "Désactiver",
+    reactivateTitle: "Réactiver {{name}} ?",
+    reactivateMessage: "{{name}} pourra de nouveau se connecter.",
+    reactivateConfirm: "Réactiver",
+    staffDeactivatedDone: "{{name}} a été désactivé.",
+    staffReactivatedDone: "{{name}} peut de nouveau se connecter.",
+    inviteResent: "Invitation renvoyée à {{email}}.",
     timezoneLoadError: "Impossible de charger le fuseau horaire du magasin.",
     title: "Paramètres",
     account: "Compte",
@@ -1037,6 +1066,8 @@ const fr = {
     screenTitle: "Définir votre mot de passe",
   },
   startup: {
+    deactivatedTitle: "Compte désactivé",
+    deactivatedMessage: "Ce compte a été désactivé. Demandez au propriétaire.",
     slowTitle: "Le chargement prend trop de temps",
     slowMessage:
       "Impossible de contacter le serveur. Vérifiez votre connexion internet, puis réessayez.",
