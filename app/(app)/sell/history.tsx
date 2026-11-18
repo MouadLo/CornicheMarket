@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
+import { colors } from "@/src/theme/tokens";
 import { Banner } from "@/src/components/ui/Banner";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { LoadQueryError } from "@/src/components/ui/LoadQueryError";
@@ -381,6 +382,14 @@ export default function SalesHistory() {
     <ScrollView contentContainerStyle={styles.container}>
       {range ? (
         <View style={styles.rangeBox}>
+          {/* Opened from Reports, another section: the stack has no screen to go back to. */}
+          <Pressable
+            accessibilityRole="button"
+            style={styles.backToReport}
+            onPress={() => router.navigate("/(app)/reports")}
+          >
+            <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
+          </Pressable>
           <Banner
             tone="info"
             icon="calendar"
@@ -464,6 +473,8 @@ const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
   day: { gap: 10 },
   rangeBox: { gap: 8 },
+  backToReport: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
+  backToReportText: { fontSize: 15, fontWeight: "700", color: colors.brand700 },
   rangeTotal: { fontSize: 15, fontWeight: "700", color: "#444" },
   dayHeader: {
     flexDirection: "row",

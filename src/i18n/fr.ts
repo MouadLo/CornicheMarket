@@ -301,6 +301,7 @@ const fr = {
     historyRangeBannerDay: "Ventes du {{date}}",
     historyRangeBanner: "Ventes du {{from}} au {{to}}",
     historyRangeTotal: "Total hors ventes annulées : {{amount}}",
+    historyBackToReport: "Retour au rapport",
     historyRangeClear: "Voir toutes les ventes",
     historyEmptyRange: "Aucune vente sur cette période",
     historyEmptyRangeHint: "Aucune vente n'a été enregistrée entre ces dates.",

@@ -14,8 +14,12 @@ let mockRole: "owner" | "cashier" = "owner";
 
 let mockParams: Record<string, unknown> = {};
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock("expo-router", () => ({
-  router: { replace: (...a: unknown[]) => mockReplace(...a) },
+  router: {
+    replace: (...a: unknown[]) => mockReplace(...a),
+    navigate: (...a: unknown[]) => mockNavigate(...a),
+  },
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -169,6 +173,13 @@ describe("sales history", () => {
       await render();
       act(() => pressableByText(tree.root, "sell.historyRangeClear").props.onPress());
       expect(mockReplace).toHaveBeenCalledWith("/(app)/sell/history");
+    });
+
+    it("goes back to the report it was opened from", async () => {
+      mockParams = { rangeFrom: from, rangeTo: to };
+      await render();
+      act(() => pressableByText(tree.root, "sell.historyBackToReport").props.onPress());
+      expect(mockNavigate).toHaveBeenCalledWith("/(app)/reports");
     });
 
     it.each([

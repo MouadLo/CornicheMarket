@@ -298,6 +298,7 @@ const ar: Translations = {
     historyRangeBannerDay: "مبيعات يوم {{date}}",
     historyRangeBanner: "المبيعات من {{from}} إلى {{to}}",
     historyRangeTotal: "المجموع دون المبيعات الملغاة: {{amount}}",
+    historyBackToReport: "العودة إلى التقرير",
     historyRangeClear: "عرض كل المبيعات",
     historyEmptyRange: "لا توجد مبيعات في هذه الفترة",
     historyEmptyRangeHint: "لم تُسجَّل أي عملية بيع بين هذين التاريخين.",

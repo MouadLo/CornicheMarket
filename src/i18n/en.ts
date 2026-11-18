@@ -300,6 +300,7 @@ const en: Translations = {
     historyRangeBannerDay: "Sales on {{date}}",
     historyRangeBanner: "Sales from {{from}} to {{to}}",
     historyRangeTotal: "Total without voided sales: {{amount}}",
+    historyBackToReport: "Back to the report",
     historyRangeClear: "Show all sales",
     historyEmptyRange: "No sales in this period",
     historyEmptyRangeHint: "No sale was recorded between these dates.",
