@@ -9,7 +9,13 @@ import { pressableByText, sizeOf } from "./sellTestUtils";
 
 const MIN = 48;
 
-jest.mock("expo-router", () => ({ router: { replace: jest.fn(), push: jest.fn() } }));
+jest.mock("expo-router", () => ({
+  router: { replace: jest.fn(), push: jest.fn() },
+  useFocusEffect: (cb: () => void) => {
+    const React = require("react");
+    React.useEffect(cb, [cb]);
+  },
+}));
 jest.mock("react-i18next", () => {
   const t = (key: string) => key; // stable identity: screens use t in hook deps
   return { useTranslation: () => ({ t, i18n: { language: "fr" } }) };

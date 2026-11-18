@@ -1,142 +1,120 @@
-import * as Crypto from "expo-crypto";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { BigButton } from "@/src/components/BigButton";
-import { useAuth } from "@/src/lib/auth/AuthProvider";
-import { formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
+import { formatMAD } from "@/src/lib/money";
+import { filterCustomers } from "@/src/lib/sales/cashEntry";
 import {
   fetchCustomerBalances,
   recordCustomerPayment,
   type CustomerBalance,
 } from "@/src/lib/sales/queries";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
+import { Text } from "@/src/theme/Text";
+import { colors, radius, touch } from "@/src/theme/tokens";
 
 export default function CreditScreen() {
-  const { profile } = useAuth();
   const { t } = useTranslation();
   const [balances, setBalances] = useState<CustomerBalance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
-  // One id per payment the cashier is entering, reused if they tap again after
-  // a network failure (the server records it once). Cleared on success, cancel,
-  // switching customer, or changing the amount.
-  const paymentId = useRef<string | null>(null);
-  const [amount, setAmount] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const load = useCallback(() => {
-    setLoading(true);
+  // Re-read on every return to this screen (a payment or sale may have changed
+  // a balance in a customer's history).
+  useFocusEffect(
+    useCallback(() => {
+      fetchCustomerBalances()
+        .then((rows) => {
+          setBalances(rows);
+          setError(null);
+        })
+        .catch((loadError) =>
+          setError(loadError instanceof Error ? loadError.message : t("credit.loadError"))
+        )
+        .finally(() => setLoaded(true));
+    }, [t])
+  );
+
+  const reload = useCallback(() => {
     fetchCustomerBalances()
       .then(setBalances)
       .catch((loadError) =>
         setError(loadError instanceof Error ? loadError.message : t("credit.loadError"))
-      )
-      .finally(() => setLoading(false));
+      );
   }, [t]);
 
-  useEffect(load, [load]);
+  if (!loaded) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
-  const handlePayment = async (customerId: string) => {
-    const amountCents = parseMoneyToCents(amount);
-    if (!profile || amountCents === null || amountCents <= 0) return;
+  const open = (id: string) => router.push({ pathname: "/(app)/clients/[id]", params: { id } });
 
-    setSaving(true);
-    setError(null);
-    try {
-      paymentId.current ??= Crypto.randomUUID();
-      await recordCustomerPayment(paymentId.current, customerId, amountCents, "cash");
-      paymentId.current = null;
-      setPayingId(null);
-      setAmount("");
-      load();
-    } catch (payError) {
-      setError(payError instanceof Error ? payError.message : t("credit.payError"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
-
-  const owing = balances.filter((balance) => balance.balance_cents > 0);
-  const settled = balances.filter((balance) => balance.balance_cents <= 0);
-  const totalOwed = owing.reduce((sum, balance) => sum + balance.balance_cents, 0);
+  const shown = filterCustomers(balances, search);
+  const owing = shown.filter((balance) => balance.balance_cents > 0);
+  const settled = shown.filter((balance) => balance.balance_cents <= 0);
+  // The shop-wide total is never filtered by the search.
+  const totalOwed = balances
+    .filter((balance) => balance.balance_cents > 0)
+    .reduce((sum, balance) => sum + balance.balance_cents, 0);
+  const searching = search.trim() !== "";
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       {error && <Text style={styles.error}>{error}</Text>}
 
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>{t("credit.totalOwed")}</Text>
-        <Text style={styles.summaryValue}>{formatMAD(totalOwed)}</Text>
+        <Text style={styles.summaryValue}>{isolateLtr(formatMAD(totalOwed))}</Text>
       </View>
 
-      {owing.length === 0 && <Text style={styles.empty}>{t("credit.nobody")}</Text>}
+      <TextInput
+        style={styles.search}
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t("credit.searchPlaceholder")}
+        placeholderTextColor={colors.ink600}
+        accessibilityLabel={t("credit.searchPlaceholder")}
+        autoCorrect={false}
+      />
+
+      {searching && shown.length === 0 && <Text style={styles.empty}>{t("credit.noResults")}</Text>}
+      {!searching && owing.length === 0 && <Text style={styles.empty}>{t("credit.nobody")}</Text>}
 
       {owing.map((balance) => (
         <View key={balance.id} style={styles.row}>
-          <View style={styles.rowTop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("credit.openCustomer", { name: balance.name })}
+            style={styles.rowTop}
+            onPress={() => open(balance.id)}
+          >
             <View style={styles.rowMain}>
-              <Text style={styles.name}>{balance.name}</Text>
+              <Text style={styles.name}>{isolateBidi(balance.name)}</Text>
               <Text style={styles.meta}>
-                {balance.phone ? `${balance.phone} · ` : ""}
-                {t("credit.took")} {formatMAD(balance.credit_total_cents)} · {t("credit.paid")}{" "}
-                {formatMAD(balance.paid_total_cents)}
+                {balance.phone ? `${isolateLtr(balance.phone)} · ` : ""}
+                {t("credit.took")} {isolateLtr(formatMAD(balance.credit_total_cents))} ·{" "}
+                {t("credit.paid")} {isolateLtr(formatMAD(balance.paid_total_cents))}
               </Text>
             </View>
-            <Text style={styles.balance}>{formatMAD(balance.balance_cents)}</Text>
-          </View>
+            <Text style={styles.balance}>{isolateLtr(formatMAD(balance.balance_cents))}</Text>
+          </Pressable>
 
-          {payingId === balance.id ? (
-            <View style={styles.payBox}>
-              <TextInput
-                style={styles.input}
-                value={amount}
-                onChangeText={(value) => {
-                  paymentId.current = null;
-                  setAmount(value);
-                }}
-                keyboardType="decimal-pad"
-                placeholder={t("credit.amountReceived")}
-                autoFocus
-              />
-              <BigButton
-                label={saving ? t("credit.recordingPayment") : t("credit.recordPayment")}
-                onPress={() => handlePayment(balance.id)}
-                disabled={saving}
-              />
-              <BigButton
-                label={t("credit.cancelPayment")}
-                variant="secondary"
-                onPress={() => {
-                  paymentId.current = null;
-                  setPayingId(null);
-                  setAmount("");
-                }}
-              />
-            </View>
-          ) : (
-            <Pressable
-              style={styles.payButton}
-              onPress={() => {
-                paymentId.current = null;
-                setPayingId(balance.id);
-                setAmount("");
-              }}
-            >
-              <Text style={styles.payButtonText}>{t("credit.recordPaymentButton")}</Text>
-            </Pressable>
-          )}
+          <CustomerPaymentAction
+            customerId={balance.id}
+            balanceCents={balance.balance_cents}
+            onRecord={(paymentId, cents) =>
+              recordCustomerPayment(paymentId, balance.id, cents, "cash")
+            }
+            onRecorded={reload}
+          />
         </View>
       ))}
 
@@ -144,14 +122,20 @@ export default function CreditScreen() {
         <>
           <Text style={styles.sectionLabel}>{t("credit.settled")}</Text>
           {settled.map((balance) => (
-            <View key={balance.id} style={styles.settledRow}>
-              <Text style={styles.settledName}>{balance.name}</Text>
+            <Pressable
+              key={balance.id}
+              accessibilityRole="button"
+              accessibilityLabel={t("credit.openCustomer", { name: balance.name })}
+              style={styles.settledRow}
+              onPress={() => open(balance.id)}
+            >
+              <Text style={styles.settledName}>{isolateBidi(balance.name)}</Text>
               <Text style={styles.settledValue}>
                 {balance.balance_cents < 0
-                  ? t("credit.inCredit", { amount: formatMAD(-balance.balance_cents) })
+                  ? t("credit.inCredit", { amount: isolateLtr(formatMAD(-balance.balance_cents)) })
                   : t("credit.clear")}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </>
       )}
@@ -161,49 +145,55 @@ export default function CreditScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 48 },
-  summary: { backgroundColor: "#f3f7f4", borderRadius: 12, padding: 16, gap: 4 },
-  summaryLabel: { fontSize: 14, color: "#555" },
-  summaryValue: { fontSize: 28, fontWeight: "800", color: "#1d7a46" },
-  row: { borderWidth: 1, borderColor: "#eee", borderRadius: 12, padding: 14, gap: 10 },
-  rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  rowMain: { flex: 1, gap: 3 },
-  name: { fontSize: 16, fontWeight: "700" },
-  meta: { fontSize: 13, color: "#666" },
-  balance: { fontSize: 18, fontWeight: "800", color: "#b3261e" },
-  payButton: {
-    minHeight: 48,
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#eef3ef",
-    alignItems: "center",
-  },
-  payButtonText: { color: "#1d7a46", fontWeight: "700", fontSize: 15 },
-  payBox: { gap: 10 },
-  input: {
-    minHeight: 52,
-    borderRadius: 10,
+  summary: { backgroundColor: colors.danger100, borderRadius: radius.panel, padding: 16, gap: 4 },
+  summaryLabel: { fontSize: 14, color: colors.ink700 },
+  // Money owed is the danger colour everywhere on this screen.
+  summaryValue: { fontSize: 28, fontWeight: "800", color: colors.danger600 },
+  search: {
+    minHeight: touch.min,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    color: colors.ink900,
     paddingHorizontal: 16,
-    fontSize: 17,
+    fontSize: 16,
   },
+  row: {
+    borderWidth: 1,
+    borderColor: colors.divider,
+    backgroundColor: colors.surface,
+    borderRadius: radius.panel,
+    padding: 14,
+    gap: 10,
+  },
+  rowTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    minHeight: touch.min,
+  },
+  rowMain: { flex: 1, gap: 3 },
+  name: { fontSize: 16, fontWeight: "700", color: colors.ink900 },
+  meta: { fontSize: 13, color: colors.ink600 },
+  balance: { fontSize: 18, fontWeight: "800", color: colors.danger600 },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#555",
-    textTransform: "uppercase",
+    color: colors.ink600,
     marginTop: 10,
   },
   settledRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    alignItems: "center",
+    gap: 12,
+    minHeight: touch.min,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
   },
-  settledName: { fontSize: 15 },
-  settledValue: { fontSize: 14, color: "#666" },
-  empty: { textAlign: "center", color: "#666", marginVertical: 20 },
-  error: { color: "#b3261e" },
+  settledName: { flex: 1, fontSize: 15, color: colors.ink900 },
+  settledValue: { fontSize: 14, color: colors.ink600 },
+  empty: { textAlign: "center", color: colors.ink600, marginVertical: 20 },
+  error: { color: colors.danger600 },
 });
