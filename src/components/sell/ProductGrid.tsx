@@ -178,7 +178,11 @@ function Tile({
       <View style={styles.tileBottom}>
         <View style={styles.priceLine}>
           <Text
-            style={[styles.price, tabularNumbers, { fontSize: priceFontSize(amount, width) }]}
+            style={[
+              styles.price,
+              tabularNumbers,
+              { fontSize: Math.max(13, priceFontSize(amount, width)) },
+            ]}
             numberOfLines={1}
           >
             {isolateLtr(amount)}

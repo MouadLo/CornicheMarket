@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: { fontSize: 18, fontWeight: "700", textAlign: "center" },
-  hint: { fontSize: 14, color: colors.ink600, textAlign: "center" },
+  hint: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   actions: { flexDirection: "row", gap: 10, marginTop: 8, width: "100%", maxWidth: 420 },
   flex: { flex: 1 },
 });

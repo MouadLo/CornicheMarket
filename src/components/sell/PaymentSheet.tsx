@@ -395,8 +395,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.divider,
   },
   chipActive: { backgroundColor: colors.brand700 },
-  chipText: { fontSize: 14, color: colors.ink700 },
-  chipOwes: { fontSize: 12, color: colors.danger600 },
+  chipText: { fontSize: 15, color: colors.ink700 },
+  chipOwes: { fontSize: 15, color: colors.danger600 },
   chipTextActive: { color: colors.white, fontWeight: "600" },
   newCustomerRow: { flexDirection: "row", gap: 8 },
   addCustomer: {
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addCustomerText: { color: colors.white, fontWeight: "700", fontSize: 15 },
-  error: { color: colors.danger600, fontSize: 14 },
+  error: { color: colors.danger600, fontSize: 15 },
   footer: {
     padding: 20,
     paddingTop: 10,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
-  hint: { fontSize: 14, color: colors.ink600, textAlign: "center" },
+  hint: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   // Small and apart from Complete sale: a slip must not leave the payment.
   back: { minHeight: touch.min, alignItems: "center", justifyContent: "center", marginTop: 8 },
   backText: { fontSize: 16, fontWeight: "600", color: colors.ink600 },

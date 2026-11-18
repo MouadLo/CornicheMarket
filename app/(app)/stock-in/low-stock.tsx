@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     padding: 10,
     minWidth: 72,
   },
-  suggestLabel: { fontSize: 11, color: "#1d7a46", textTransform: "uppercase" },
+  suggestLabel: { fontSize: 13, color: "#1d7a46", textTransform: "uppercase" },
   suggestValue: { fontSize: 20, fontWeight: "800", color: "#1d7a46" },
   empty: { textAlign: "center", color: "#666", marginTop: 32 },
   error: { color: "#b3261e" },

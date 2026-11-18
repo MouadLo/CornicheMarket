@@ -67,5 +67,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "700", color: colors.warning700 },
   summary: { fontSize: 17, fontWeight: "600", color: colors.ink900 },
   hint: { fontSize: 15, color: colors.ink700 },
-  error: { fontSize: 14, color: colors.danger700 },
+  error: { fontSize: 15, color: colors.danger700 },
 });

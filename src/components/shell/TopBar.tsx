@@ -191,5 +191,5 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 16, fontWeight: "700", color: colors.ink900 },
   userName: { fontSize: 15, fontWeight: "600", color: colors.white, maxWidth: 120 },
-  userRole: { fontSize: 12, color: "#b9d3db" },
+  userRole: { fontSize: 13, color: "#b9d3db" },
 });

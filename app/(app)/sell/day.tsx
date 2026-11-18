@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   lineLabel: { fontSize: 15, color: colors.ink700, flexShrink: 1 },
   lineValue: { fontSize: 15, fontWeight: "600" },
   strong: { fontWeight: "800", color: colors.ink900 },
-  meta: { fontSize: 13, color: colors.ink600 },
+  meta: { fontSize: 15, color: colors.ink600 },
   field: { gap: 4, marginTop: 8 },
   input: {
     minHeight: 48,

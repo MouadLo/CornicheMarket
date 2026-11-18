@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   historyRight: { alignItems: "flex-end" },
   delta: { fontSize: 16, fontWeight: "700", color: "#1d7a46" },
   deltaNegative: { color: "#b3261e" },
-  lossValue: { fontSize: 12, color: "#666" },
+  lossValue: { fontSize: 13, color: "#666" },
   empty: { color: "#666", textAlign: "center", marginVertical: 16 },
   error: { color: "#b3261e" },
 });

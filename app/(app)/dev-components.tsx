@@ -320,5 +320,5 @@ const styles = StyleSheet.create({
   gap: { marginTop: 12 },
   grow: { flex: 1 },
   icon: { width: 84, alignItems: "center", gap: 4, paddingVertical: 6 },
-  iconLabel: { fontSize: 12, color: colors.ink600 },
+  iconLabel: { fontSize: 13, color: colors.ink600 },
 });

@@ -109,8 +109,8 @@ const styles = StyleSheet.create({
   days: { fontSize: 17, fontWeight: "800", color: "#1d7a46" },
   urgent: { color: "#b36b00" },
   expired: { color: "#b3261e" },
-  date: { fontSize: 12, color: "#777" },
+  date: { fontSize: 13, color: "#777" },
   empty: { textAlign: "center", color: "#666", marginVertical: 24, lineHeight: 20 },
-  note: { fontSize: 12, color: "#777", fontStyle: "italic", marginTop: 16, lineHeight: 18 },
+  note: { fontSize: 13, color: "#777", fontStyle: "italic", marginTop: 16, lineHeight: 19 },
   error: { color: "#b3261e" },
 });
