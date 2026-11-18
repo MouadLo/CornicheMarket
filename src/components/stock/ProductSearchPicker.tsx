@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { useCameraScanAvailable } from "@/src/lib/scanner/scanMode";
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import { fetchProducts, findByBarcode, type Product } from "@/src/lib/products/queries";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
@@ -23,6 +24,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const cameraScan = useCameraScanAvailable();
   const [notice, setNotice] = useState<string | null>(null);
   const debounced = useDebouncedValue(term, 300);
 
@@ -85,10 +87,16 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
           accessibilityLabel={t("stockIn.searchProduct")}
           value={term}
           onChangeText={setTerm}
+          // A USB scanner types the code into this field and presses Enter:
+          // pick that exact product instead of waiting for the list.
+          onSubmitEditing={() => {
+            const code = term.trim();
+            if (/^\d{4,}$/.test(code)) handleScanned(code);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {Platform.OS !== "web" && (
+        {cameraScan && (
           <Pressable
             accessibilityRole="button"
             style={styles.scanButton}

@@ -1127,6 +1127,16 @@ const fr = {
     allowCamera: "Autoriser la caméra",
     pointCamera: "Pointez la caméra vers le code-barres",
     cancel: "Annuler",
+    tryAgain: "Réessayer",
+    close: "Fermer",
+    webDenied:
+      "La caméra est bloquée. Autorisez-la dans les réglages de votre navigateur (icône à gauche de l'adresse, ou Réglages du site), puis appuyez sur Réessayer.",
+    webNotFound: "Aucune caméra n'a été trouvée sur cet appareil.",
+    webInUse:
+      "La caméra est utilisée par une autre application. Fermez-la, puis appuyez sur Réessayer.",
+    webInsecure:
+      "La caméra ne fonctionne que sur une page sécurisée (HTTPS). Ouvrez l'application avec son adresse https://.",
+    webGeneric: "Impossible de démarrer la caméra. Appuyez sur Réessayer.",
   },
   priceChart: {
     empty: "Aucune livraison enregistrée pour ce produit.",

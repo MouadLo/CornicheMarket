@@ -1,11 +1,13 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { InlineError } from "@/src/components/ui/InlineError";
 import { errorKeyOr } from "@/src/lib/errors/userMessage";
+import { useCameraScanAvailable } from "@/src/lib/scanner/scanMode";
+import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import {
   centsToDisplay,
@@ -102,6 +104,10 @@ export function ProductForm({
   const [tileColor, setTileColor] = useState(initialTile?.color ?? null);
 
   const [scannerOpen, setScannerOpen] = useState(false);
+  const cameraScan = useCameraScanAvailable();
+  // A USB scanner fills the barcode field from anywhere in the form, and never
+  // types the digits into the name or a price box.
+  useKeyboardWedge(setBarcode, !scannerOpen, true);
   const [duplicate, setDuplicate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -296,7 +302,7 @@ export function ProductForm({
             placeholder={t("products.formBarcodePlaceholder")}
             keyboardType="number-pad"
           />
-          {Platform.OS !== "web" && (
+          {cameraScan && (
             <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
               <Text style={styles.scanButtonText}>{t("products.formScan")}</Text>
             </Pressable>

@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -56,6 +55,7 @@ import {
   saleTotal,
   validateSaleDiscounts,
 } from "@/src/lib/sales/totals";
+import { useCameraScanAvailable } from "@/src/lib/scanner/scanMode";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
@@ -90,6 +90,7 @@ export default function SellScreen() {
   const [resultsFor, setResultsFor] = useState("");
   const [searchSlow, setSearchSlow] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const cameraScan = useCameraScanAvailable();
   // A weighed (kg) product waiting for its weight on the keypad.
   const [weighing, setWeighing] = useState<Product | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -314,10 +315,14 @@ export default function SellScreen() {
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.
-  useKeyboardWedge((barcode) => {
-    setSearch("");
-    addByBarcode(barcode);
-  }, !paymentOpen && !weighing);
+  useKeyboardWedge(
+    (barcode) => {
+      setSearch("");
+      addByBarcode(barcode);
+      // The camera feeds the same handler; never let both read one scan.
+    },
+    !paymentOpen && !weighing && !scannerOpen
+  );
 
   const handleConfirm = async (method: PaymentMethod, customerId: string | null, change = 0) => {
     if (accepting.current || !profile || lines.length === 0) return;
@@ -490,7 +495,7 @@ export default function SellScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {Platform.OS !== "web" && (
+        {cameraScan && (
           <Pressable
             accessibilityRole="button"
             style={styles.scanButton}
