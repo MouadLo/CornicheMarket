@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { Banner } from "@/src/components/ui/Banner";
+import { Icon } from "@/src/components/ui/Icon";
 import { useTodayClosed } from "@/src/lib/day/useTodayClosed";
 import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
@@ -458,9 +459,11 @@ export default function SellScreen() {
       <View style={styles.headerTop}>
         <View style={styles.headerLinks}>
           <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
+            <Icon name="receipt" size={20} color="#1d7a46" />
             <Text style={styles.link}>{t("sell.history")}</Text>
           </Pressable>
           <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/day")}>
+            <Icon name="calendar" size={20} color="#1d7a46" />
             <Text style={styles.link}>{t("day.link")}</Text>
           </Pressable>
         </View>
@@ -787,7 +790,19 @@ const styles = StyleSheet.create({
   header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 8 },
-  headerLink: { minHeight: 48, minWidth: 48, justifyContent: "center", paddingHorizontal: 8 },
+  headerLink: {
+    minHeight: 48,
+    minWidth: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#1d7a46",
+    backgroundColor: "#eaf6ee",
+  },
   link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
   searchRow: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
