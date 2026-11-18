@@ -124,7 +124,11 @@ export function useBasket(userId: string | null) {
     [update]
   );
   const setSaleDiscount = useCallback(
-    (next: string) => update((previous) => ({ ...previous, saleDiscount: next })),
+    (next: Update<string>) =>
+      update((previous) => ({
+        ...previous,
+        saleDiscount: typeof next === "function" ? next(previous.saleDiscount) : next,
+      })),
     [update]
   );
 

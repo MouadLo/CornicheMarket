@@ -2,6 +2,7 @@ const fr = {
   common: {
     save: "Enregistrer",
     cancel: "Annuler",
+    undo: "Annuler",
     delete: "Supprimer",
     edit: "Modifier",
     add: "Ajouter",
@@ -260,6 +261,11 @@ const fr = {
     lineDiscountTooHigh: "La remise dépasse le prix de cet article.",
     saleDiscountTooHigh: "La remise dépasse le total du panier.",
     remove: "Retirer",
+    emptyBasket: "Vider le panier",
+    emptyBasketConfirm: "Tous les articles du panier seront retirés.",
+    emptyBasketYes: "Vider",
+    lineRemoved: "{{name}} retiré",
+    basketEmptied: "Panier vidé",
     weightRequired: "Indiquez le poids.",
     grid: {
       favorites: "Favoris",

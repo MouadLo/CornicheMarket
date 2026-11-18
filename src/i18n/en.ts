@@ -4,6 +4,7 @@ const en: Translations = {
   common: {
     save: "Save",
     cancel: "Cancel",
+    undo: "Undo",
     delete: "Delete",
     edit: "Edit",
     add: "Add",
@@ -260,6 +261,11 @@ const en: Translations = {
     lineDiscountTooHigh: "Discount exceeds this item's price.",
     saleDiscountTooHigh: "Discount exceeds the basket total.",
     remove: "Remove",
+    emptyBasket: "Empty basket",
+    emptyBasketConfirm: "All items will be removed from the basket.",
+    emptyBasketYes: "Empty",
+    lineRemoved: "{{name}} removed",
+    basketEmptied: "Basket emptied",
     weightRequired: "Enter the weight.",
     grid: {
       favorites: "Favorites",
