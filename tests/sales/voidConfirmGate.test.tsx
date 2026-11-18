@@ -64,6 +64,19 @@ async function startVoid() {
 }
 
 describe("void confirmation", () => {
+  it("shows a closed-day refusal inside the void box and keeps the box open", async () => {
+    mockVoidSale.mockRejectedValueOnce(new Error("The day is closed"));
+    await startVoid();
+    await act(async () => {
+      pressableByText(tree.root, "sell.voidAndRestore").props.onPress();
+    });
+    const shown = tree.root.findAll(
+      (node) => node.props.children === "sell.voidErrDayClosed" && typeof node.type === "string"
+    );
+    expect(shown.length).toBeGreaterThan(0);
+    expect(pressableByText(tree.root, "sell.voidAndRestore")).toBeTruthy();
+  });
+
   it("asks for confirmation naming the amount before voiding", async () => {
     await startVoid();
     await act(async () => {

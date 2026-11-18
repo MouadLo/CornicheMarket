@@ -63,6 +63,8 @@ export default function SalesHistory() {
   const [reason, setReason] = useState<VoidReason | null>(null);
   const [reasonNote, setReasonNote] = useState("");
   const [saving, setSaving] = useState(false);
+  // Shown inside the void box: the page-level error can be scrolled out of view.
+  const [voidError, setVoidError] = useState<string | null>(null);
   // Cashier: the sale being asked about, and what the owner has answered so far.
   const [askingId, setAskingId] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
@@ -139,15 +141,15 @@ export default function SalesHistory() {
     if (!confirmed) return;
 
     setSaving(true);
-    setError(null);
+    setVoidError(null);
     try {
       await voidSale(saleId, composeVoidReason(reason, reasonNote));
       setVoidingId(null);
       setReason(null);
       setReasonNote("");
       load();
-    } catch (voidError) {
-      setError(voidError instanceof Error ? voidError.message : t("sell.historyVoidError"));
+    } catch (failure) {
+      setVoidError(describeVoidRequestError(failure, t));
     } finally {
       setSaving(false);
     }
@@ -305,6 +307,7 @@ export default function SalesHistory() {
                 onNote={setReasonNote}
                 noteAlways
               />
+              {voidError ? <Text style={styles.error}>{voidError}</Text> : null}
               <BigButton
                 label={saving ? t("sell.voiding") : t("sell.voidAndRestore")}
                 variant="danger"
@@ -318,6 +321,7 @@ export default function SalesHistory() {
                   setVoidingId(null);
                   setReason(null);
                   setReasonNote("");
+                  setVoidError(null);
                 }}
               />
             </View>
@@ -327,6 +331,7 @@ export default function SalesHistory() {
               onPress={() => {
                 setReason(null);
                 setReasonNote("");
+                setVoidError(null);
                 setVoidingId(sale.id);
               }}
             >
