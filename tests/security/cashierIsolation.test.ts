@@ -490,6 +490,7 @@ suite("money and stock writes only go through trusted functions (C06)", () => {
       { p_payment_id: NO_ROW, p_customer_id: NO_ROW, p_amount_cents: 1, p_method: "cash" },
     ],
     ["void_sale", { p_sale_id: NO_ROW, p_reason: "probe" }],
+    ["customer_credit_sales", { p_customer_id: NO_ROW, p_limit: 1, p_offset: 0 }],
     ["batch_update_selling_prices", { p_updates: [] }],
     ["bulk_adjust_selling_price", { p_category_id: NO_ROW, p_percent: 0 }],
     ["store_timezone", {}],
