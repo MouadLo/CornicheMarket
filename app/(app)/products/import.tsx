@@ -126,18 +126,16 @@ export default function ImportProducts() {
         <>
           <Text style={styles.title}>{t("products.importMapTitle")}</Text>
           <Text style={styles.body}>
-            {fileName} · {t("leftovers.importRows", { count: rawRows.length })}
+            {fileName} · {t("importCsv.rows", { count: rawRows.length })}
           </Text>
 
           {IMPORT_FIELDS.map((field) => (
             <View key={field.key} style={styles.field}>
               <Text style={styles.label}>
-                {t(`leftovers.importFields.${field.key}`)}
+                {t(`importCsv.fields.${field.key}`)}
                 {field.required ? " *" : ""}
               </Text>
-              {field.hint && (
-                <Text style={styles.hint}>{t(`leftovers.importHints.${field.key}`)}</Text>
-              )}
+              {field.hint && <Text style={styles.hint}>{t(`importCsv.hints.${field.key}`)}</Text>}
               <View style={styles.chips}>
                 <Chip
                   label={t("products.importIgnore")}
@@ -183,7 +181,7 @@ export default function ImportProducts() {
                 {row.product.barcode ?? t("products.importNoBarcode")} ·{" "}
                 {unitLabel(row.product.unit, 1, t)}
                 {row.opening
-                  ? ` · ${t("leftovers.importOpening", {
+                  ? ` · ${t("importCsv.opening", {
                       quantity: row.opening.quantity,
                       cost: formatMAD(row.opening.unit_cost_cents),
                     })}`

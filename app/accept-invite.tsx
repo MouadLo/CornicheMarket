@@ -43,9 +43,9 @@ export default function AcceptInvite() {
   if (done) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>{t("leftovers.accept.done")}</Text>
+        <Text style={styles.message}>{t("invite.done")}</Text>
         <View style={styles.buttonWrap}>
-          <BigButton label={t("leftovers.accept.goSignIn")} onPress={goToSignIn} />
+          <BigButton label={t("invite.goSignIn")} onPress={goToSignIn} />
         </View>
       </View>
     );
@@ -54,21 +54,19 @@ export default function AcceptInvite() {
   if (!session) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>{t("leftovers.accept.expired")}</Text>
+        <Text style={styles.message}>{t("invite.expired")}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t("leftovers.accept.welcome")}</Text>
-      <Text style={styles.subtitle}>
-        {t("leftovers.accept.choose", { email: session.user.email })}
-      </Text>
+      <Text style={styles.title}>{t("invite.welcome")}</Text>
+      <Text style={styles.subtitle}>{t("invite.choose", { email: session.user.email })}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder={t("leftovers.accept.newPassword")}
+        placeholder={t("invite.newPassword")}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -78,7 +76,7 @@ export default function AcceptInvite() {
 
       <View style={styles.buttonWrap}>
         <BigButton
-          label={submitting ? t("leftovers.accept.saving") : t("leftovers.accept.setPassword")}
+          label={submitting ? t("invite.saving") : t("invite.setPassword")}
           onPress={handleSetPassword}
           disabled={submitting || password.length < 6}
         />

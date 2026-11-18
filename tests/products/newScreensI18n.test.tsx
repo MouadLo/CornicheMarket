@@ -130,7 +130,7 @@ it("accept-invite ends on a button to sign-in once the password is set", async (
   expect(hardcodedTexts(tree.root)).toEqual([]);
 
   await act(async () => {
-    await pressableByText(tree.root, "⟦leftovers.accept.goSignIn⟧").props.onPress();
+    await pressableByText(tree.root, "⟦invite.goSignIn⟧").props.onPress();
   });
   expect(mockSignOut).toHaveBeenCalled();
   expect(mockReplace).toHaveBeenCalledWith("/sign-in");

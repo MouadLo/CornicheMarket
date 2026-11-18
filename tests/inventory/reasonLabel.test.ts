@@ -9,8 +9,8 @@ const t = (key: string) => `⟦${key}⟧`;
 describe("reasonLabel", () => {
   it("translates every stored reason code through its own key", () => {
     for (const reason of ADJUSTMENT_REASONS) {
-      expect(reasonLabel(reason, t)).toBe(`⟦leftovers.adjustReasons.${reason}⟧`);
-      expect(Object.keys(fr.leftovers.adjustReasons)).toContain(reason);
+      expect(reasonLabel(reason, t)).toBe(`⟦adjustReasons.${reason}⟧`);
+      expect(Object.keys(fr.adjustReasons)).toContain(reason);
     }
   });
 

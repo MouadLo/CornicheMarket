@@ -19,7 +19,7 @@ type Props = {
 export function PriceHistoryChart({ points, averageCostCents }: Props) {
   const { t } = useTranslation();
   if (points.length === 0) {
-    return <Text style={styles.empty}>{t("leftovers.priceChart.empty")}</Text>;
+    return <Text style={styles.empty}>{t("priceChart.empty")}</Text>;
   }
 
   const costs = points.map((point) => point.unit_cost_cents);
@@ -29,17 +29,13 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
   return (
     <View style={styles.wrapper}>
       <View style={styles.scaleRow}>
-        <Text style={styles.scaleText}>
-          {t("leftovers.priceChart.high", { price: centsToDisplay(max) })}
-        </Text>
+        <Text style={styles.scaleText}>{t("priceChart.high", { price: centsToDisplay(max) })}</Text>
         {averageCostCents !== null && (
           <Text style={styles.scaleText}>
-            {t("leftovers.priceChart.avg", { price: centsToDisplay(averageCostCents) })}
+            {t("priceChart.avg", { price: centsToDisplay(averageCostCents) })}
           </Text>
         )}
-        <Text style={styles.scaleText}>
-          {t("leftovers.priceChart.low", { price: centsToDisplay(min) })}
-        </Text>
+        <Text style={styles.scaleText}>{t("priceChart.low", { price: centsToDisplay(min) })}</Text>
       </View>
 
       <View style={styles.chart}>

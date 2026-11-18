@@ -9,11 +9,11 @@ export default function NotFoundScreen() {
   const { t } = useTranslation();
   return (
     <>
-      <Stack.Screen options={{ title: t("leftovers.titles.notFoundTitle") }} />
+      <Stack.Screen options={{ title: t("screenTitles.notFoundTitle") }} />
       <ThemedView style={styles.container}>
-        <ThemedText type="title">{t("leftovers.titles.notFound")}</ThemedText>
+        <ThemedText type="title">{t("screenTitles.notFound")}</ThemedText>
         <Link href="/" style={styles.link}>
-          <ThemedText type="link">{t("leftovers.titles.goHome")}</ThemedText>
+          <ThemedText type="link">{t("screenTitles.goHome")}</ThemedText>
         </Link>
       </ThemedView>
     </>

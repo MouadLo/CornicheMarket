@@ -53,10 +53,10 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   if (loading && loadTimedOut) {
     return (
       <View style={guardStyles.container}>
-        <Text style={guardStyles.title}>{t("leftovers.guard.slowTitle")}</Text>
-        <Text style={guardStyles.message}>{t("leftovers.guard.slowMessage")}</Text>
+        <Text style={guardStyles.title}>{t("startup.slowTitle")}</Text>
+        <Text style={guardStyles.message}>{t("startup.slowMessage")}</Text>
         <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
-          <Text style={guardStyles.retryText}>{t("leftovers.guard.retry")}</Text>
+          <Text style={guardStyles.retryText}>{t("startup.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -65,13 +65,13 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   if (!loading && profileError) {
     return (
       <View style={guardStyles.container}>
-        <Text style={guardStyles.title}>{t("leftovers.guard.profileTitle")}</Text>
+        <Text style={guardStyles.title}>{t("startup.profileTitle")}</Text>
         <Text style={guardStyles.message}>{profileError}</Text>
         <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
-          <Text style={guardStyles.retryText}>{t("leftovers.guard.retry")}</Text>
+          <Text style={guardStyles.retryText}>{t("startup.retry")}</Text>
         </Pressable>
         <Pressable onPress={signOut}>
-          <Text style={guardStyles.signOutText}>{t("leftovers.guard.signOut")}</Text>
+          <Text style={guardStyles.signOutText}>{t("startup.signOut")}</Text>
         </Pressable>
       </View>
     );
@@ -128,7 +128,7 @@ export default function RootLayout() {
               <Stack.Screen name="sign-in" options={{ headerShown: false }} />
               <Stack.Screen
                 name="accept-invite"
-                options={{ title: i18n.t("leftovers.accept.screenTitle") }}
+                options={{ title: i18n.t("invite.screenTitle") }}
               />
               <Stack.Screen name="+not-found" />
             </Stack>

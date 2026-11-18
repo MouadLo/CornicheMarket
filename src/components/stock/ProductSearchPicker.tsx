@@ -89,7 +89,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
         />
         {Platform.OS !== "web" && (
           <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
-            <Text style={styles.scanButtonText}>{t("leftovers.picker.scan")}</Text>
+            <Text style={styles.scanButtonText}>{t("productPicker.scan")}</Text>
           </Pressable>
         )}
       </View>
@@ -109,11 +109,11 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
               {isolateBidi(product.name)}
             </Text>
             <Text style={[styles.resultMeta, { textAlign }]}>
-              {t("leftovers.picker.meta", {
-                barcode: product.barcode ?? t("leftovers.productRow.noBarcode"),
+              {t("productPicker.meta", {
+                barcode: product.barcode ?? t("productRow.noBarcode"),
                 stock: product.stock_quantity,
               })}
-              {alreadyAdded ? ` · ${t("leftovers.picker.alreadyAdded")}` : ""}
+              {alreadyAdded ? ` · ${t("productPicker.alreadyAdded")}` : ""}
             </Text>
           </Pressable>
         );

@@ -7,5 +7,5 @@ type Translate = (key: string) => string;
 const KNOWN_REASONS = ["damaged", "expired", "theft", "count_correction"];
 
 export function reasonLabel(reason: string, t: Translate): string {
-  return KNOWN_REASONS.includes(reason) ? t(`leftovers.adjustReasons.${reason}`) : reason;
+  return KNOWN_REASONS.includes(reason) ? t(`adjustReasons.${reason}`) : reason;
 }

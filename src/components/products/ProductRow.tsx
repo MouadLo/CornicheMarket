@@ -44,10 +44,10 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
           {isolateBidi(product.name)}
         </Text>
         <Text style={[styles.meta, { textAlign }]} numberOfLines={1}>
-          {product.barcode ?? t("leftovers.productRow.noBarcode")} · {product.stock_quantity}{" "}
+          {product.barcode ?? t("productRow.noBarcode")} · {product.stock_quantity}{" "}
           {unitLabel(product.unit, product.stock_quantity, t)}
-          {product.is_low_stock ? ` · ${t("leftovers.productRow.low")}` : ""}
-          {product.active ? "" : ` · ${t("leftovers.productRow.inactive")}`}
+          {product.is_low_stock ? ` · ${t("productRow.low")}` : ""}
+          {product.active ? "" : ` · ${t("productRow.inactive")}`}
         </Text>
       </View>
 
@@ -57,16 +57,14 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
         {showCost &&
           (hasCost ? (
             <>
-              <Text style={styles.cost}>
-                {t("leftovers.productRow.buy", { price: formatMAD(cost) })}
-              </Text>
+              <Text style={styles.cost}>{t("productRow.buy", { price: formatMAD(cost) })}</Text>
               <Text style={[styles.profit, belowCost && styles.profitNegative]}>
                 {(unitProfit as number) >= 0 ? "+" : ""}
                 {formatMAD(unitProfit as number)} · {formatMargin(margin)}
               </Text>
             </>
           ) : (
-            <Text style={styles.cost}>{t("leftovers.productRow.noCost")}</Text>
+            <Text style={styles.cost}>{t("productRow.noCost")}</Text>
           ))}
       </View>
     </Pressable>

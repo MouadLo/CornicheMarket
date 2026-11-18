@@ -35,9 +35,9 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
       <View style={styles.container}>
         {!permission?.granted ? (
           <View style={styles.center}>
-            <Text style={styles.message}>{t("leftovers.scanner.cameraNeeded")}</Text>
-            <BigButton label={t("leftovers.scanner.allowCamera")} onPress={requestPermission} />
-            <BigButton label={t("leftovers.scanner.cancel")} variant="secondary" onPress={close} />
+            <Text style={styles.message}>{t("barcodeScanner.cameraNeeded")}</Text>
+            <BigButton label={t("barcodeScanner.allowCamera")} onPress={requestPermission} />
+            <BigButton label={t("barcodeScanner.cancel")} variant="secondary" onPress={close} />
           </View>
         ) : (
           <>
@@ -49,12 +49,8 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
               onBarcodeScanned={({ data }) => handleScan(data)}
             />
             <View style={styles.overlay}>
-              <Text style={styles.hint}>{t("leftovers.scanner.pointCamera")}</Text>
-              <BigButton
-                label={t("leftovers.scanner.cancel")}
-                variant="secondary"
-                onPress={close}
-              />
+              <Text style={styles.hint}>{t("barcodeScanner.pointCamera")}</Text>
+              <BigButton label={t("barcodeScanner.cancel")} variant="secondary" onPress={close} />
             </View>
           </>
         )}
