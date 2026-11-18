@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
+import { colors } from "@/src/theme/tokens";
+import { Banner } from "@/src/components/ui/Banner";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadQueryError } from "@/src/components/ui/LoadQueryError";
 import { StatusPill } from "@/src/components/ui/StatusPill";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
@@ -19,6 +24,13 @@ import {
   saleInstant,
   voidReasonDisplay,
 } from "@/src/lib/sales/historyView";
+import {
+  HISTORY_RANGE_FROM,
+  HISTORY_RANGE_TO,
+  lastInstantOf,
+  nonVoidedTotalCents,
+  parseHistoryRange,
+} from "@/src/lib/sales/historyRange";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import {
@@ -48,6 +60,16 @@ export default function SalesHistory() {
   const language = i18n?.language ?? "fr";
   const isOwner = profile?.role === "owner";
 
+  // Opened from a report: only the sales of that report's range. Bad or
+  // partial params mean no filter at all.
+  const params = useLocalSearchParams<{ rangeFrom?: string; rangeTo?: string }>();
+  const rangeFromParam = params?.[HISTORY_RANGE_FROM];
+  const rangeToParam = params?.[HISTORY_RANGE_TO];
+  const range = useMemo(
+    () => parseHistoryRange(rangeFromParam, rangeToParam),
+    [rangeFromParam, rangeToParam]
+  );
+
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const salesCount = useRef(0);
   salesCount.current = sales.length;
@@ -58,7 +80,7 @@ export default function SalesHistory() {
   const [linesBySale, setLinesBySale] = useState<Map<string, SaleLine[]>>(new Map());
   const [linesError, setLinesError] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState<false | "page" | "more">(false);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [reason, setReason] = useState<VoidReason | null>(null);
   const [reasonNote, setReasonNote] = useState("");
@@ -91,6 +113,7 @@ export default function SalesHistory() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadFailed(false);
     Promise.resolve(fetchStoreTimezone())
       .then(setTimeZone)
       .catch(() => {});
@@ -101,29 +124,28 @@ export default function SalesHistory() {
         .catch(() => {});
     }
     // A reload after a void keeps every page already loaded.
-    fetchRecentSales(Math.max(PAGE_SIZE, salesCount.current), 0)
+    fetchRecentSales(Math.max(PAGE_SIZE, salesCount.current), 0, range)
       .then((page) => {
         setSales(page);
         setHasMore(page.length >= Math.max(PAGE_SIZE, salesCount.current));
         loadLines(page.map((sale) => sale.id));
       })
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t("sell.historyLoadError"))
-      )
+      .catch(() => setLoadFailed("page"))
       .finally(() => setLoading(false));
-  }, [t, isOwner, loadLines]);
+  }, [isOwner, loadLines, range]);
 
   useEffect(load, [load]);
 
   const loadMore = async () => {
     setLoadingMore(true);
+    setLoadFailed(false);
     try {
-      const page = await fetchRecentSales(PAGE_SIZE, sales.length);
+      const page = await fetchRecentSales(PAGE_SIZE, sales.length, range);
       setSales((prev) => [...prev, ...page]);
       setHasMore(page.length >= PAGE_SIZE);
       loadLines(page.map((sale) => sale.id));
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("sell.historyLoadError"));
+    } catch {
+      setLoadFailed("more");
     } finally {
       setLoadingMore(false);
     }
@@ -348,10 +370,66 @@ export default function SalesHistory() {
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
+  if (loadFailed && sales.length === 0) {
+    return <LoadQueryError what={t("sell.historyLoadWhat")} onRetry={load} />;
+  }
+
+  const clearRange = () => router.replace("/(app)/sell/history");
+  const firstDay = range ? formatLocaleDayHeading(range.from, language, timeZone) : "";
+  const lastDay = range ? formatLocaleDayHeading(lastInstantOf(range), language, timeZone) : "";
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
-      {sales.length === 0 && <Text style={styles.empty}>{t("sell.historyEmpty")}</Text>}
+      {range ? (
+        <View style={styles.rangeBox}>
+          {/* Opened from Reports, another section: the stack has no screen to go back to. */}
+          <Pressable
+            accessibilityRole="button"
+            style={styles.backToReport}
+            onPress={() => router.navigate("/(app)/reports")}
+          >
+            <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
+          </Pressable>
+          <Banner
+            tone="info"
+            icon="calendar"
+            text={
+              firstDay === lastDay
+                ? t("sell.historyRangeBannerDay", { date: firstDay })
+                : t("sell.historyRangeBanner", { from: firstDay, to: lastDay })
+            }
+            action={{ label: t("sell.historyRangeClear"), onPress: clearRange }}
+          />
+          {!hasMore ? (
+            <Text style={styles.rangeTotal}>
+              {t("sell.historyRangeTotal", { amount: formatMAD(nonVoidedTotalCents(sales)) })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      {loadFailed ? (
+        <Banner
+          tone="bad"
+          text={t("sell.historyLoadError")}
+          action={{ label: t("common.retry"), onPress: loadFailed === "more" ? loadMore : load }}
+        />
+      ) : null}
+      {sales.length === 0 && !loadFailed ? (
+        <EmptyState
+          icon="receipt"
+          title={range ? t("sell.historyEmptyRange") : t("sell.historyEmpty")}
+          message={range ? t("sell.historyEmptyRangeHint") : undefined}
+          action={
+            range ? (
+              <BigButton
+                label={t("sell.historyRangeClear")}
+                variant="secondary"
+                onPress={clearRange}
+              />
+            ) : undefined
+          }
+        />
+      ) : null}
 
       {groupSalesByDay(sales, timeZone).map((group) => (
         <View key={group.dayKey} style={styles.day}>
@@ -394,6 +472,10 @@ export default function SalesHistory() {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
   day: { gap: 10 },
+  rangeBox: { gap: 8 },
+  backToReport: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
+  backToReportText: { fontSize: 15, fontWeight: "700", color: colors.brand700 },
+  rangeTotal: { fontSize: 15, fontWeight: "700", color: "#444" },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
