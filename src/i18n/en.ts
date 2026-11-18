@@ -820,8 +820,7 @@ const en: Translations = {
     loadingMore: "Loading...",
     historyLoadError: "Could not load the history.",
     notFound: "This customer could not be found.",
-    cashierNote:
-      "You see the sales you rang up yourself and every payment here. The balance above counts all sales.",
+    rungUpBy: "Rung up by {{name}}",
     showLines: "Show items",
     hideLines: "Hide items",
     noLines: "No items.",

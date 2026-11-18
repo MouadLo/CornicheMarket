@@ -811,8 +811,7 @@ const ar: Translations = {
     loadingMore: "جاري التحميل...",
     historyLoadError: "تعذر تحميل السجل.",
     notFound: "تعذر العثور على هذا الزبون.",
-    cashierNote:
-      "تشاهد هنا المبيعات التي أجريتها بنفسك وكل الدفعات. الرصيد أعلاه يحسب جميع المبيعات.",
+    rungUpBy: "سجّلها {{name}}",
     showLines: "عرض المواد",
     hideLines: "إخفاء المواد",
     noLines: "لا توجد مواد.",
