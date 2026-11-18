@@ -155,6 +155,7 @@ const ar: Translations = {
     language: "اللغة",
   },
   settings: {
+    timezoneLoadError: "تعذر تحميل المنطقة الزمنية للمتجر.",
     title: "الإعدادات",
     account: "الحساب",
     timezoneConfirmTitle: "تغيير المنطقة الزمنية؟",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Platform,
@@ -12,10 +12,13 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Banner } from "@/src/components/ui/Banner";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { inviteCashier } from "@/src/lib/auth/inviteCashier";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { useSignOut } from "@/src/lib/auth/useSignOut";
 import { confirm } from "@/src/lib/dialog/store";
-import { supabase } from "@/src/lib/supabase/client";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
 import {
   exportEverything,
@@ -25,7 +28,6 @@ import {
   getLastBackupTime,
 } from "@/src/lib/backup/export";
 import { fetchStoreTimezone, updateStoreTimezone } from "@/src/lib/reports/queries";
-import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
 
 const LANGUAGES: { code: SupportedLang; labelKey: "languageFr" | "languageEn" | "languageAr" }[] = [
   { code: "fr", labelKey: "languageFr" },
@@ -131,13 +133,20 @@ function StoreTimezonePicker() {
   const { t } = useTranslation();
   const [current, setCurrent] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Translation keys (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  // A failed read must not pretend the default zone is the saved one: it would
+  // show a time zone nobody chose, next to buttons that move every report.
+  const load = useCallback(() => {
+    setLoadFailed(false);
     fetchStoreTimezone()
       .then(setCurrent)
-      .catch(() => setCurrent(DEFAULT_STORE_TIMEZONE));
+      .catch(() => setLoadFailed(true));
   }, []);
+
+  useEffect(load, [load]);
 
   const handleSelect = async (tz: string) => {
     const previous = current;
@@ -157,27 +166,38 @@ function StoreTimezonePicker() {
       await updateStoreTimezone(tz);
     } catch (e) {
       setCurrent(previous);
-      setError(e instanceof Error ? e.message : t("common.error"));
+      setError(errorKeyOr(e, "errors.generic"));
     } finally {
       setSaving(false);
     }
   };
 
+  if (loadFailed) {
+    return (
+      <Banner
+        tone="warn"
+        text={t("settings.timezoneLoadError")}
+        action={{ label: t("common.retry"), onPress: load }}
+      />
+    );
+  }
   if (current === null) return <Text style={styles.hint}>{t("common.loading")}</Text>;
 
   return (
-    <View style={styles.langRow}>
-      {STORE_TIMEZONES.map((tz) => (
-        <Pressable
-          key={tz}
-          style={[styles.langButton, current === tz && styles.langButtonActive]}
-          disabled={saving}
-          onPress={() => handleSelect(tz)}
-        >
-          <Text style={[styles.langText, current === tz && styles.langTextActive]}>{tz}</Text>
-        </Pressable>
-      ))}
-      {error && <Text style={styles.exportError}>{error}</Text>}
+    <View style={styles.tzBox}>
+      <View style={styles.langRow}>
+        {STORE_TIMEZONES.map((tz) => (
+          <Pressable
+            key={tz}
+            style={[styles.langButton, current === tz && styles.langButtonActive]}
+            disabled={saving}
+            onPress={() => handleSelect(tz)}
+          >
+            <Text style={[styles.langText, current === tz && styles.langTextActive]}>{tz}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {error ? <InlineError reasonKey={error} /> : null}
     </View>
   );
 }
@@ -198,7 +218,7 @@ function ExportButtons({ onDone }: { onDone: () => void }) {
       onDone();
     } catch (e) {
       setMessage(null);
-      setError(e instanceof Error ? e.message : t("common.error"));
+      setError(errorKeyOr(e, "errors.generic"));
     } finally {
       setBusy(false);
     }
@@ -207,7 +227,7 @@ function ExportButtons({ onDone }: { onDone: () => void }) {
   return (
     <View style={styles.exportButtons}>
       {message ? <Text style={styles.exportMessage}>{message}</Text> : null}
-      {error ? <Text style={styles.exportError}>{error}</Text> : null}
+      {error ? <InlineError reasonKey={error} /> : null}
       <BigButton
         label={t("settings.exportAll")}
         onPress={() => run(exportEverything)}
@@ -265,19 +285,13 @@ function InviteCashierForm() {
     setMessage(null);
     setSubmitting(true);
 
-    const { data, error: invokeError } = await supabase.functions.invoke("invite-cashier", {
-      body: { email: email.trim(), full_name: fullName.trim() },
-    });
-
-    setSubmitting(false);
-
-    if (invokeError) {
-      setError(invokeError.message);
+    try {
+      await inviteCashier(email.trim(), fullName.trim());
+    } catch (failure) {
+      setError(errorKeyOr(failure, "errors.generic"));
       return;
-    }
-    if (data?.error) {
-      setError(data.error);
-      return;
+    } finally {
+      setSubmitting(false);
     }
 
     setMessage(t("settings.inviteSent", { email: email.trim() }));
@@ -301,7 +315,7 @@ function InviteCashierForm() {
         value={email}
         onChangeText={setEmail}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <InlineError reasonKey={error} /> : null}
       {message ? <Text style={styles.success}>{message}</Text> : null}
       <BigButton
         label={submitting ? t("settings.sending") : t("settings.sendInvite")}
@@ -319,6 +333,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 14, fontWeight: "600", color: "#555", textTransform: "uppercase" },
   value: { fontSize: 16 },
   hint: { fontSize: 13, color: "#777", lineHeight: 18 },
+  tzBox: { gap: 10 },
   langRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   langButton: {
     paddingVertical: 10,
@@ -341,7 +356,6 @@ const styles = StyleSheet.create({
   reminderText: { color: "#7a5c00", fontSize: 14 },
   exportButtons: { gap: 10 },
   exportMessage: { color: "#1d7a46", fontSize: 14 },
-  exportError: { color: "#b3261e", fontSize: 14 },
   smallButton: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -360,6 +374,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  error: { color: "#b3261e" },
   success: { color: "#1d7a46" },
 });

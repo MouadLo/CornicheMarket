@@ -157,6 +157,7 @@ const en: Translations = {
     language: "Language",
   },
   settings: {
+    timezoneLoadError: "Could not load the store time zone.",
     title: "Settings",
     account: "Account",
     timezoneConfirmTitle: "Change the time zone?",

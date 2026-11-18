@@ -158,6 +158,7 @@ const fr = {
     language: "Langue",
   },
   settings: {
+    timezoneLoadError: "Impossible de charger le fuseau horaire du magasin.",
     title: "Paramètres",
     account: "Compte",
     timezoneConfirmTitle: "Changer le fuseau horaire ?",
