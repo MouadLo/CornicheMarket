@@ -256,7 +256,8 @@ const en: Translations = {
     voidRefused: "Void refused",
     voidRefusedNote: "Owner: {{note}}",
     voidRequestTitle: "Ask the owner to void",
-    voidRequestHint: "The owner decides. The {{amount}} sale counts as normal until he approves.",
+    voidRequestHint:
+      "The owner decides. The {{amount}} sale counts as normal until the owner approves it.",
     voidRequestNote: "Say why in a few words",
     voidRequestSend: "Send request",
     voidRequestSending: "Sending...",
