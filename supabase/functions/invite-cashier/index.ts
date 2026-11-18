@@ -33,10 +33,15 @@ Deno.serve(async (req: Request) => {
 
   const { data: callerProfile, error: profileError } = await callerClient
     .from("profiles")
-    .select("role")
+    .select("role, deactivated_at")
     .eq("id", userData.user.id)
     .single();
 
+  // A deactivated user is refused by the database before this query runs
+  // (PT403); the column check is the same rule if that ever changes.
+  if (profileError?.code === "PT403" || callerProfile?.deactivated_at) {
+    return Response.json({ error: "Account deactivated", code: "PT403" }, { status: 403 });
+  }
   if (profileError || callerProfile?.role !== "owner") {
     return Response.json({ error: "Only an owner can invite cashiers" }, { status: 403 });
   }

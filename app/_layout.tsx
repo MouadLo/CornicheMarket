@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthProvider";
 import { useOrientationLock } from "@/src/lib/device/orientation";
+import { DeactivatedScreen } from "@/src/components/auth/DeactivatedScreen";
 import { DialogHost } from "@/src/components/ui/DialogHost";
 import { bundledFonts } from "@/src/theme/fonts";
 import { colors } from "@/src/theme/tokens";
@@ -21,7 +22,8 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   // Rendered inside I18nextProvider, which only mounts once the saved language
   // has loaded (see RootLayout), so these screens use the user's language.
   const { t } = useTranslation();
-  const { session, loading, profileError, loadTimedOut, retryProfile, signOut } = useAuth();
+  const { session, loading, profileError, deactivated, loadTimedOut, retryProfile, signOut } =
+    useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -43,6 +45,10 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       router.replace("/(app)/sell");
     }
   }, [session, loading, segments, router]);
+
+  // The owner turned this account off: nothing of the app is shown, whatever
+  // request found out first (the profile fetch on start, or any later one).
+  if (session && deactivated) return <DeactivatedScreen onSignOut={signOut} />;
 
   // Still loading after LOAD_TIMEOUT_MS: something is hung (wrong Supabase
   // URL, local stack not running, dead network) rather than slow. Without

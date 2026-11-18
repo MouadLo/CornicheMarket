@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { StaffSection } from "@/src/components/settings/StaffSection";
 import { Banner } from "@/src/components/ui/Banner";
 import { InlineError } from "@/src/components/ui/InlineError";
 import { inviteCashier } from "@/src/lib/auth/inviteCashier";
@@ -45,6 +46,8 @@ export default function Settings() {
   const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
   const [showBackupReminder, setShowBackupReminder] = useState(false);
+  // Bumped after an invite so the staff list shows the new person.
+  const [staffVersion, setStaffVersion] = useState(0);
 
   useEffect(() => {
     getLastBackupTime().then((last) => {
@@ -117,8 +120,15 @@ export default function Settings() {
 
       {isOwner && (
         <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("settings.staffTitle")}</Text>
+          <StaffSection refreshKey={staffVersion} />
+        </View>
+      )}
+
+      {isOwner && (
+        <View style={styles.section}>
           <Text style={styles.sectionLabel}>{t("settings.inviteCashier")}</Text>
-          <InviteCashierForm />
+          <InviteCashierForm onInvited={() => setStaffVersion((n) => n + 1)} />
         </View>
       )}
 
@@ -272,7 +282,7 @@ function SmallExportButton({
   );
 }
 
-function InviteCashierForm() {
+function InviteCashierForm({ onInvited }: { onInvited: () => void }) {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -295,6 +305,7 @@ function InviteCashierForm() {
     }
 
     setMessage(t("settings.inviteSent", { email: email.trim() }));
+    onInvited();
     setEmail("");
     setFullName("");
   };

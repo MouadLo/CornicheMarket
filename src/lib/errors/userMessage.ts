@@ -11,6 +11,10 @@ export const ERROR_KEYS = {
   network: "errors.network",
   busy: "errors.busy",
   sessionExpired: "errors.sessionExpired",
+  accountDeactivated: "errors.accountDeactivated",
+  staffPartial: "errors.staffPartial",
+  staffProtected: "errors.staffProtected",
+  inviteAccepted: "errors.inviteAccepted",
   emailTaken: "errors.emailTaken",
   permission: "errors.permission",
   notYours: "errors.notYours",
@@ -63,6 +67,19 @@ export function errorKey(error: unknown): string {
   const code = codeOf(error);
 
   if (NETWORK.test(message)) return ERROR_KEYS.network;
+
+  // This very account was turned off (database pre-request check, PT403).
+  if (/account deactivated|account_deactivated|user is banned/.test(m) || code === "PT403") {
+    return ERROR_KEYS.accountDeactivated;
+  }
+
+  // Deactivating/reactivating a person: the account is blocked or unblocked in
+  // the database but the Auth step failed. A retry finishes it.
+  if (/ban_failed|unban_failed|unblock_failed/.test(m)) return ERROR_KEYS.staffPartial;
+
+  if (/cannot deactivate|cannot be deactivated/.test(m)) return ERROR_KEYS.staffProtected;
+
+  if (/already_accepted|already accepted/.test(m)) return ERROR_KEYS.inviteAccepted;
 
   if (
     /authentication required|authenticated staff required|invalid session|missing authorization|jwt (expired|invalid)|invalid jwt|not authenticated|refresh token/.test(

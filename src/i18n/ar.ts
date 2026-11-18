@@ -32,6 +32,10 @@ const ar: Translations = {
     offlineNeeded: "الاتصال مطلوب من أجل {{action}}. إدخالك محفوظ في الجهاز.",
   },
   errors: {
+    accountDeactivated: "تم تعطيل هذا الحساب. اسأل المالك.",
+    staffPartial: "الحساب محظور بالفعل، لكن الخطوة الأخيرة فشلت. حاول مرة أخرى لإكمالها.",
+    staffProtected: "لا يمكنك تعطيل حسابك ولا حساب مالك.",
+    inviteAccepted: "هذا الشخص قبل الدعوة بالفعل.",
     network: "لا يوجد اتصال بالخادم.",
     tryAgainOnline: "ما أدخلته ما زال هنا: حاول مجدداً عند عودة الشبكة.",
     offlineExplain:
@@ -142,6 +146,7 @@ const ar: Translations = {
     settings: "الإعدادات",
   },
   auth: {
+    accountDeactivated: "تم تعطيل هذا الحساب. اسأل المالك.",
     title: "سوق كورنيش",
     email: "البريد الإلكتروني",
     password: "كلمة المرور",
@@ -155,6 +160,29 @@ const ar: Translations = {
     language: "اللغة",
   },
   settings: {
+    staffTitle: "الموظفون",
+    staffHint:
+      "لا يستطيع الأشخاص المعطّلون تسجيل الدخول بعد الآن. تبقى مبيعاتهم السابقة في سجلاتك.",
+    staffLoadError: "تعذر تحميل قائمة الموظفين.",
+    staffYou: "أنت",
+    statusActive: "نشط",
+    statusPending: "الدعوة قيد الانتظار",
+    statusDeactivated: "معطّل",
+    lastSignIn: "آخر تسجيل دخول: {{when}}",
+    neverSignedIn: "لم يسجّل الدخول قط",
+    deactivate: "تعطيل",
+    reactivate: "إعادة التفعيل",
+    resendInvite: "إعادة إرسال الدعوة",
+    deactivateTitle: "تعطيل {{name}}؟",
+    deactivateMessage:
+      "لن يتمكن {{name}} من تسجيل الدخول أو استخدام التطبيق. تبقى مبيعاته السابقة في سجلاتك.",
+    deactivateConfirm: "تعطيل",
+    reactivateTitle: "إعادة تفعيل {{name}}؟",
+    reactivateMessage: "سيتمكن {{name}} من تسجيل الدخول مرة أخرى.",
+    reactivateConfirm: "إعادة التفعيل",
+    staffDeactivatedDone: "تم تعطيل {{name}}.",
+    staffReactivatedDone: "يستطيع {{name}} تسجيل الدخول مرة أخرى.",
+    inviteResent: "تمت إعادة إرسال الدعوة إلى {{email}}.",
     timezoneLoadError: "تعذر تحميل المنطقة الزمنية للمتجر.",
     title: "الإعدادات",
     account: "الحساب",
@@ -1035,6 +1063,8 @@ const ar: Translations = {
     screenTitle: "تعيين كلمة المرور",
   },
   startup: {
+    deactivatedTitle: "الحساب معطّل",
+    deactivatedMessage: "تم تعطيل هذا الحساب. اسأل المالك.",
     slowTitle: "التحميل يستغرق وقتًا طويلًا",
     slowMessage: "تعذر الاتصال بالخادم. تحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.",
     profileTitle: "تعذر تحميل الملف الشخصي",

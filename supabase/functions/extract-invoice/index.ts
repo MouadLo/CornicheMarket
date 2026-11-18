@@ -22,7 +22,9 @@ Deno.serve(async (req) => {
   const caller = createClient(url, anon, { global: { headers: { Authorization: authorization } } });
   const { data: auth, error: authError } = await caller.auth.getUser();
   if (authError || !auth.user) return response(401, { error: "session" });
-  const { data: owner } = await caller.rpc("is_owner");
+  const { data: owner, error: ownerError } = await caller.rpc("is_owner");
+  // A deactivated user is refused by the database's pre-request check (PT403).
+  if (ownerError?.code === "PT403") return response(403, { error: "account_deactivated", code: "PT403" });
   if (owner !== true) return response(403, { error: "owner_only" });
 
   const draftId = (await req.json().catch(() => null))?.draft_id;

@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { isDeactivatedError, onDeactivated } from "@/src/lib/auth/deactivated";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type Role = "owner" | "cashier";
@@ -16,6 +17,9 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   profileError: string | null;
+  // The owner turned this account off. `profile` stays null, so `isOwner` is
+  // false: nothing here ever grants access.
+  deactivated: boolean;
   loadTimedOut: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -40,6 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileRetry, setProfileRetry] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
+  const [deactivated, setDeactivated] = useState(false);
+  const signedIn = useRef(false);
 
   // Re-runs on profileRetry too: the hang that needs retrying might be
   // getSession() itself (e.g. a Supabase URL that can't be reached at
@@ -75,7 +81,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // visible again). Re-fetching then would flip `loading` on and off for
   // nothing; see the timeout below for why that used to wipe the screen.
   const userId = session?.user.id ?? null;
+  signedIn.current = userId !== null;
+
+  // Any request can find out first (see deactivationAwareFetch). Only counts
+  // while someone is signed in: a refused sign-in has its own message.
+  useEffect(
+    () =>
+      onDeactivated(() => {
+        if (signedIn.current) {
+          setProfile(null);
+          setDeactivated(true);
+        }
+      }),
+    []
+  );
+
   useEffect(() => {
+    setDeactivated(false);
     if (!userId) {
       setProfile(null);
       setProfileError(null);
@@ -94,7 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .single()
       .then(({ data, error }) => {
         if (mounted) {
-          if (error || !data) {
+          if (error && isDeactivatedError(error)) {
+            // Refused by the database's pre-request check: not a broken
+            // profile, a turned-off account. No retry, no raw error text.
+            setProfile(null);
+            setDeactivated(true);
+          } else if (error || !data) {
             setProfileError(error?.message ?? "Profile not found");
             setProfile(null);
           } else {
@@ -126,11 +153,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // The Auth server says "User is banned" (code user_banned) for a
+    // deactivated account: pass a stable text the sign-in screen can recognise.
+    if (error && isDeactivatedError(error)) return { error: "Account deactivated" };
     return { error: error?.message ?? null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // A deactivated account cannot reach the server (its session is revoked),
+    // so only clear this device.
+    await supabase.auth.signOut(deactivated ? { scope: "local" } : undefined);
   };
 
   const retryProfile = useCallback(() => setProfileRetry((n) => n + 1), []);
@@ -142,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         profileError,
+        deactivated,
         loadTimedOut,
         signIn,
         signOut,
