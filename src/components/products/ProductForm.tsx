@@ -41,6 +41,13 @@ import {
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { priceWarning } from "@/src/lib/products/pricing";
 import { unitLabel } from "@/src/lib/products/unitLabel";
+import { TileColorPicker, TilePreview } from "@/src/components/products/TileColorPicker";
+import {
+  needsGridWrite,
+  TileSettingsError,
+  type TileChange,
+  type TileSettings,
+} from "@/src/lib/sellGrid/tileSettings";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -50,7 +57,10 @@ type Props = {
   categories: Category[];
   initial?: Product | null;
   submitLabel: string;
-  onSubmit: (input: ProductInput) => Promise<void>;
+  // `tile` is set only when the Sell grid settings changed (and are shown).
+  onSubmit: (input: ProductInput, tile: TileChange | null) => Promise<void>;
+  // The owner's Sell tile settings. Given = the two controls and the preview show.
+  initialTile?: TileSettings;
   // Tells the screen whether there are unsaved changes (it guards leaving).
   // Called with false just before onSubmit, since a saved screen navigates away.
   onDirtyChange?: (dirty: boolean) => void;
@@ -61,6 +71,7 @@ export function ProductForm({
   initial,
   submitLabel,
   onSubmit,
+  initialTile,
   onDirtyChange,
 }: Props) {
   const { t, i18n } = useTranslation();
@@ -87,13 +98,25 @@ export function ProductForm({
   const [price, setPrice] = useState(initial ? centsToDisplay(initial.selling_price_cents) : "");
   const [threshold, setThreshold] = useState(String(initial?.low_stock_threshold ?? 0));
   const [active, setActive] = useState(initial?.active ?? true);
+  const [favorite, setFavorite] = useState(initialTile?.favorite ?? false);
+  const [tileColor, setTileColor] = useState(initialTile?.color ?? null);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [duplicate, setDuplicate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const snapshot = JSON.stringify([name, barcode, categoryId, unit, price, threshold, active]);
+  const snapshot = JSON.stringify([
+    name,
+    barcode,
+    categoryId,
+    unit,
+    price,
+    threshold,
+    active,
+    favorite,
+    tileColor,
+  ]);
   const [initialSnapshot] = useState(snapshot);
   useEffect(() => {
     onDirtyChange?.(snapshot !== initialSnapshot);
@@ -213,22 +236,41 @@ export function ProductForm({
       if (!ok) return;
     }
 
+    // The grid is written only when its settings changed (or a colour has to
+    // follow the product to a new category tab).
+    let tile: TileChange | null = null;
+    if (initialTile) {
+      const next = { favorite, color: tileColor };
+      const tabCategoryId = mainCategoryId(categories, categoryId);
+      const was = mainCategoryId(categories, initial?.category_id ?? null);
+      if (needsGridWrite(initialTile, next, was, tabCategoryId)) {
+        tile = { settings: next, tabCategoryId };
+      }
+    }
+
     setSubmitting(true);
     try {
       onDirtyChange?.(false);
-      await onSubmit({
-        name: name.trim(),
-        barcode: barcode.trim() || null,
-        category_id: categoryId,
-        unit,
-        selling_price_cents: priceCents,
-        low_stock_threshold: thresholdValue,
-        active,
-      });
+      await onSubmit(
+        {
+          name: name.trim(),
+          barcode: barcode.trim() || null,
+          category_id: categoryId,
+          unit,
+          selling_price_cents: priceCents,
+          low_stock_threshold: thresholdValue,
+          active,
+        },
+        tile
+      );
       showToast({ text: t("products.formSavedToast"), tone: "success" });
     } catch (submitError) {
       onDirtyChange?.(true);
-      setError(errorKeyOr(submitError, "products.formSaveError"));
+      setError(
+        submitError instanceof TileSettingsError
+          ? "products.formTileSaveError"
+          : errorKeyOr(submitError, "products.formSaveError")
+      );
     } finally {
       setSubmitting(false);
     }
@@ -400,6 +442,26 @@ export function ProductForm({
         <Switch value={active} onValueChange={setActive} />
       </View>
       <Text style={styles.note}>{t("products.formActiveHint")}</Text>
+
+      {initialTile ? (
+        <>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>{t("products.formFavorite")}</Text>
+            <Switch
+              value={favorite}
+              onValueChange={setFavorite}
+              accessibilityLabel={t("products.formFavorite")}
+            />
+          </View>
+          <Text style={styles.note}>{t("products.formFavoriteHint")}</Text>
+
+          <Field label={t("products.formTileColor")}>
+            <TileColorPicker value={tileColor} onChange={setTileColor} />
+            <Text style={styles.note}>{t("products.formTileColorHint")}</Text>
+            <TilePreview name={name} priceCents={parseMoneyToCents(price)} color={tileColor} />
+          </Field>
+        </>
+      ) : null}
 
       {initial && <CostSummary product={initial} price={price} />}
 

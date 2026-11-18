@@ -15,6 +15,10 @@ import {
   type Category,
   type Product,
 } from "@/src/lib/products/queries";
+import { fetchProductTileSettings, saveProductTileSettings } from "@/src/lib/sellGrid/queries";
+import { refreshGridCache } from "@/src/lib/sellGrid/refresh";
+import { mainCategoryId } from "@/src/lib/products/categories";
+import type { TileSettings } from "@/src/lib/sellGrid/tileSettings";
 
 export default function EditProduct() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +35,9 @@ export default function EditProduct() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
+  // Undefined when the grid could not be read: the form then hides its Sell
+  // controls and saves the product alone, rather than blocking the edit.
+  const [tile, setTile] = useState<TileSettings | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +48,13 @@ export default function EditProduct() {
     setLoading(true);
     setError(null);
     Promise.all([fetchCategories(), fetchProduct(id, true)])
-      .then(([loadedCategories, loadedProduct]) => {
+      .then(async ([loadedCategories, loadedProduct]) => {
+        const tabCategoryId = mainCategoryId(loadedCategories, loadedProduct?.category_id ?? null);
+        const loadedTile = loadedProduct
+          ? await fetchProductTileSettings(loadedProduct.id, tabCategoryId).catch(() => undefined)
+          : undefined;
         setCategories(loadedCategories);
+        setTile(loadedTile);
         setProduct(loadedProduct);
       })
       .catch((failure) => setError(errorKey(failure)))
@@ -65,9 +77,14 @@ export default function EditProduct() {
       onDirtyChange={setDirty}
       categories={categories}
       initial={product}
+      initialTile={tile}
       submitLabel={t("products.formSave")}
-      onSubmit={async (input) => {
+      onSubmit={async (input, change) => {
         await updateProduct(product.id, input);
+        if (change) {
+          await saveProductTileSettings(product.id, change.tabCategoryId, change.settings);
+          void refreshGridCache(true);
+        }
         router.back();
       }}
     />

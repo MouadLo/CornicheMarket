@@ -186,7 +186,8 @@ it("saves the product with the new category", async () => {
     await button("save").props.onPress();
   });
   expect(onSubmit).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Savon", category_id: "new-id" })
+    expect.objectContaining({ name: "Savon", category_id: "new-id" }),
+    null
   );
 });
 
