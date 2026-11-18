@@ -246,26 +246,41 @@ export async function fetchCustomerBalance(customerId: string): Promise<Customer
   return (data as CustomerBalance | null) ?? null;
 }
 
+// One credit sale as the customer history shows it. Deliberately thin: no cost,
+// profit, discount or void reason, because every signed-in user gets these rows.
+export type CustomerCreditSale = {
+  id: string;
+  occurred_at: string | null;
+  created_at: string;
+  total_cents: number;
+  voided_at: string | null;
+  // Who rang it up (null if the profile has no name).
+  cashier_name: string | null;
+  // True when the signed-in user rang this sale up: only then may a cashier
+  // open its product lines (RLS hides the lines of other people's sales).
+  is_own: boolean;
+};
+
 // One page of a customer's credit sales, newest first, voided ones included
-// (the screen marks them and leaves them out of the totals). RLS: a cashier
-// reads only the sales they rang up themselves; the owner reads all.
+// (the screen marks them and leaves them out of the totals). Both roles use the
+// customer_credit_sales function: a cashier must see debt that another cashier
+// or the owner rang up, which RLS on sales would hide. The function limits the
+// page size itself (at most 100).
 export async function fetchCustomerCreditSales(
   customerId: string,
   limit: number,
   offset: number
-): Promise<SaleSummary[]> {
-  const { data, error } = await supabase
-    .from("sales")
-    .select(
-      "id, created_at, occurred_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason"
-    )
-    .eq("customer_id", customerId)
-    .eq("payment_method", "credit")
-    .order("occurred_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(offset, offset + limit - 1);
+): Promise<CustomerCreditSale[]> {
+  const { data, error } = await supabase.rpc("customer_credit_sales", {
+    p_customer_id: customerId,
+    p_limit: limit,
+    p_offset: offset,
+  });
   if (error) throw new Error(error.message);
-  return (data ?? []) as SaleSummary[];
+  return ((data ?? []) as CustomerCreditSale[]).map((row) => ({
+    ...row,
+    total_cents: Number(row.total_cents),
+  }));
 }
 
 // One page of a customer's repayments, newest first. Every signed-in user may

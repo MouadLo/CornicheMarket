@@ -847,8 +847,7 @@ const fr = {
     loadingMore: "Chargement...",
     historyLoadError: "Impossible de charger l'historique.",
     notFound: "Ce client est introuvable.",
-    cashierNote:
-      "Vous voyez ici les ventes que vous avez faites vous-même et tous les paiements. Le solde ci-dessus compte toutes les ventes.",
+    rungUpBy: "Vendu par {{name}}",
     showLines: "Voir les articles",
     hideLines: "Masquer les articles",
     noLines: "Aucun article.",
