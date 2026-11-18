@@ -22,6 +22,9 @@ import {
   receiveDelivery,
   type Supplier,
 } from "@/src/lib/stock/queries";
+import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
+import { fetchStoreTimezone } from "@/src/lib/reports/queries";
+import { storeDayKey } from "@/src/lib/sales/historyView";
 import { buildReceivePayload } from "@/src/lib/stock/receive";
 
 export default function ReceiveDeliveryScreen() {
@@ -45,6 +48,15 @@ export default function ReceiveDeliveryScreen() {
   // only once the delivery is confirmed or the draft is emptied.
   const operationId = useRef<string | null>(null);
   const savingNow = useRef(false);
+
+  // The store's day, not the device's, for the expiry calendar's Today shortcut.
+  const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  useEffect(() => {
+    Promise.resolve(fetchStoreTimezone())
+      .then(setTimeZone)
+      .catch(() => {});
+  }, []);
+  const today = storeDayKey(new Date().toISOString(), timeZone);
 
   useEffect(() => {
     fetchSuppliers()
@@ -207,6 +219,7 @@ export default function ReceiveDeliveryScreen() {
         <StockInLine
           key={line.product.id}
           line={line}
+          today={today}
           onChange={(next) =>
             setLines((current) => current.map((item, i) => (i === index ? next : item)))
           }
