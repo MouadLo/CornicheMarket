@@ -34,6 +34,7 @@ jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT }) }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner-1", role: "owner" } }),
 }));
+jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/lib/sales/queries", () => ({
   fetchRecentSales: async () => [sale],
   voidSale: (...args: unknown[]) => mockVoidSale(...args),

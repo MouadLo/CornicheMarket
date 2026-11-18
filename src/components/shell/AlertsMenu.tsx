@@ -18,6 +18,7 @@ export function AlertsMenu({
   counts,
   stuck,
   onReview,
+  onVoidRequests,
   onStuck,
 }: {
   visible: boolean;
@@ -25,11 +26,19 @@ export function AlertsMenu({
   counts: AlertCounts;
   stuck: number;
   onReview: (kind: ReviewKind) => void;
+  onVoidRequests: () => void;
   onStuck: () => void;
 }) {
   const { t } = useTranslation();
   type Row = { key: string; icon: IconName; label: string; count: number; onPress: () => void };
   const all: Row[] = [
+    {
+      key: "voidRequests",
+      icon: "alert",
+      label: t("shell.alertVoidRequests"),
+      count: counts.voidRequests,
+      onPress: onVoidRequests,
+    },
     {
       key: "price",
       icon: "tag",
@@ -75,7 +84,11 @@ export function AlertsMenu({
             <Text style={styles.label}>{r.label}</Text>
             <Badge
               value={r.count}
-              tone={r.key === "stuck" || r.key === "negative" ? "bad" : "warn"}
+              tone={
+                r.key === "stuck" || r.key === "negative" || r.key === "voidRequests"
+                  ? "bad"
+                  : "warn"
+              }
             />
             <Icon name="chevron" size={18} color={colors.ink600} />
           </Pressable>

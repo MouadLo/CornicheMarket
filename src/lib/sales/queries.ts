@@ -29,6 +29,7 @@ export type SaleSummary = {
   total_cents: number;
   discount_cents: number;
   customer_id: string | null;
+  cashier_id?: string;
   voided_at: string | null;
   void_reason: string | null;
 };
@@ -143,7 +144,7 @@ export async function fetchRecentSales(limit = 50): Promise<SaleSummary[]> {
   const { data, error } = await supabase
     .from("sales")
     .select(
-      "id, created_at, payment_method, total_cents, discount_cents, customer_id, voided_at, void_reason"
+      "id, created_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason"
     )
     .order("created_at", { ascending: false })
     .limit(limit);

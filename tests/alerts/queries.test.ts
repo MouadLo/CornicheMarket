@@ -53,18 +53,35 @@ beforeEach(() => {
 
 describe("alert mockCounts", () => {
   it("mockCounts flagged sales by kind, and negative-stock products", async () => {
-    mockCounts = { needs_price_review: 3, needs_discount_review: 2, negative_stock_products: 1 };
-    await expect(fetchAlertCounts()).resolves.toEqual({ price: 3, discount: 2, negativeStock: 1 });
+    mockCounts = {
+      needs_price_review: 3,
+      needs_discount_review: 2,
+      negative_stock_products: 1,
+      void_requests: 4,
+    };
+    await expect(fetchAlertCounts()).resolves.toEqual({
+      price: 3,
+      discount: 2,
+      negativeStock: 1,
+      voidRequests: 4,
+    });
     expect(mockCalls.map((c) => c.table).sort()).toEqual([
       "negative_stock_products",
       "sales",
       "sales",
+      "void_requests",
+    ]);
+    expect(mockCalls.find((c) => c.table === "void_requests")?.filters).toContainEqual([
+      "status",
+      "pending",
     ]);
     expect(mockCalls.every((c) => c.head)).toBe(true);
   });
 
   it("totals alerts with the stuck sales that live on the device", () => {
-    expect(totalAlerts({ price: 3, discount: 2, negativeStock: 1 }, 4)).toBe(10);
+    expect(totalAlerts({ price: 3, discount: 2, negativeStock: 1, voidRequests: 0 }, 4)).toBe(10);
+    // Pending void requests count toward the bell badge.
+    expect(totalAlerts({ price: 0, discount: 0, negativeStock: 0, voidRequests: 2 }, 1)).toBe(3);
     expect(totalAlerts(NO_ALERTS, 0)).toBe(0);
   });
 });

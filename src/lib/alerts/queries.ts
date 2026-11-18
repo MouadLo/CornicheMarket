@@ -19,11 +19,17 @@ const DISMISS_RPC: Record<ReviewKind, string> = {
   discount: "dismiss_discount_review",
 };
 
-export type AlertCounts = { price: number; discount: number; negativeStock: number };
-export const NO_ALERTS: AlertCounts = { price: 0, discount: 0, negativeStock: 0 };
+export type AlertCounts = {
+  price: number;
+  discount: number;
+  negativeStock: number;
+  // Cashiers' requests to void a sale, waiting for the owner (migration 038).
+  voidRequests: number;
+};
+export const NO_ALERTS: AlertCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
 
 export function totalAlerts(counts: AlertCounts, stuck: number): number {
-  return counts.price + counts.discount + counts.negativeStock + stuck;
+  return counts.price + counts.discount + counts.negativeStock + counts.voidRequests + stuck;
 }
 
 async function countOf(
@@ -35,7 +41,7 @@ async function countOf(
 }
 
 export async function fetchAlertCounts(): Promise<AlertCounts> {
-  const [price, discount, negativeStock] = await Promise.all([
+  const [price, discount, negativeStock, voidRequests] = await Promise.all([
     countOf(
       supabase
         .from("sales")
@@ -51,8 +57,14 @@ export async function fetchAlertCounts(): Promise<AlertCounts> {
     countOf(
       supabase.from("negative_stock_products").select("product_id", { count: "exact", head: true })
     ),
+    countOf(
+      supabase
+        .from("void_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+    ),
   ]);
-  return { price, discount, negativeStock };
+  return { price, discount, negativeStock, voidRequests };
 }
 
 // --- review lists ----------------------------------------------------------
