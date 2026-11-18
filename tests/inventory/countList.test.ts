@@ -4,6 +4,7 @@ import {
   countProgress,
   countedQuantity,
   hasUnsavedWork,
+  isInvalidCount,
   isEligible,
   mergeProducts,
   runInBatches,
@@ -46,6 +47,18 @@ describe("an empty line is not zero", () => {
     expect(countedQuantity(line("a", "   "))).toBeNull();
     expect(isEligible(line("a", ""))).toBe(false);
     expect(isEligible(line("a", "  "))).toBe(false);
+  });
+
+  it("a negative or malformed count is null, invalid, and never eligible", () => {
+    for (const text of ["-5", "-0,5", "abc", "5abc", "5-3"]) {
+      expect(countedQuantity(line("a", text))).toBeNull();
+      expect(isInvalidCount(line("a", text))).toBe(true);
+      expect(isEligible(line("a", text))).toBe(false);
+    }
+    expect(isInvalidCount(line("a", ""))).toBe(false);
+    expect(isInvalidCount(line("a", "  "))).toBe(false);
+    expect(isInvalidCount(line("a", "0"))).toBe(false);
+    expect(countedQuantity(line("a", "1 250,5"))).toBe(1250.5);
   });
 
   it("a typed 0 is a real count", () => {

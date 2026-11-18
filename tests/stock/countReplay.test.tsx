@@ -13,6 +13,7 @@ jest.mock("expo-router", () => ({
 jest.mock("../../src/lib/products/queries", () => ({ fetchProductByBarcode: jest.fn() }));
 jest.mock("../../src/lib/inventory/queries", () => ({
   applyStockCount: (...args: unknown[]) => mockApply(...args),
+  fetchCurrentStock: async (ids: string[]) => new Map(ids.map((id) => [id, 10])),
 }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner", role: "owner" } }),

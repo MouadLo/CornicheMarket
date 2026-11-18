@@ -206,3 +206,28 @@ export async function fetchProductsForCount(
   }
   return all;
 }
+
+// The stock on the shelf right now, per product. A count's discrepancy is
+// counted minus the system quantity, so it must be measured against current
+// stock, not the quantity read when the list was loaded. Read in chunks: a
+// long list would overflow the request URL.
+const STOCK_CHUNK = 100;
+
+export async function fetchCurrentStock(
+  productIds: string[],
+  isOwner: boolean
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  for (let start = 0; start < productIds.length; start += STOCK_CHUNK) {
+    const chunk = productIds.slice(start, start + STOCK_CHUNK);
+    const { data, error } = await supabase
+      .from(productsSource(isOwner))
+      .select("id, stock_quantity")
+      .in("id", chunk);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      result.set(row.id as string, Number(row.stock_quantity));
+    }
+  }
+  return result;
+}

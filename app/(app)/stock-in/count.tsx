@@ -14,6 +14,7 @@ import {
   countProgress,
   countedQuantity,
   hasUnsavedWork,
+  isInvalidCount,
   isEligible,
   mergeProducts,
   runInBatches,
@@ -22,6 +23,7 @@ import {
 } from "@/src/lib/inventory/countList";
 import {
   applyStockCount,
+  fetchCurrentStock,
   fetchLowStockProducts,
   fetchProductsForCount,
 } from "@/src/lib/inventory/queries";
@@ -109,6 +111,8 @@ const CountRow = memo(function CountRow({
           placeholderTextColor={colors.ink400}
         />
       </View>
+
+      {isInvalidCount(line) && <Text style={styles.error}>{t("stockIn.countInvalid")}</Text>}
 
       {applied ? (
         "delta" in applied ? (
@@ -312,10 +316,37 @@ export default function StockCountScreen() {
     if (busy.current || !profile) return;
     busy.current = true;
     try {
-      const batch = linesRef.current.filter(
+      const wanted = linesRef.current.filter(
         (line) => isEligible(line) && (!onlyId || line.product.id === onlyId)
       );
-      if (!batch.length) return;
+      if (!wanted.length) return;
+      // The discrepancy is counted minus system stock, and the list may have
+      // been loaded hours ago: measure against stock as it is now. A retry
+      // (it has an operation id) keeps its frozen quantity so it resends the
+      // very same delta. If stock cannot be read, nothing is applied.
+      const fresh = wanted.filter((line) => !line.operationId);
+      let current = new Map<string, number>();
+      if (fresh.length) {
+        try {
+          current = await fetchCurrentStock(
+            fresh.map((line) => line.product.id),
+            true
+          );
+        } catch {
+          setNotice({ text: t("stockIn.countStaleError"), tone: "error" });
+          return;
+        }
+        if (fresh.some((line) => !current.has(line.product.id))) {
+          setNotice({ text: t("stockIn.countStaleError"), tone: "error" });
+          return;
+        }
+      }
+      setNotice(null);
+      const batch = wanted.map((line) =>
+        line.operationId
+          ? line
+          : { ...line, product: { ...line.product, stock_quantity: current.get(line.product.id)! } }
+      );
       const preview = confirmPreview(batch);
       const detail = preview.shown
         .map(

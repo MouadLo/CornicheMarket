@@ -740,6 +740,8 @@ const fr = {
     countDone: "Appliqué. {{count}} produit(s) corrigé(s).",
     countUnknown: "Code-barres inconnu {{barcode}}",
     countAdded: "{{name}} ajouté",
+    countStaleError: "Impossible de relire le stock actuel : rien n'a été appliqué. Réessayez.",
+    countInvalid: "Quantité invalide : tapez un nombre positif ou 0.",
     countStartTitle: "Démarrer depuis une liste",
     countCategory: "Compter une catégorie",
     countLowStock: "Tout le stock bas",

@@ -734,6 +734,8 @@ const en: Translations = {
     countDone: "Applied. {{count}} product(s) corrected.",
     countUnknown: "Unknown barcode {{barcode}}",
     countAdded: "{{name}} added to the count",
+    countStaleError: "Could not re-read the current stock: nothing was applied. Try again.",
+    countInvalid: "Invalid quantity: type a positive number or 0.",
     countStartTitle: "Start from a list",
     countCategory: "Count a category",
     countLowStock: "All low stock",

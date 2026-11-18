@@ -9,6 +9,7 @@ const mockApply = jest.fn();
 const mockLowStock = jest.fn();
 const mockForCount = jest.fn();
 const mockConfirm = jest.fn();
+const mockStock = jest.fn();
 const mockListeners: ((event: { preventDefault: () => void; data: unknown }) => void)[] = [];
 let mockRole = "owner";
 let mockSequence = 0;
@@ -35,6 +36,7 @@ jest.mock("../../src/lib/products/queries", () => ({
 }));
 jest.mock("../../src/lib/inventory/queries", () => ({
   applyStockCount: (...args: unknown[]) => mockApply(...args),
+  fetchCurrentStock: (...args: unknown[]) => mockStock(...args),
   fetchLowStockProducts: (...args: unknown[]) => mockLowStock(...args),
   fetchProductsForCount: (...args: unknown[]) => mockForCount(...args),
 }));
@@ -102,6 +104,9 @@ beforeEach(async () => {
   mockLowStock.mockReset();
   mockForCount.mockReset();
   mockConfirm.mockReset().mockResolvedValue(true);
+  mockStock
+    .mockReset()
+    .mockImplementation(async (ids: string[]) => new Map(ids.map((id) => [id, 10])));
   await act(async () => {
     tree = create(<Screen />);
   });
@@ -327,5 +332,75 @@ describe("USB scanner on web", () => {
     expect(allText()).toContain("stockIn.countUnknown");
     expect(inputs()).toHaveLength(1);
     expect(inputs()[0].props.value).toBe("");
+  });
+});
+
+describe("stock is re-read before applying", () => {
+  beforeEach(async () => {
+    mockLowStock.mockResolvedValue([mockProduct("a")]);
+    await press("stockIn.countLowStock");
+  });
+
+  it("counts against current stock: 2 sold since loading, shelf count 8 -> no change", async () => {
+    mockStock.mockResolvedValue(new Map([["a", 8]]));
+    await type(0, "8");
+    await press("stockIn.countApply:1");
+    expect(mockStock).toHaveBeenCalledWith(["a"], true);
+    expect(mockApply.mock.calls[0].slice(0, 3)).toEqual(["a", 8, 8]);
+    expect(mockConfirm.mock.calls[0][1]).toContain("8 → 8");
+  });
+
+  it("a failed re-read applies nothing and says so", async () => {
+    mockStock.mockRejectedValue(new Error("offline"));
+    await type(0, "8");
+    await press("stockIn.countApply:1");
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(allText()).toContain("stockIn.countStaleError");
+  });
+
+  it("a product missing from the re-read applies nothing", async () => {
+    mockStock.mockResolvedValue(new Map());
+    await type(0, "8");
+    await press("stockIn.countApply:1");
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(allText()).toContain("stockIn.countStaleError");
+  });
+
+  it("a retry keeps its frozen quantity and does not re-read", async () => {
+    mockStock.mockResolvedValue(new Map([["a", 10]]));
+    mockApply.mockRejectedValueOnce(new Error("lost"));
+    await type(0, "7");
+    await press("stockIn.countApply:1");
+    const first = mockApply.mock.calls[0];
+    mockStock.mockClear().mockResolvedValue(new Map([["a", 3]]));
+    await press("stockIn.countApply:1");
+    expect(mockStock).not.toHaveBeenCalled();
+    expect(mockApply.mock.calls[1]).toEqual(first);
+    expect(first[2]).toBe(10);
+  });
+});
+
+describe("invalid counts", () => {
+  beforeEach(async () => {
+    mockLowStock.mockResolvedValue([mockProduct("a")]);
+    await press("stockIn.countLowStock");
+  });
+
+  it.each(["-5", "abc", "5abc", "5-3"])(
+    "%s is not a count: message shown, never applied",
+    async (text) => {
+      await type(0, text);
+      expect(allText()).toContain("stockIn.countInvalid");
+      expect(tree.root.findAllByType(BigButton).some((b) => /countApply/.test(b.props.label))).toBe(
+        false
+      );
+      expect(allText()).toContain("stockIn.countProgress:0/1");
+    }
+  );
+
+  it("a valid count shows no message", async () => {
+    await type(0, "0");
+    expect(allText()).not.toContain("stockIn.countInvalid");
   });
 });

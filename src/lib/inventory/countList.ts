@@ -24,8 +24,18 @@ export const CONFIRM_PREVIEW_LINES = 5;
 // one holding only spaces) is "not counted", NEVER zero: only an explicitly
 // typed number counts, and a typed 0 is a real count of zero.
 export function countedQuantity(line: Pick<CountLine, "counted">): number | null {
-  if (line.counted.trim() === "") return null;
-  return parseQuantity(line.counted);
+  const text = line.counted.trim();
+  if (text === "") return null;
+  // Digits and one separator only: "5abc" or "5-3" must not be read as 5.
+  if (!/^[\d.,\s]+$/.test(text)) return null;
+  const value = parseQuantity(text);
+  // A shelf count can never be negative.
+  return value === null || value < 0 ? null : value;
+}
+
+// Text was typed, but it is not a usable count ("-5", "abc").
+export function isInvalidCount(line: Pick<CountLine, "counted">): boolean {
+  return line.counted.trim() !== "" && countedQuantity(line) === null;
 }
 
 export function isCounted(line: Pick<CountLine, "counted">): boolean {

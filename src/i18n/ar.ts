@@ -725,6 +725,8 @@ const ar: Translations = {
     countDone: "تم التطبيق. {{count}} منتج تم تصحيحه.",
     countUnknown: "رمز شريطي غير معروف {{barcode}}",
     countAdded: "تمت إضافة {{name}}",
+    countStaleError: "تعذرت إعادة قراءة المخزون الحالي: لم يتم تطبيق أي شيء. أعد المحاولة.",
+    countInvalid: "كمية غير صالحة: اكتب رقمًا موجبًا أو 0.",
     countStartTitle: "ابدأ من قائمة",
     countCategory: "جرد فئة",
     countLowStock: "كل المخزون المنخفض",
