@@ -37,3 +37,24 @@ export function formatLocaleDateTime(date: Date, language: string): string {
     minute: "2-digit",
   });
 }
+
+// Sales history: times and day headings are read in the STORE's time zone
+// (not the device's) and in the app language, without seconds.
+export function formatLocaleTime(date: Date, language: string, timeZone?: string): string {
+  return date.toLocaleTimeString(resolveLocale(language), {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  });
+}
+
+export function formatLocaleDayHeading(date: Date, language: string, timeZone?: string): string {
+  return date.toLocaleDateString(resolveLocale(language), {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone,
+  });
+}
