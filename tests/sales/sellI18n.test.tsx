@@ -155,7 +155,7 @@ describe("Clients section", () => {
       .findAll((node) => node.props.name && node.props.options)
       .map((node) => node.props.options.title)
       .filter(Boolean);
-    expect(titles).toEqual(["⟦nav.clients⟧"]);
+    expect(titles).toEqual(["⟦nav.clients⟧", "⟦credit.historyTitle⟧"]);
   });
 });
 

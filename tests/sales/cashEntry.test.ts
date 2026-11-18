@@ -51,3 +51,30 @@ describe("findCustomerByName", () => {
     expect(findCustomerByName(list, " ")).toBeNull();
   });
 });
+
+describe("filterCustomers: accents and phones", () => {
+  const list = [
+    { name: "Hélène B.", phone: "0661 23 45 67" },
+    { name: "Karim", phone: "+212 600-11-22-33" },
+    { name: "Omar", phone: null },
+  ];
+  it("ignores case and accents", () => {
+    expect(filterCustomers(list, "HELENE").map((c) => c.name)).toEqual(["Hélène B."]);
+    expect(filterCustomers(list, "hélène").map((c) => c.name)).toEqual(["Hélène B."]);
+  });
+  it("matches a phone by its digits, ignoring spaces and dashes", () => {
+    expect(filterCustomers(list, "0661234").map((c) => c.name)).toEqual(["Hélène B."]);
+    expect(filterCustomers(list, "600 11").map((c) => c.name)).toEqual(["Karim"]);
+  });
+  it("lists name matches before phone matches", () => {
+    const mixed = [
+      { name: "Zed", phone: "0612" },
+      { name: "Ali 0612", phone: null },
+    ];
+    expect(filterCustomers(mixed, "0612").map((c) => c.name)).toEqual(["Ali 0612", "Zed"]);
+  });
+  it("copes with a customer without a phone", () => {
+    expect(filterCustomers(list, "omar")).toHaveLength(1);
+    expect(filterCustomers(list, "999")).toEqual([]);
+  });
+});

@@ -226,3 +226,62 @@ export async function voidSale(saleId: string, reason: string): Promise<void> {
   });
   if (error) throw new Error(error.message);
 }
+
+export type CustomerPayment = {
+  id: string;
+  amount_cents: number;
+  method: PaymentMethod;
+  created_at: string;
+};
+
+// One customer's balance row (the same view the list reads, so the history
+// header can never disagree with the list). Null when the customer is gone.
+export async function fetchCustomerBalance(customerId: string): Promise<CustomerBalance | null> {
+  const { data, error } = await supabase
+    .from("customer_balances")
+    .select("id, name, phone, credit_total_cents, paid_total_cents, balance_cents")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as CustomerBalance | null) ?? null;
+}
+
+// One page of a customer's credit sales, newest first, voided ones included
+// (the screen marks them and leaves them out of the totals). RLS: a cashier
+// reads only the sales they rang up themselves; the owner reads all.
+export async function fetchCustomerCreditSales(
+  customerId: string,
+  limit: number,
+  offset: number
+): Promise<SaleSummary[]> {
+  const { data, error } = await supabase
+    .from("sales")
+    .select(
+      "id, created_at, occurred_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason"
+    )
+    .eq("customer_id", customerId)
+    .eq("payment_method", "credit")
+    .order("occurred_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SaleSummary[];
+}
+
+// One page of a customer's repayments, newest first. Every signed-in user may
+// read customer_payments (policy "staff read payments").
+export async function fetchCustomerPayments(
+  customerId: string,
+  limit: number,
+  offset: number
+): Promise<CustomerPayment[]> {
+  const { data, error } = await supabase
+    .from("customer_payments")
+    .select("id, amount_cents, method, created_at")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CustomerPayment[];
+}

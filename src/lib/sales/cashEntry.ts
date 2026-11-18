@@ -22,19 +22,38 @@ export function pressCashKey(entry: string, key: WeightKey): string {
   return entry.length >= MAX_INTEGER_DIGITS ? entry : entry + key;
 }
 
-// The customers a Pay Later search shows: names containing the text, those
-// starting with it first. An empty search shows everyone.
-export function filterCustomers<T extends { name: string }>(customers: T[], search: string): T[] {
-  const term = search.trim().toLowerCase();
+// Case, accents and Arabic vowel marks do not matter when searching names
+// ("Hélène" is found by "helene").
+function fold(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f\u064b-\u065f]/g, "")
+    .toLowerCase();
+}
+
+// The customers a search shows (Pay Later sheet, the clients list): names
+// containing the text, those starting with it first, then phone numbers
+// containing the typed digits. Spaces and dots in a phone are ignored. An
+// empty search shows everyone.
+export function filterCustomers<T extends { name: string; phone?: string | null }>(
+  customers: T[],
+  search: string
+): T[] {
+  const term = fold(search.trim());
   if (!term) return customers;
+  const digits = search.replace(/\D/g, "");
   const starts: T[] = [];
   const contains: T[] = [];
+  const byPhone: T[] = [];
   for (const customer of customers) {
-    const name = customer.name.toLowerCase();
+    const name = fold(customer.name);
     if (name.startsWith(term)) starts.push(customer);
     else if (name.includes(term)) contains.push(customer);
+    else if (digits && customer.phone && customer.phone.replace(/\D/g, "").includes(digits)) {
+      byPhone.push(customer);
+    }
   }
-  return [...starts, ...contains];
+  return [...starts, ...contains, ...byPhone];
 }
 
 // A name typed for a new customer that already exists (ignoring case and
