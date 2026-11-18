@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { formatMAD } from "@/src/lib/money";
 import { centsToInputText, checkPaymentAmount } from "@/src/lib/sales/creditLedger";
 import { isolateLtr } from "@/src/lib/text/bidi";
@@ -31,6 +33,7 @@ export function CustomerPaymentAction({ customerId, balanceCents, onRecord, onRe
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
+  // A translation key (see errorKeyOr), never the server's text.
   const [error, setError] = useState<string | null>(null);
 
   // A different customer is a different payment.
@@ -68,7 +71,7 @@ export function CustomerPaymentAction({ customerId, balanceCents, onRecord, onRe
       setAmount("");
       onRecorded();
     } catch (payError) {
-      setError(payError instanceof Error ? payError.message : t("credit.payError"));
+      setError(errorKeyOr(payError, "credit.payError"));
     } finally {
       setSaving(false);
     }
@@ -117,7 +120,7 @@ export function CustomerPaymentAction({ customerId, balanceCents, onRecord, onRe
         </Text>
       </Pressable>
       {validation ? <Text style={styles.error}>{validation}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <InlineError reasonKey={error} /> : null}
       <BigButton
         label={saving ? t("credit.recordingPayment") : t("credit.recordPayment")}
         onPress={record}

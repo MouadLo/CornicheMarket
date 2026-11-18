@@ -5,8 +5,12 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
+import { Banner } from "@/src/components/ui/Banner";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { LoadError } from "@/src/components/ui/LoadError";
 import { StatusPill } from "@/src/components/ui/StatusPill";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { formatMAD } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { fetchStoreTimezone } from "@/src/lib/reports/queries";
@@ -61,7 +65,9 @@ export default function CustomerHistory() {
   const [paymentsMore, setPaymentsMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  // Translation keys (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [linesBySale, setLinesBySale] = useState<Map<string, SaleLine[]>>(new Map());
   const [linesError, setLinesError] = useState(false);
@@ -96,16 +102,20 @@ export default function CustomerHistory() {
         setPaymentsMore(paymentRows.length >= paymentsLimit);
         setError(null);
       })
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t("credit.historyLoadError"))
-      )
+      .catch((failure) => setError(errorKey(failure)))
       .finally(() => setLoaded(true));
-  }, [id, t]);
+  }, [id]);
 
   useFocusEffect(load);
 
+  const retry = () => {
+    setLoaded(false);
+    load();
+  };
+
   const loadMore = async () => {
     setLoadingMore(true);
+    setMoreError(null);
     try {
       const [saleRows, paymentRows] = await Promise.all([
         salesMore ? fetchCustomerCreditSales(id, PAGE_SIZE, sales.length) : Promise.resolve([]),
@@ -123,8 +133,8 @@ export default function CustomerHistory() {
       ]);
       if (salesMore) setSalesMore(saleRows.length >= PAGE_SIZE);
       if (paymentsMore) setPaymentsMore(paymentRows.length >= PAGE_SIZE);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("credit.historyLoadError"));
+    } catch (failure) {
+      setMoreError(errorKeyOr(failure, "credit.historyLoadError"));
     } finally {
       setLoadingMore(false);
     }
@@ -150,8 +160,11 @@ export default function CustomerHistory() {
   if (!balance) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
-        {error && <Text style={styles.error}>{error}</Text>}
-        <Text style={styles.empty}>{t("credit.notFound")}</Text>
+        {error ? (
+          <LoadError title={t("credit.historyLoadError")} reasonKey={error} onRetry={retry} />
+        ) : (
+          <Text style={styles.empty}>{t("credit.notFound")}</Text>
+        )}
       </ScrollView>
     );
   }
@@ -254,7 +267,13 @@ export default function CustomerHistory() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error ? (
+        <Banner
+          tone="warn"
+          text={t("credit.refreshFailed")}
+          action={{ label: t("common.retry"), onPress: retry }}
+        />
+      ) : null}
 
       <View style={styles.summary}>
         <Text style={styles.name}>{isolateBidi(balance.name)}</Text>
@@ -300,6 +319,7 @@ export default function CustomerHistory() {
         </View>
       ))}
 
+      {moreError ? <InlineError reasonKey={moreError} /> : null}
       {hasMore && (
         <BigButton
           label={loadingMore ? t("credit.loadingMore") : t("credit.loadMore")}
@@ -345,5 +365,4 @@ const styles = StyleSheet.create({
   lineName: { fontSize: 14, fontWeight: "600", color: colors.ink900 },
   lineTotal: { fontSize: 14, fontWeight: "600", color: colors.ink900 },
   empty: { textAlign: "center", color: colors.ink600, marginVertical: 20 },
-  error: { color: colors.danger600 },
 });

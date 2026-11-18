@@ -128,6 +128,41 @@ describe("clients list", () => {
   });
 });
 
+describe("clients list: failed and empty reads", () => {
+  it("a failed read is an error with Retry, never 'nobody owes' or a total of 0", async () => {
+    mockBalances.mockRejectedValue(new TypeError("Failed to fetch"));
+    await render(<CreditScreen />);
+    const shown = allTexts(tree.root);
+    expect(shown).toContain("credit.loadError");
+    expect(shown.join("|")).toContain("errors.network");
+    expect(shown.join("|")).toContain("errors.offlineExplain");
+    expect(shown.join("|")).not.toContain("Failed to fetch");
+    expect(shown).not.toContain("credit.nobody");
+    expect(shown).not.toContain("credit.emptyTitle");
+    expect(shown).not.toContain("credit.totalOwed");
+    expect(shown.join("|")).not.toContain("0.00 DH");
+
+    mockBalances.mockResolvedValue([bal("c1", "Hélène", 1000)]);
+    await act(async () => pressableByText(tree.root, "common.retry").props.onPress());
+    expect(allTexts(tree.root)).not.toContain("credit.loadError");
+    expect(allTexts(tree.root).join("|")).toContain("Hélène");
+  });
+
+  it("raw server text is never shown", async () => {
+    mockBalances.mockRejectedValue(new Error("permission denied for table customers"));
+    await render(<CreditScreen />);
+    expect(allTexts(tree.root).join("|")).not.toContain("permission denied");
+    expect(allTexts(tree.root).join("|")).toContain("errors.permission");
+  });
+
+  it("a real empty list says there are no customers yet", async () => {
+    mockBalances.mockResolvedValue([]);
+    await render(<CreditScreen />);
+    expect(allTexts(tree.root)).toContain("credit.emptyTitle");
+    expect(allTexts(tree.root)).not.toContain("credit.loadError");
+  });
+});
+
 describe("customer history", () => {
   const sale = (id: string, at: string, total: number, voided = false, own = true) => ({
     id,
@@ -159,6 +194,25 @@ describe("customer history", () => {
         line_total_cents: 1500,
       },
     ]);
+  });
+
+  it("a failed read shows the error and Retry, not 'customer not found'", async () => {
+    mockBalance.mockRejectedValue(new TypeError("Failed to fetch"));
+    await render(<CustomerHistory />);
+    const shown = allTexts(tree.root);
+    expect(shown).toContain("credit.historyLoadError");
+    expect(shown.join("|")).toContain("errors.network");
+    expect(shown).not.toContain("credit.notFound");
+    expect(shown).not.toContain("credit.noHistory");
+    mockBalance.mockResolvedValue(bal("c1", "Hélène", 1000));
+    await act(async () => pressableByText(tree.root, "common.retry").props.onPress());
+    expect(allTexts(tree.root).join("|")).toContain("Hélène");
+  });
+
+  it("a customer that really does not exist still says so", async () => {
+    mockBalance.mockResolvedValue(null);
+    await render(<CustomerHistory />);
+    expect(allTexts(tree.root)).toContain("credit.notFound");
   });
 
   it("lists sales and payments newest first, marks the voided sale", async () => {
