@@ -19,7 +19,7 @@ on conflict (id) do update set full_name = excluded.full_name, role = excluded.r
 insert into public.sales (id, cashier_id, payment_method, discount_cents, total_cents, occurred_at)
 values ('50000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000bb',
         'cash', 0, 100, '2026-03-01 10:00+00');
-insert into auth.sessions (user_id) values ('00000000-0000-0000-0000-0000000000bb');
+insert into auth.sessions (id, user_id) values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000bb');
 
 create function pg_temp.as_user(p_id uuid) returns void language sql as $$
   select set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);
