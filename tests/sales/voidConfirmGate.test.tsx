@@ -58,9 +58,25 @@ async function startVoid() {
   await act(async () => {
     pressableByText(tree.root, "sell.voidRefund").props.onPress();
   });
+  await act(async () => {
+    pressableByText(tree.root, "sell.voidReasonWrongItem").props.onPress();
+  });
 }
 
 describe("void confirmation", () => {
+  it("shows a closed-day refusal inside the void box and keeps the box open", async () => {
+    mockVoidSale.mockRejectedValueOnce(new Error("The day is closed"));
+    await startVoid();
+    await act(async () => {
+      pressableByText(tree.root, "sell.voidAndRestore").props.onPress();
+    });
+    const shown = tree.root.findAll(
+      (node) => node.props.children === "sell.voidErrDayClosed" && typeof node.type === "string"
+    );
+    expect(shown.length).toBeGreaterThan(0);
+    expect(pressableByText(tree.root, "sell.voidAndRestore")).toBeTruthy();
+  });
+
   it("asks for confirmation naming the amount before voiding", async () => {
     await startVoid();
     await act(async () => {
@@ -73,7 +89,7 @@ describe("void confirmation", () => {
       "sell.voidAndRestore",
       "common.cancel"
     );
-    expect(mockVoidSale).toHaveBeenCalledWith("sale-1", expect.any(String));
+    expect(mockVoidSale).toHaveBeenCalledWith("sale-1", "wrong_item");
   });
 
   it("does not void when the confirmation is declined", async () => {
@@ -84,5 +100,77 @@ describe("void confirmation", () => {
     });
 
     expect(mockVoidSale).not.toHaveBeenCalled();
+  });
+});
+
+describe("the owner's reason (O9)", () => {
+  const voidButton = () => pressableByText(tree.root, "sell.voidAndRestore");
+  const open = () =>
+    act(async () => {
+      pressableByText(tree.root, "sell.voidRefund").props.onPress();
+    });
+  const choose = (key: string) =>
+    act(async () => {
+      pressableByText(tree.root, key).props.onPress();
+    });
+  const noteInput = () =>
+    tree.root.findAll(
+      (n) => typeof n.props.onChangeText === "function" && n.props.value !== undefined
+    )[0];
+
+  it("has nothing preselected and keeps the void button disabled", async () => {
+    await open();
+    expect(voidButton().props.disabled).toBe(true);
+    expect(noteInput()).toBeUndefined();
+    await act(async () => {
+      voidButton().props.onPress();
+    });
+    expect(mockConfirmDestructive).not.toHaveBeenCalled();
+    expect(mockVoidSale).not.toHaveBeenCalled();
+  });
+
+  it("stores a preset reason as its bare code", async () => {
+    await open();
+    await choose("sell.voidReasonChangedMind");
+    expect(voidButton().props.disabled).toBe(false);
+    await act(async () => {
+      voidButton().props.onPress();
+    });
+    expect(mockVoidSale).toHaveBeenCalledWith("sale-1", "customer_changed_mind");
+  });
+
+  it("keeps the note optional for a preset and stores it as '<code> - <note>'", async () => {
+    await open();
+    await choose("sell.voidReasonWrongQuantity");
+    expect(noteInput().props.placeholder).toBe("sell.voidNoteOptional");
+    await act(async () => noteInput().props.onChangeText("  rang 3 not 2 "));
+    await act(async () => {
+      voidButton().props.onPress();
+    });
+    expect(mockVoidSale).toHaveBeenCalledWith("sale-1", "wrong_quantity - rang 3 not 2");
+  });
+
+  it("requires a note for 'other'", async () => {
+    await open();
+    await choose("sell.voidReasonOther");
+    expect(voidButton().props.disabled).toBe(true);
+    await act(async () => noteInput().props.onChangeText("   "));
+    expect(voidButton().props.disabled).toBe(true);
+    await act(async () => noteInput().props.onChangeText("left without paying"));
+    expect(voidButton().props.disabled).toBe(false);
+    await act(async () => {
+      voidButton().props.onPress();
+    });
+    expect(mockVoidSale).toHaveBeenCalledWith("sale-1", "other - left without paying");
+  });
+
+  it("starts empty again after cancelling", async () => {
+    await open();
+    await choose("sell.voidReasonWrongItem");
+    await act(async () => {
+      pressableByText(tree.root, "common.cancel").props.onPress();
+    });
+    await open();
+    expect(voidButton().props.disabled).toBe(true);
   });
 });

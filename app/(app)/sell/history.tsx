@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import type { TFunction } from "i18next";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
 import { StatusPill } from "@/src/components/ui/StatusPill";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -23,9 +15,9 @@ import { fetchStoreTimezone } from "@/src/lib/reports/queries";
 import {
   groupSalesByDay,
   itemsPreview,
-  parseVoidReason,
+  composeVoidReason,
   saleInstant,
-  type VoidReasonCode,
+  voidReasonDisplay,
 } from "@/src/lib/sales/historyView";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
@@ -43,6 +35,7 @@ import {
   fetchMyVoidRequests,
   latestRequestBySale,
   requestVoid,
+  voidRequestValid,
   type MyVoidRequest,
   type VoidReason,
 } from "@/src/lib/sales/voidRequests";
@@ -67,8 +60,11 @@ export default function SalesHistory() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<VoidReason | null>(null);
+  const [reasonNote, setReasonNote] = useState("");
   const [saving, setSaving] = useState(false);
+  // Shown inside the void box: the page-level error can be scrolled out of view.
+  const [voidError, setVoidError] = useState<string | null>(null);
   // Cashier: the sale being asked about, and what the owner has answered so far.
   const [askingId, setAskingId] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
@@ -135,7 +131,7 @@ export default function SalesHistory() {
 
   const handleVoid = async (saleId: string) => {
     const sale = sales.find((s) => s.id === saleId);
-    if (!sale) return;
+    if (!sale || !reason || !voidRequestValid(reason, reasonNote)) return;
     const confirmed = await confirmDestructive(
       t("sell.voidConfirmTitle"),
       voidSaleConfirmMessage(sale.total_cents, t),
@@ -145,14 +141,15 @@ export default function SalesHistory() {
     if (!confirmed) return;
 
     setSaving(true);
-    setError(null);
+    setVoidError(null);
     try {
-      await voidSale(saleId, reason.trim() || t("sell.voidReason"));
+      await voidSale(saleId, composeVoidReason(reason, reasonNote));
       setVoidingId(null);
-      setReason("");
+      setReason(null);
+      setReasonNote("");
       load();
-    } catch (voidError) {
-      setError(voidError instanceof Error ? voidError.message : t("sell.historyVoidError"));
+    } catch (failure) {
+      setVoidError(describeVoidRequestError(failure, t));
     } finally {
       setSaving(false);
     }
@@ -231,7 +228,7 @@ export default function SalesHistory() {
                   ? ` ${t("sell.historyDiscount", { amount: formatMAD(sale.discount_cents) })}`
                   : ""}
                 {sale.voided_at
-                  ? ` ${t("sell.historyVoided", { reason: voidReasonText(sale.void_reason, t) })}`
+                  ? ` ${t("sell.historyVoided", { reason: voidReasonDisplay(sale.void_reason, t, isolateBidi) })}`
                   : ""}
               </Text>
               {sale.customer_name ? (
@@ -302,30 +299,42 @@ export default function SalesHistory() {
           !sale.voided_at &&
           (voidingId === sale.id ? (
             <View style={styles.voidBox}>
-              <TextInput
-                style={styles.input}
-                value={reason}
-                onChangeText={setReason}
-                placeholder={t("sell.voidReason")}
-                autoFocus
+              <Text style={styles.voidTitle}>{t("sell.voidReasonTitle")}</Text>
+              <VoidReasonPicker
+                reason={reason}
+                note={reasonNote}
+                onReason={setReason}
+                onNote={setReasonNote}
+                noteAlways
               />
+              {voidError ? <Text style={styles.error}>{voidError}</Text> : null}
               <BigButton
                 label={saving ? t("sell.voiding") : t("sell.voidAndRestore")}
                 variant="danger"
                 onPress={() => handleVoid(sale.id)}
-                disabled={saving}
+                disabled={saving || !voidRequestValid(reason, reasonNote)}
               />
               <BigButton
                 label={t("common.cancel")}
                 variant="secondary"
                 onPress={() => {
                   setVoidingId(null);
-                  setReason("");
+                  setReason(null);
+                  setReasonNote("");
+                  setVoidError(null);
                 }}
               />
             </View>
           ) : (
-            <Pressable style={styles.voidButton} onPress={() => setVoidingId(sale.id)}>
+            <Pressable
+              style={styles.voidButton}
+              onPress={() => {
+                setReason(null);
+                setReasonNote("");
+                setVoidError(null);
+                setVoidingId(sale.id);
+              }}
+            >
               <Text style={styles.voidButtonText}>{t("sell.voidRefund")}</Text>
             </Pressable>
           ))}
@@ -418,34 +427,8 @@ const styles = StyleSheet.create({
   },
   voidButtonText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
   voidBox: { gap: 10 },
-  input: {
-    minHeight: 52,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 16,
-    fontSize: 16,
-  },
+  voidTitle: { fontSize: 15, fontWeight: "700", color: "#333" },
   empty: { textAlign: "center", color: "#666", marginTop: 32 },
   refusal: { fontSize: 14, color: "#666" },
   error: { color: "#b3261e" },
 });
-
-const REASON_KEYS: Record<VoidReasonCode, string> = {
-  wrong_item: "sell.voidReasonWrongItem",
-  wrong_quantity: "sell.voidReasonWrongQuantity",
-  customer_changed_mind: "sell.voidReasonChangedMind",
-  other: "sell.voidReasonOther",
-};
-
-// A reason from an approved void request, translated; anything else as stored.
-function voidReasonText(reason: string | null, t: TFunction) {
-  const parsed = parseVoidReason(reason);
-  if (!parsed) return reason ?? "";
-  const label = parsed.note
-    ? `${t(REASON_KEYS[parsed.code])}: ${parsed.note}`
-    : t(REASON_KEYS[parsed.code]);
-  return parsed.requestedBy
-    ? `${label} · ${t("sell.historyRequestedBy", { name: isolateBidi(parsed.requestedBy) })}`
-    : label;
-}

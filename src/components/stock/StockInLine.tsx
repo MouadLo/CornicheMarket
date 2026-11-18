@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { DateField } from "@/src/components/ui/DateField";
 import {
   centsToDisplay,
   formatMAD,
@@ -33,9 +34,11 @@ type Props = {
   line: LineState;
   onChange: (next: LineState) => void;
   onRemove: () => void;
+  // The store's day (YYYY-MM-DD), for the calendar's Today shortcut.
+  today: string;
 };
 
-export function StockInLine({ line, onChange, onRemove }: Props) {
+export function StockInLine({ line, onChange, onRemove, today }: Props) {
   const { t } = useTranslation();
   const { product, lastCostCents } = line;
   const costCents = parseMoneyToCents(line.unitCost);
@@ -106,13 +109,13 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>{t("stockLine.expiry")}</Text>
-        <TextInput
-          style={[styles.input, expiryInvalid && styles.inputInvalid]}
+        <DateField
+          label={t("stockLine.expiry")}
           value={line.expiryDate}
-          onChangeText={(value) => onChange({ ...line, expiryDate: value })}
-          placeholder={t("stockLine.expiryPlaceholder")}
-          autoCapitalize="none"
+          onChange={(value) => onChange({ ...line, expiryDate: value })}
+          today={today}
+          clearable
+          invalid={expiryInvalid}
         />
         {expiryInvalid && <Text style={styles.invalid}>{t("stockIn.expiryInvalid")}</Text>}
       </View>
@@ -198,7 +201,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
-  inputInvalid: { borderColor: colors.danger600 },
   invalid: { color: colors.danger600, fontSize: 13 },
   lastPrice: { fontSize: 13, color: colors.ink600 },
   alert: { backgroundColor: colors.warning100, borderRadius: radius.control, padding: 12, gap: 6 },

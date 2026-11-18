@@ -1,18 +1,11 @@
 import { Redirect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 
+import { DateField } from "@/src/components/ui/DateField";
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
@@ -42,6 +35,7 @@ import {
   type RangeKey,
 } from "@/src/lib/reports/ranges";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { storeDayKey } from "@/src/lib/sales/historyView";
 import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 
@@ -85,6 +79,9 @@ export default function ReportsScreen() {
       .then(setTimeZone)
       .catch(() => {});
   }, []);
+
+  // The store's calendar day, not the device's: the latest date a report may reach.
+  const todayKey = storeDayKey(new Date().toISOString(), timeZone);
 
   const range = useMemo(
     () =>
@@ -301,19 +298,20 @@ export default function ReportsScreen() {
 
       {rangeKey === "custom" && (
         <View style={styles.customRow}>
-          <TextInput
-            style={styles.dateInput}
+          <DateField
+            label={t("reports.fromDate")}
             value={customFrom}
-            onChangeText={setCustomFrom}
-            placeholder={t("reports.fromDate")}
-            autoCapitalize="none"
+            onChange={setCustomFrom}
+            today={todayKey}
+            max={customTo || todayKey}
           />
-          <TextInput
-            style={styles.dateInput}
+          <DateField
+            label={t("reports.toDate")}
             value={customTo}
-            onChangeText={setCustomTo}
-            placeholder={t("reports.toDate")}
-            autoCapitalize="none"
+            onChange={setCustomTo}
+            today={todayKey}
+            min={customFrom || undefined}
+            max={todayKey}
           />
         </View>
       )}
@@ -687,15 +685,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, color: "#333" },
   chipTextActive: { color: "#fff", fontWeight: "600" },
   customRow: { flexDirection: "row", gap: 10 },
-  dateInput: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
   section: { gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: "#444", textTransform: "uppercase" },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
