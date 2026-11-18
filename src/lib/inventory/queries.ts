@@ -1,4 +1,4 @@
-import { productsSource, type Product } from "@/src/lib/products/queries";
+import { PAGE_SIZE, fetchProducts, productsSource, type Product } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type AdjustmentReason = "damaged" | "expired" | "theft" | "count_correction";
@@ -183,4 +183,26 @@ export async function fetchNegativeStockProducts(): Promise<NegativeStockProduct
 
   if (error) throw new Error(error.message);
   return (data ?? []) as NegativeStockProduct[];
+}
+
+// Every active product of these categories, for starting a stock count from a
+// list. Reads page by page (fetchProducts caps a page) up to a safety limit.
+const COUNT_LIST_MAX = 1000;
+
+export async function fetchProductsForCount(
+  categoryIds: string[],
+  isOwner: boolean
+): Promise<Product[]> {
+  if (categoryIds.length === 0) return [];
+  const all: Product[] = [];
+  for (let page = 0; all.length < COUNT_LIST_MAX; page++) {
+    const rows = await fetchProducts(
+      { search: "", categoryId: null, categoryIds, lowStockOnly: false, status: "active" },
+      page,
+      isOwner
+    );
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return all;
 }
