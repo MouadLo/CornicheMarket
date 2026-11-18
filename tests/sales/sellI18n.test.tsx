@@ -86,14 +86,15 @@ describe("no hardcoded English in the Sell flow", () => {
     act(() => {
       tree = create(sheet());
     });
-    expect(hardcodedTexts(tree.root)).toEqual([]);
+    // "—" is the empty amount, not a word.
+    expect(hardcodedTexts(tree.root, ["—"])).toEqual([]);
   });
 
   it("payment sheet, short payment", () => {
     act(() => {
       tree = create(sheet());
     });
-    act(() => tree.root.findAllByProps({ keyboardType: "decimal-pad" })[0].props.onChangeText("5"));
+    act(() => tree.root.findByProps({ testID: "cash-key-5" }).props.onPress());
     expect(hardcodedTexts(tree.root)).toEqual([]);
   });
 
