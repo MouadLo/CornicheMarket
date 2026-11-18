@@ -16,7 +16,8 @@ import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
-import { exportTablesAsCsv, exportTablesAsPdf, type ReportTable } from "@/src/lib/reports/export";
+import { exportTablesAsCsv, exportTablesAsPdf } from "@/src/lib/reports/export";
+import { buildReportTables } from "@/src/lib/reports/exportTables";
 import { compareByMetricThenName } from "@/src/lib/reports/math";
 import {
   fetchByCategory,
@@ -173,84 +174,23 @@ export default function ReportsScreen() {
     )
     .slice(0, 20);
 
-  const buildTables = (): ReportTable[] => [
-    {
-      title: `Summary (${t(range.labelKey)})`,
-      columns: ["Metric", "Value"],
-      rows: [
-        ["Revenue", centsToDisplay(summary?.revenue_cents ?? 0)],
-        ["Cost of goods sold", centsToDisplay(summary?.cogs_cents ?? 0)],
-        ["Gross profit", centsToDisplay(summary?.gross_profit_cents ?? 0)],
-        ["Margin %", summary?.margin_percent != null ? `${summary.margin_percent}` : "—"],
-        ["Transactions", summary?.transaction_count ?? 0],
-        ["Average basket", centsToDisplay(summary?.average_basket_cents ?? 0)],
-        ["Losses from adjustments", centsToDisplay(summary?.loss_cents ?? 0)],
-        ["Inventory at cost", centsToDisplay(inventory?.cost_value_cents ?? 0)],
-        ["Inventory at selling price", centsToDisplay(inventory?.retail_value_cents ?? 0)],
-      ],
-    },
-    {
-      title: "Daily trend",
-      columns: ["Day", "Revenue", "Profit", "Transactions"],
-      rows: daily.map((point) => [
-        point.day,
-        centsToDisplay(point.revenue_cents),
-        centsToDisplay(point.profit_cents),
-        point.transaction_count,
-      ]),
-    },
-    {
-      title: "By category",
-      columns: ["Category", "Quantity", "Revenue", "Profit"],
-      rows: categories.map((row) => [
-        localizeCategoryName(row.category_name, i18n.language),
-        row.quantity,
-        centsToDisplay(row.revenue_cents),
-        centsToDisplay(row.profit_cents),
-      ]),
-    },
-    {
-      title: "Top 20 by profit",
-      columns: ["Product", "Quantity", "Revenue", "Profit", "Margin %"],
-      rows: topByProfit.map((row) => [
-        row.product_name,
-        row.quantity,
-        centsToDisplay(row.revenue_cents),
-        centsToDisplay(row.profit_cents),
-        row.margin_percent ?? "—",
-      ]),
-    },
-    {
-      title: "Top 20 by quantity",
-      columns: ["Product", "Quantity", "Revenue", "Profit"],
-      rows: topByQuantity.map((row) => [
-        row.product_name,
-        row.quantity,
-        centsToDisplay(row.revenue_cents),
-        centsToDisplay(row.profit_cents),
-      ]),
-    },
-    {
-      title: "Lowest margin",
-      columns: ["Product", "Revenue", "Profit", "Margin %"],
-      rows: lowestMargin.map((row) => [
-        row.product_name,
-        centsToDisplay(row.revenue_cents),
-        centsToDisplay(row.profit_cents),
-        row.margin_percent ?? "—",
-      ]),
-    },
-    {
-      title: "Not sold in 30 days",
-      columns: ["Product", "Stock", "Value at cost", "Last sold"],
-      rows: deadStock.map((row) => [
-        row.product_name,
-        row.stock_quantity,
-        centsToDisplay(row.stock_value_cents),
-        row.last_sold_at ? formatLocaleDate(new Date(row.last_sold_at), i18n.language) : "never",
-      ]),
-    },
-  ];
+  const buildTables = () =>
+    buildReportTables(
+      {
+        rangeLabel: t(range.labelKey),
+        summary,
+        inventory,
+        daily,
+        categories,
+        topByProfit,
+        topByQuantity,
+        lowestMargin,
+        deadStock,
+        timeZone,
+        language: i18n.language,
+      },
+      t
+    );
 
   const fileStamp = new Date().toISOString().slice(0, 10);
 
@@ -511,9 +451,13 @@ export default function ReportsScreen() {
               style={styles.exportButton}
               onPress={() =>
                 exportTablesAsPdf(
-                  "Corniche Market report",
-                  `${t(range.labelKey)} · generated ${formatLocaleDateTime(new Date(), i18n.language)}`,
-                  buildTables()
+                  t("reports.csv.heading"),
+                  t("reports.csv.generated", {
+                    range: t(range.labelKey),
+                    date: formatLocaleDateTime(new Date(), i18n.language),
+                  }),
+                  buildTables(),
+                  i18n.language
                 )
               }
             >

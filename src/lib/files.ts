@@ -29,7 +29,8 @@ export async function pickTextFile(): Promise<{ name: string; text: string } | n
 const UTF8_BOM = "﻿";
 
 export async function saveTextFile(filename: string, content: string): Promise<void> {
-  const withBom = UTF8_BOM + content;
+  // Strip any BOM the caller already added so the file never gets two.
+  const withBom = UTF8_BOM + content.replace(/^\uFEFF/, "");
 
   if (Platform.OS === "web") {
     const blob = new Blob([withBom], { type: "text/csv;charset=utf-8;" });
