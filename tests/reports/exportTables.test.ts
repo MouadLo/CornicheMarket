@@ -91,7 +91,8 @@ const data = (language: string): ReportExportData => ({
       last_sold_at: null,
     },
   ],
-  timeZone: "Africa/Casablanca",
+  // A fixed-offset zone: Morocco's offset depends on the machine's tz data.
+  timeZone: "Asia/Tokyo",
   language,
 });
 
