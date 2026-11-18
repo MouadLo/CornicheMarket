@@ -136,14 +136,14 @@ function Tile({
         <Text style={styles.name} numberOfLines={2}>
           {isolateBidi(tile.label)}
         </Text>
-        {count > 0 ? (
-          <View style={styles.qty}>
-            <Text style={[styles.qtyText, tabularNumbers]}>{kg ? "✓" : `×${count}`}</Text>
-          </View>
-        ) : kg ? (
-          <Icon name="scale" size={18} color={colors.ink600} />
-        ) : null}
+        {kg ? <Icon name="scale" size={18} color={colors.ink600} /> : null}
       </View>
+      {/* Overlaid on the end corner so the name keeps the full tile width. */}
+      {count > 0 ? (
+        <View style={styles.qty} testID="tile-qty-badge" pointerEvents="none">
+          <Text style={[styles.qtyText, tabularNumbers]}>{kg ? "✓" : `×${count}`}</Text>
+        </View>
+      ) : null}
       <View style={styles.tileBottom}>
         <View style={styles.priceLine}>
           <Text
@@ -225,6 +225,9 @@ const styles = StyleSheet.create({
   },
   name: { flex: 1, fontSize: 17, fontWeight: "600", color: colors.ink900, lineHeight: 20 },
   qty: {
+    position: "absolute",
+    top: 6,
+    end: 6,
     minWidth: 24,
     height: 24,
     paddingHorizontal: 7,
