@@ -125,6 +125,10 @@ const ar: Translations = {
     signingIn: "جاري تسجيل الدخول...",
     invalidCredentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
     signInError: "تعذر تسجيل الدخول. تحقق من اتصالك وحاول مرة أخرى.",
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
+    forgotPasswordHelp: "نسيت كلمة المرور؟ اطلب من مالك المتجر إرسال دعوة جديدة لك.",
+    language: "اللغة",
   },
   settings: {
     title: "الإعدادات",

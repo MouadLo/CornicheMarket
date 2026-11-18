@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 
 import { Text } from "@/src/theme/Text";
@@ -12,10 +12,24 @@ type Props = Omit<TextInputProps, "style"> & {
   // "DH", "kg": shown after the value. Numeric fields are end-aligned with tabular figures.
   unit?: string;
   numeric?: boolean;
+  // Control shown after the input inside the box (e.g. a show-password toggle).
+  accessory?: ReactNode;
+  inputRef?: Ref<TextInput>;
 };
 
 // 56 px input, 10 radius, visible outline (3.2:1), 2 px ring on focus.
-export function Field({ label, helper, error, unit, numeric, onFocus, onBlur, ...input }: Props) {
+export function Field({
+  label,
+  helper,
+  error,
+  unit,
+  numeric,
+  accessory,
+  inputRef,
+  onFocus,
+  onBlur,
+  ...input
+}: Props) {
   const [focused, setFocused] = useState(false);
   return (
     <View>
@@ -23,6 +37,7 @@ export function Field({ label, helper, error, unit, numeric, onFocus, onBlur, ..
       <View style={[styles.box, focused && styles.focus, !!error && styles.error]}>
         <TextInput
           {...input}
+          ref={inputRef}
           keyboardType={numeric ? "decimal-pad" : input.keyboardType}
           placeholderTextColor={colors.ink600}
           accessibilityLabel={input.accessibilityLabel ?? label}
@@ -37,6 +52,7 @@ export function Field({ label, helper, error, unit, numeric, onFocus, onBlur, ..
           style={[styles.input, numeric && styles.numeric, numeric && tabularNumbers]}
         />
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
+        {accessory}
       </View>
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
