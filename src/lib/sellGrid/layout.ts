@@ -119,7 +119,11 @@ export function resolveGrid(input: {
       const hidden = new Set([...own.values()].filter((r) => r.hidden).map((r) => r.product_id));
       const shown = inCategory.filter((p) => !hidden.has(p.id));
       const pinned = [...own.values()].filter((r) => r.pinned && !r.hidden).sort(byPosition);
-      const placed = [...own.values()].filter((r) => !r.pinned && !r.hidden).sort(byPosition);
+      // A negative position (UNORDERED_POSITION) is a row that only carries a
+      // colour or label: that product keeps its automatic place.
+      const placed = [...own.values()]
+        .filter((r) => !r.pinned && !r.hidden && r.position >= 0)
+        .sort(byPosition);
       const placedIds = new Set([...pinned, ...placed].map((r) => r.product_id));
       const rest = shown.filter((p) => !placedIds.has(p.id)).sort(byName);
       tiles = [

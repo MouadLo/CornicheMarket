@@ -4,7 +4,7 @@
  * changes so the screen can guard leaving.
  */
 import React from "react";
-import { TextInput } from "react-native";
+import { Pressable, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import { BigButton } from "../../src/components/BigButton";
@@ -45,7 +45,7 @@ const product = {
   active: true,
 } as unknown as Product;
 
-const onSubmit = jest.fn(async () => {});
+const onSubmit = jest.fn(async (..._args: unknown[]) => {});
 const onDirtyChange = jest.fn();
 let tree: ReactTestRenderer;
 
@@ -135,4 +135,82 @@ it("marks the form dirty again when the save fails", async () => {
   await save();
   expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   expect(mockToast).not.toHaveBeenCalled();
+});
+
+describe("Sell tile settings (O7)", () => {
+  const { Switch } = require("react-native");
+  const { TileSettingsError } = require("../../src/lib/sellGrid/tileSettings");
+  const renderWithTile = async (tile = { favorite: false, color: null as string | null }) => {
+    await act(async () => {
+      tree = create(
+        <ProductForm
+          categories={[]}
+          initial={product}
+          initialTile={tile as never}
+          submitLabel="save"
+          onSubmit={onSubmit}
+          onDirtyChange={onDirtyChange}
+        />
+      );
+    });
+  };
+  const swatch = (label: string) =>
+    tree.root.findAll(
+      (n) => n.props.accessibilityRole === "radio" && n.props.accessibilityLabel === label
+    )[0];
+
+  it("shows no controls without initialTile (cashiers never get them)", async () => {
+    await render(product);
+    expect(tree.root.findAllByType(Switch)).toHaveLength(1);
+    expect(
+      tree.root.findAllByType(Pressable).filter((n) => n.props.accessibilityRole === "radio")
+    ).toHaveLength(0);
+  });
+
+  it("offers the default and every colour, each with a name and a checked state", async () => {
+    await renderWithTile({ favorite: false, color: "teal" });
+    const radios = tree.root
+      .findAllByType(Pressable)
+      .filter((n) => n.props.accessibilityRole === "radio");
+    expect(radios.map((r) => r.props.accessibilityLabel)).toEqual([
+      "products.formTileColorDefault",
+      ...["green", "teal", "blue", "indigo", "purple", "red", "amber", "grey"].map(
+        (c) => `products.formTileColors.${c}`
+      ),
+    ]);
+    expect(swatch("products.formTileColors.teal").props.accessibilityState.checked).toBe(true);
+    expect(swatch("products.formTileColors.red").props.accessibilityState.checked).toBe(false);
+  });
+
+  it("an untouched save sends no grid change", async () => {
+    await renderWithTile();
+    await save();
+    expect(onSubmit.mock.calls[0][1]).toBeNull();
+  });
+
+  it("a favourite and a colour are sent, and count as unsaved changes", async () => {
+    await renderWithTile();
+    act(() => swatch("products.formTileColors.red").props.onPress());
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    const favSwitch = tree.root
+      .findAllByType(Switch)
+      .find((s) => s.props.accessibilityLabel === "products.formFavorite")!;
+    act(() => favSwitch.props.onValueChange(true));
+    await save();
+    expect(onSubmit.mock.calls[0][1]).toEqual({
+      settings: { favorite: true, color: "red" },
+      tabCategoryId: null,
+    });
+  });
+
+  it("a grid failure shows its own message and keeps the form usable", async () => {
+    onSubmit.mockRejectedValueOnce(new TileSettingsError(new Error("x")));
+    await renderWithTile();
+    act(() => swatch("products.formTileColors.blue").props.onPress());
+    await save();
+    expect(JSON.stringify(tree.toJSON())).toContain("products.formTileSaveError");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    await save();
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+  });
 });
