@@ -1,3 +1,4 @@
+import Papa from "papaparse";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -7,6 +8,8 @@ import { saveTextFile } from "@/src/lib/files";
 import { BigButton } from "@/src/components/BigButton";
 import { fetchLowStockProducts, fetchSalesVelocity } from "@/src/lib/inventory/queries";
 import { COVER_DAYS, daysOfStockLeft, suggestedReorder } from "@/src/lib/inventory/reorder";
+import { unitLabel } from "@/src/lib/products/unitLabel";
+import { neutralizeFormula } from "@/src/lib/reports/export";
 import type { Product } from "@/src/lib/products/queries";
 
 type Row = {
@@ -60,20 +63,27 @@ export default function LowStockScreen() {
   }, [load]);
 
   const exportList = async () => {
-    const lines = ["product,barcode,stock,sold_30d,suggested_order,unit"];
-    rows.forEach((row) => {
-      lines.push(
+    const csv = Papa.unparse({
+      fields: [
+        t("reports.csv.lowProduct"),
+        t("reports.csv.lowBarcode"),
+        t("reports.csv.lowStock"),
+        t("reports.csv.lowSold30d"),
+        t("reports.csv.lowSuggested"),
+        t("reports.csv.lowUnit"),
+      ],
+      data: rows.map((row) =>
         [
-          `"${row.product.name.replace(/"/g, '""')}"`,
+          row.product.name,
           row.product.barcode ?? "",
           row.product.stock_quantity,
           row.sold30d,
           row.suggested,
-          row.product.unit,
-        ].join(",")
-      );
+          unitLabel(row.product.unit, row.suggested, t),
+        ].map(neutralizeFormula)
+      ),
     });
-    await saveTextFile(`reorder-${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n"));
+    await saveTextFile(`reorder-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   };
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
