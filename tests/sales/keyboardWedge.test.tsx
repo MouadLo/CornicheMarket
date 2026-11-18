@@ -138,3 +138,85 @@ describe("unguarded (Sell): unchanged", () => {
     expect(registered[0].capture).toBe(false);
   });
 });
+
+describe("guarded: swallowed keys are held, never lost", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+  const wait = (ms: number) => act(() => void jest.advanceTimersByTime(ms));
+
+  it("fast '12' stays 12 once no further key arrives", () => {
+    mount(true);
+    const field = makeField("");
+    key("1", field, 300);
+    key("2", field, 10);
+    expect(field.value).toBe("1");
+    wait(150);
+    expect(field.value).toBe("12");
+    expect(onScan).not.toHaveBeenCalled();
+  });
+
+  it("fast '12' then Enter stays 12 and Enter is not taken as a scan", () => {
+    mount(true);
+    const field = makeField("");
+    key("1", field, 300);
+    key("2", field, 10);
+    const enter = key("Enter", field, 10);
+    expect(field.value).toBe("12");
+    expect(enter.preventDefault).not.toHaveBeenCalled();
+    expect(onScan).not.toHaveBeenCalled();
+    wait(500);
+    expect(field.value).toBe("12");
+  });
+
+  it("keys held back are restored after the existing text, in order", () => {
+    mount(true);
+    const field = makeField("7");
+    key("3", field, 300);
+    key("4", field, 10);
+    key("5", field, 10);
+    wait(150);
+    expect(field.value).toBe("7345");
+  });
+
+  it("Backspace mid-burst finds the held keys already in the field", () => {
+    mount(true);
+    const field = makeField("");
+    key("1", field, 300);
+    key("2", field, 10);
+    // The browser would now delete the last character: flushed first.
+    key("Backspace", field, 10);
+    expect(field.value).toBe("12");
+    field.value = field.value.slice(0, -1);
+    wait(500);
+    expect(field.value).toBe("1");
+  });
+
+  it("a key after a short pause flushes held keys before it lands", () => {
+    mount(true);
+    const field = makeField("");
+    key("1", field, 300);
+    key("2", field, 10);
+    key("3", field, 70);
+    expect(field.value).toBe("123");
+  });
+
+  it("a full scan still leaves the field as it was, and no timer fires later", () => {
+    mount(true);
+    const field = makeField("5");
+    scan("6111000000000", field);
+    expect(field.value).toBe("5");
+    wait(500);
+    expect(field.value).toBe("5");
+    expect(onScan).toHaveBeenCalledTimes(1);
+  });
+
+  it("unmounting cancels the pending restore", () => {
+    mount(true);
+    const field = makeField("");
+    key("1", field, 300);
+    key("2", field, 10);
+    act(() => tree.unmount());
+    wait(500);
+    expect(field.value).toBe("1");
+  });
+});

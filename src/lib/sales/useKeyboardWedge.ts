@@ -6,6 +6,9 @@ import { Platform } from "react-native";
 // and only treat a burst as a scan, so ordinary typing is left alone.
 const MAX_GAP_MS = 50;
 const MIN_LENGTH = 4;
+// Guarded mode: how long swallowed keys wait for the rest of a scan.
+const HOLD_MS = 100;
+const MODIFIERS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"]);
 
 type FieldLike = { tagName?: string; value?: string; dispatchEvent?: (event: Event) => boolean };
 
@@ -38,6 +41,11 @@ export function useKeyboardWedge(
   const buffer = useRef("");
   const lastKeyTime = useRef(0);
   const leaked = useRef<{ field: FieldLike; before: string } | null>(null);
+  // Guarded mode only: keys swallowed because they looked like a scan. They
+  // are kept here until we know. If the burst turns out to be a person typing
+  // fast, they go back into the field, in order: swallowing is never losing.
+  const held = useRef("");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handler = useRef(onScan);
 
   useEffect(() => {
@@ -47,6 +55,22 @@ export function useKeyboardWedge(
   useEffect(() => {
     if (Platform.OS !== "web" || !enabled || typeof document === "undefined") return;
 
+    const clearTimer = () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = null;
+    };
+    // Not a scan after all: give the held keys back to the field, and forget
+    // the burst so a later Enter is not mistaken for the end of a scan.
+    const flushHeld = () => {
+      clearTimer();
+      const text = held.current;
+      const mark = leaked.current;
+      held.current = "";
+      buffer.current = "";
+      leaked.current = null;
+      if (text && mark) restoreFieldValue(mark.field, (mark.field.value ?? "") + text);
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       const now = Date.now();
       const gap = now - lastKeyTime.current;
@@ -55,9 +79,11 @@ export function useKeyboardWedge(
       if (event.key === "Enter") {
         const code = buffer.current;
         const mark = leaked.current;
-        buffer.current = "";
-        leaked.current = null;
         if (code.length >= MIN_LENGTH) {
+          clearTimer();
+          held.current = "";
+          buffer.current = "";
+          leaked.current = null;
           event.preventDefault();
           if (guardFields) {
             event.stopPropagation();
@@ -66,11 +92,21 @@ export function useKeyboardWedge(
             }
           }
           handler.current(code);
+          return;
         }
+        // Too short to be a scan: whatever was held is ordinary typing.
+        if (guardFields) flushHeld();
+        buffer.current = "";
+        leaked.current = null;
         return;
       }
 
-      if (event.key.length !== 1) return;
+      if (event.key.length !== 1) {
+        // Backspace, Tab, arrows...: the held keys must be in the field before
+        // this key acts on it. Bare modifiers are part of typing a scan.
+        if (guardFields && !MODIFIERS.has(event.key)) flushHeld();
+        return;
+      }
       if (guardFields && (event.ctrlKey || event.metaKey || event.altKey)) return;
 
       // A slow keystroke starts a fresh buffer: it is a person typing, and
@@ -78,6 +114,7 @@ export function useKeyboardWedge(
       // treats a held-down key as typing, never as a scan.)
       const fresh = gap > MAX_GAP_MS || (guardFields && event.repeat);
       if (fresh || buffer.current === "") {
+        if (guardFields) flushHeld();
         buffer.current = event.key;
         // Remember what the focused field held before this key landed in it.
         const target = event.target;
@@ -88,13 +125,21 @@ export function useKeyboardWedge(
 
       buffer.current += event.key;
       if (guardFields) {
-        // Second key or later, arriving too fast to be a person: a scan.
+        // Second key or later, arriving too fast to be a person: probably a
+        // scan. Keep it out of the field, but hold it in case it is not.
         event.preventDefault();
         event.stopPropagation();
+        held.current += event.key;
+        clearTimer();
+        timer.current = setTimeout(flushHeld, HOLD_MS);
       }
     };
 
     document.addEventListener("keydown", onKeyDown, guardFields);
-    return () => document.removeEventListener("keydown", onKeyDown, guardFields);
+    return () => {
+      clearTimer();
+      held.current = "";
+      document.removeEventListener("keydown", onKeyDown, guardFields);
+    };
   }, [enabled, guardFields]);
 }
