@@ -7,6 +7,7 @@ export default function StockInLayout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="receive" options={{ title: t("stockIn.receiveTitle") }} />
       <Stack.Screen name="history" options={{ title: t("screenTitles.purchaseHistory") }} />
       <Stack.Screen name="delivery/[id]" options={{ title: t("stockIn.deliveryTitle") }} />
       <Stack.Screen name="invoice/index" options={{ title: t("invoices.drafts") }} />
