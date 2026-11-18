@@ -67,3 +67,15 @@ export function isValidDateInput(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   return !Number.isNaN(new Date(value).getTime());
 }
+
+// True when the range covers exactly one store day: Today, Yesterday, or a
+// custom range whose From and To are the same date. Decided in the store's
+// time zone (a day is 23 or 25 hours long across a clock change, so comparing
+// against "from + 24 h" would be wrong).
+export function isSingleStoreDay(
+  range: { from: Date; to: Date },
+  timeZone: string = DEFAULT_STORE_TIMEZONE
+): boolean {
+  if (range.to.getTime() <= range.from.getTime()) return false;
+  return addDaysInTimeZone(range.from, 1, timeZone).getTime() === range.to.getTime();
+}

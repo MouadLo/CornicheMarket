@@ -1,4 +1,4 @@
-import { isValidDateInput, resolveRange } from "../../src/lib/reports/ranges";
+import { isSingleStoreDay, isValidDateInput, resolveRange } from "../../src/lib/reports/ranges";
 
 // A fixed "now" so these tests don't depend on the day they happen to run.
 // 2026-01-15 23:30 UTC+1 (Casablanca) -- deliberately late evening, so a
@@ -76,5 +76,54 @@ describe("isValidDateInput", () => {
     expect(isValidDateInput("15/01/2026")).toBe(false);
     expect(isValidDateInput("not a date")).toBe(false);
     expect(isValidDateInput("")).toBe(false);
+  });
+});
+
+describe("isSingleStoreDay", () => {
+  const NOW_UTC = new Date("2026-01-15T10:00:00.000Z");
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(NOW_UTC);
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it.each(["UTC", "Asia/Tokyo"])("Today and Yesterday are one day in %s", (tz) => {
+    expect(isSingleStoreDay(resolveRange("today", undefined, undefined, tz), tz)).toBe(true);
+    expect(isSingleStoreDay(resolveRange("yesterday", undefined, undefined, tz), tz)).toBe(true);
+  });
+
+  it.each(["UTC", "Asia/Tokyo"])("a custom range with From equal To is one day in %s", (tz) => {
+    expect(isSingleStoreDay(resolveRange("custom", "2026-01-10", "2026-01-10", tz), tz)).toBe(true);
+  });
+
+  it.each(["UTC", "Asia/Tokyo"])("longer ranges are not one day in %s", (tz) => {
+    expect(isSingleStoreDay(resolveRange("custom", "2026-01-10", "2026-01-11", tz), tz)).toBe(
+      false
+    );
+    expect(isSingleStoreDay(resolveRange("7d", undefined, undefined, tz), tz)).toBe(false);
+    expect(isSingleStoreDay(resolveRange("30d", undefined, undefined, tz), tz)).toBe(false);
+  });
+
+  it("an empty or inverted range is not one day", () => {
+    const at = new Date("2026-01-10T00:00:00.000Z");
+    expect(isSingleStoreDay({ from: at, to: at }, "UTC")).toBe(false);
+    expect(isSingleStoreDay({ from: new Date(at.getTime() + 1), to: at }, "UTC")).toBe(false);
+  });
+
+  it("a 23-hour day across a clock change still counts as one day", () => {
+    // Europe/Paris springs forward on 2026-03-29: that day is 23 hours long.
+    const tz = "Europe/Paris";
+    const range = resolveRange("custom", "2026-03-29", "2026-03-29", tz);
+    expect(range.to.getTime() - range.from.getTime()).toBe(23 * 60 * 60 * 1000);
+    expect(isSingleStoreDay(range, tz)).toBe(true);
+  });
+
+  it("is decided in the store zone, not UTC", () => {
+    // A Tokyo midnight-to-midnight range is one Tokyo day, but not one UTC day.
+    const tokyo = resolveRange("custom", "2026-01-10", "2026-01-10", "Asia/Tokyo");
+    expect(tokyo.from.toISOString()).toBe("2026-01-09T15:00:00.000Z");
+    expect(isSingleStoreDay(tokyo, "Asia/Tokyo")).toBe(true);
+    expect(isSingleStoreDay(tokyo, "UTC")).toBe(false);
   });
 });

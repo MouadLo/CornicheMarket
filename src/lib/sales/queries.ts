@@ -168,12 +168,27 @@ type SaleRow = Omit<SaleSummary, "customer_name" | "cashier_name"> & {
 // cashier their own sales and the owner everyone's. The customer and cashier
 // names ride along as embedded selects (a cashier can only read their own
 // profile, which is exactly the sales they can see).
-export async function fetchRecentSales(limit = 50, offset = 0): Promise<SaleSummary[]> {
-  const { data, error } = await supabase
+//
+// An optional range keeps only the sales the report counted for it: the same
+// instants, half-open [from, to), on occurred_at (the column every report
+// function filters on). Voided sales stay in the list; callers leave them out
+// of totals, as report_summary does.
+export async function fetchRecentSales(
+  limit = 50,
+  offset = 0,
+  range?: { from: Date; to: Date } | null
+): Promise<SaleSummary[]> {
+  let query = supabase
     .from("sales")
     .select(
       "id, created_at, occurred_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason, customers(name), profiles!sales_cashier_id_fkey(full_name)"
-    )
+    );
+  if (range) {
+    query = query
+      .gte("occurred_at", range.from.toISOString())
+      .lt("occurred_at", range.to.toISOString());
+  }
+  const { data, error } = await query
     .order("occurred_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, offset + limit - 1);
