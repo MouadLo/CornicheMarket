@@ -1113,6 +1113,15 @@ const en: Translations = {
     allowCamera: "Allow camera",
     pointCamera: "Point the camera at the barcode",
     cancel: "Cancel",
+    tryAgain: "Try again",
+    close: "Close",
+    webDenied:
+      "The camera is blocked. Allow it in your browser settings (the icon next to the address, or Site settings), then tap Try again.",
+    webNotFound: "No camera was found on this device.",
+    webInUse: "The camera is being used by another app. Close it, then tap Try again.",
+    webInsecure:
+      "The camera only works on a secure page (HTTPS). Open the app using its https:// address.",
+    webGeneric: "The camera could not start. Tap Try again.",
   },
   priceChart: {
     empty: "No deliveries recorded for this product yet.",
