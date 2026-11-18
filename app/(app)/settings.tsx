@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { useSignOut } from "@/src/lib/auth/useSignOut";
+import { confirm } from "@/src/lib/dialog/store";
 import { supabase } from "@/src/lib/supabase/client";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
 import {
@@ -66,9 +67,13 @@ export default function Settings() {
         <Text style={styles.sectionLabel}>{t("settings.account")}</Text>
         <Text style={styles.value}>{session?.user.email}</Text>
         <Text style={styles.value}>
-          {profile?.full_name} · {profile?.role}
+          {profile?.full_name} ·{" "}
+          {profile?.role === "owner"
+            ? t("shell.roleOwner")
+            : profile?.role === "cashier"
+              ? t("shell.roleCashier")
+              : profile?.role}
         </Text>
-        <BigButton label={t("settings.signOut")} variant="danger" onPress={signOut} />
       </View>
 
       <View style={styles.section}>
@@ -114,6 +119,10 @@ export default function Settings() {
           <InviteCashierForm />
         </View>
       )}
+
+      <View style={styles.section}>
+        <BigButton label={t("settings.signOut")} variant="secondary" onPress={signOut} />
+      </View>
     </ScrollView>
   );
 }
@@ -132,6 +141,15 @@ function StoreTimezonePicker() {
 
   const handleSelect = async (tz: string) => {
     const previous = current;
+    if (tz === previous) return;
+    // It moves the day boundaries of every report and of day close: ask first.
+    const ok = await confirm({
+      title: t("settings.timezoneConfirmTitle"),
+      message: t("settings.timezoneConfirmMessage", { tz }),
+      confirmLabel: t("settings.timezoneConfirmAction"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
     setCurrent(tz);
     setSaving(true);
     setError(null);

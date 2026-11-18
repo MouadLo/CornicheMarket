@@ -4,6 +4,7 @@ import { ActivityIndicator, Text } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
+import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import {
   fetchCategories,
@@ -18,6 +19,13 @@ export default function EditProduct() {
   const { profile } = useAuth();
   const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
+  const guardTexts = {
+    title: t("products.formUnsavedTitle"),
+    message: t("products.formUnsavedMessage"),
+    leave: t("products.formUnsavedLeave"),
+    stay: t("products.formUnsavedStay"),
+  };
+  const setDirty = useUnsavedGuard(guardTexts);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
@@ -48,6 +56,7 @@ export default function EditProduct() {
 
   return (
     <ProductForm
+      onDirtyChange={setDirty}
       categories={categories}
       initial={product}
       submitLabel={t("products.formSave")}
