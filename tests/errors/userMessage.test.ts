@@ -54,6 +54,14 @@ describe("errorKey", () => {
     ["Only an owner can close the day", ERROR_KEYS.permission],
     ["Reports are owner only", ERROR_KEYS.permission],
     ['new row violates row-level security policy for table "products"', ERROR_KEYS.permission],
+    ["Account deactivated", ERROR_KEYS.accountDeactivated],
+    ["User is banned", ERROR_KEYS.accountDeactivated],
+    ["ban_failed", ERROR_KEYS.staffPartial],
+    ["unblock_failed", ERROR_KEYS.staffPartial],
+    ["You cannot deactivate your own account", ERROR_KEYS.staffProtected],
+    ["An owner account cannot be deactivated", ERROR_KEYS.staffProtected],
+    ["already_accepted", ERROR_KEYS.inviteAccepted],
+    ["Staff member not found", ERROR_KEYS.notFound],
     ["The Divers item cannot be deleted", ERROR_KEYS.diversItem],
     ["Sale not found", ERROR_KEYS.notFound],
     ["Unknown supplier", ERROR_KEYS.notFound],
@@ -75,6 +83,7 @@ describe("errorKey", () => {
     ["x", "CM413", ERROR_KEYS.alreadyRecorded],
     ["x", "CM414", ERROR_KEYS.invalidEntry],
     ["x", "PGRST301", ERROR_KEYS.sessionExpired],
+    ["x", "PT403", ERROR_KEYS.accountDeactivated],
   ])("code %s/%s -> %s", (message, code, key) => {
     expect(errorKey(withCode(message, code))).toBe(key);
   });

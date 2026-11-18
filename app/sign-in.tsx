@@ -17,6 +17,7 @@ import { Icon } from "@/src/components/ui/Icon";
 import { Field } from "@/src/components/ui/Field";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { isDeactivatedError } from "@/src/lib/auth/deactivated";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, touch } from "@/src/theme/tokens";
 
@@ -55,9 +56,11 @@ export default function SignIn() {
     // generic one rather than showing raw English/technical text.
     if (signInError) {
       setError(
-        /invalid login credentials/i.test(signInError)
-          ? t("auth.invalidCredentials")
-          : t("auth.signInError")
+        isDeactivatedError(signInError)
+          ? t("auth.accountDeactivated")
+          : /invalid login credentials/i.test(signInError)
+            ? t("auth.invalidCredentials")
+            : t("auth.signInError")
       );
     }
   };

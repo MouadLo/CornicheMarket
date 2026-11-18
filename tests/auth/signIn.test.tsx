@@ -66,6 +66,23 @@ describe("sign-in", () => {
     expect(texts).not.toContain("Invalid login credentials");
   });
 
+  it("says the account was deactivated, not 'invalid credentials' and not raw text", async () => {
+    for (const raw of ["Account deactivated", "User is banned"]) {
+      mockSignIn.mockResolvedValue({ error: raw });
+      fillCredentials("amina@corniche.local", "pw");
+      await act(async () => {
+        tree.root
+          .findAllByProps({ accessibilityLabel: "auth.password" })[0]
+          .props.onSubmitEditing();
+      });
+      const { Text } = jest.requireActual("react-native");
+      const texts = tree.root.findAllByType(Text).map((n) => n.props.children);
+      expect(texts).toContain("auth.accountDeactivated");
+      expect(texts).not.toContain("auth.invalidCredentials");
+      expect(texts).not.toContain(raw);
+    }
+  });
+
   it("falls back to a generic translated message for any other failure", async () => {
     mockSignIn.mockResolvedValue({ error: "TypeError: Failed to fetch" });
     fillCredentials("owner@corniche.local", "owner123");
