@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +17,11 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
   const { t } = useTranslation();
   // The camera fires continuously while a code is in frame; one scan is enough.
   const handled = useRef(false);
+  // The parent usually closes this after a scan without going through close():
+  // every opening must be able to read a code again.
+  useEffect(() => {
+    if (visible) handled.current = false;
+  }, [visible]);
 
   const handleScan = (barcode: string) => {
     if (handled.current) return;

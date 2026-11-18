@@ -89,6 +89,8 @@ export function CameraBarcodeView({ onBarcode, onClose, children }: CameraBarcod
         };
         tick();
       } catch (e) {
+        // The stream may already be live if only the decoder failed to load.
+        controller.stop();
         if (!dead) setError(classifyCameraError(e, env));
       }
     };

@@ -1,9 +1,4 @@
-import {
-  confirmRead,
-  createScanFilter,
-  LEAVE_FRAME_MS,
-  passFrameGate,
-} from "../../src/lib/scanner/webScanRules";
+import { confirmRead, createScanFilter, LEAVE_FRAME_MS } from "../../src/lib/scanner/webScanRules";
 import { shouldAcceptScan } from "../../src/lib/sales/scanRules";
 
 const CODE = "6111234567890";
@@ -21,24 +16,6 @@ describe("confirmRead (two consecutive reads)", () => {
   });
   it("a decode that finds nothing resets the run", () => {
     expect(confirmRead(CODE, null)).toEqual({ previous: null, confirmed: false });
-  });
-});
-
-describe("passFrameGate (leave the frame before the same code again)", () => {
-  it("accepts the first sighting", () => {
-    expect(passFrameGate(null, CODE, 0).accept).toBe(true);
-  });
-  it("refuses the same code while it stays in view", () => {
-    const first = passFrameGate(null, CODE, 0);
-    expect(passFrameGate(first.gate, CODE, 200).accept).toBe(false);
-  });
-  it("accepts it again once it was unseen for the leave time", () => {
-    const first = passFrameGate(null, CODE, 0);
-    expect(passFrameGate(first.gate, CODE, LEAVE_FRAME_MS).accept).toBe(true);
-  });
-  it("a different code is accepted at once", () => {
-    const first = passFrameGate(null, CODE, 0);
-    expect(passFrameGate(first.gate, OTHER, 10).accept).toBe(true);
   });
 });
 
@@ -62,7 +39,7 @@ describe("createScanFilter", () => {
 
   it("two identical products, one moved out and the next brought in, add two", () => {
     const filter = createScanFilter();
-    const out = feed(filter, [CODE, CODE, ...Array(6).fill(null), CODE, CODE]); // 6 empty = 900 ms
+    const out = feed(filter, [CODE, CODE, ...Array(11).fill(null), CODE, CODE]); // 11 empty = 1650 ms
     expect(out.filter(Boolean)).toEqual([CODE, CODE]);
   });
 
@@ -70,6 +47,24 @@ describe("createScanFilter", () => {
     const filter = createScanFilter();
     const out = feed(filter, [CODE, CODE, null, null, CODE, CODE, CODE]);
     expect(out.filter(Boolean)).toEqual([CODE]);
+  });
+
+  it("a held product read only every other frame is still accepted once", () => {
+    const flaky = Array.from({ length: 60 }, (_, i) => (i < 2 || i % 2 === 0 ? CODE : null));
+    expect(feed(createScanFilter(), flaky).filter(Boolean)).toEqual([CODE]);
+  });
+
+  it("two barcodes in view do not re-add each other", () => {
+    const both = Array.from({ length: 60 }, (_, i) => (Math.floor(i / 2) % 2 === 0 ? CODE : OTHER));
+    expect(feed(createScanFilter(), both).filter(Boolean)).toEqual([CODE, OTHER]);
+  });
+
+  it("the leave time is measured from the last sighting", () => {
+    const filter = createScanFilter();
+    filter.push(CODE, 0);
+    expect(filter.push(CODE, 150)).toBe(CODE);
+    filter.push(CODE, 150 + LEAVE_FRAME_MS - 1);
+    expect(filter.push(CODE, 150 + 2 * LEAVE_FRAME_MS - 2)).toBeNull();
   });
 
   it("is independent of shouldAcceptScan, which is left as it was", () => {
