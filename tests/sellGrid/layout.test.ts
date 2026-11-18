@@ -298,3 +298,45 @@ describe("resolveGrid with sub-categories", () => {
     expect(grid[0].tiles.map((t) => t.product.name)).toEqual(["Sidi Ali", "Coca"]);
   });
 });
+
+describe("resolveGrid with colour-only rows (O7)", () => {
+  const products = [
+    product("a", "Abricot", "c1"),
+    product("b", "Banane", "c1"),
+    product("z", "Zeste", "c1"),
+  ];
+  const resolve = (tiles: GridTile[]) =>
+    resolveGrid({
+      tabs: [tab("t1", "category", "c1", 1)],
+      tiles,
+      products,
+      categories: [{ id: "c1", name: "Fruits" }],
+      favoritesLabel: "Favoris",
+    })[0].tiles;
+
+  it("a colour-only row keeps the automatic order and shows its colour", () => {
+    const tiles = resolve([tile("t1", "z", -1, { color: "red" })]);
+    expect(tiles.map((t) => t.product.id)).toEqual(["a", "b", "z"]);
+    expect(tiles[2].color).toBe("red");
+  });
+
+  it("a placed row still goes first, and pinned rows before them", () => {
+    const tiles = resolve([
+      tile("t1", "z", -1, { color: "red" }),
+      tile("t1", "b", 0),
+      tile("t1", "a", 5, { pinned: true }),
+    ]);
+    expect(tiles.map((t) => t.product.id)).toEqual(["a", "b", "z"]);
+  });
+
+  it("a colour-only row for a Favorites pick keeps the colour", () => {
+    const grid = resolveGrid({
+      tabs: [tab("fav", "favorites", null, 0, { auto_fill: false })],
+      tiles: [tile("fav", "a", 0, { color: "teal" })],
+      products,
+      categories: [],
+      favoritesLabel: "Favoris",
+    });
+    expect(grid[0].tiles[0].color).toBe("teal");
+  });
+});
