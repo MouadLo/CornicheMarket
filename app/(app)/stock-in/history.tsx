@@ -92,6 +92,7 @@ export default function PurchaseHistory() {
             const voided = purchase.voided_at !== null;
             return (
               <Pressable
+                accessibilityRole="button"
                 key={purchase.id}
                 style={[styles.row, voided && styles.rowVoided]}
                 onPress={() => router.push(`/(app)/stock-in/delivery/${purchase.id}` as never)}
@@ -182,7 +183,12 @@ function TabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={[styles.tab, active && styles.tabActive]}
+      onPress={onPress}
+    >
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </Pressable>
   );

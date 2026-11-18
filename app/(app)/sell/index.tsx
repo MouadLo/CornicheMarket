@@ -458,11 +458,19 @@ export default function SellScreen() {
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <View style={styles.headerLinks}>
-          <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/history")}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.headerLink}
+            onPress={() => router.push("/(app)/sell/history")}
+          >
             <Icon name="receipt" size={20} color="#1d7a46" />
             <Text style={styles.link}>{t("sell.history")}</Text>
           </Pressable>
-          <Pressable style={styles.headerLink} onPress={() => router.push("/(app)/sell/day")}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.headerLink}
+            onPress={() => router.push("/(app)/sell/day")}
+          >
             <Icon name="calendar" size={20} color="#1d7a46" />
             <Text style={styles.link}>{t("day.link")}</Text>
           </Pressable>
@@ -473,13 +481,18 @@ export default function SellScreen() {
         <TextInput
           style={[styles.search, styles.flex]}
           placeholder={t("sell.searchPlaceholder")}
+          accessibilityLabel={t("sell.searchPlaceholder")}
           value={search}
           onChangeText={setSearch}
           autoCapitalize="none"
           autoCorrect={false}
         />
         {Platform.OS !== "web" && (
-          <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.scanButton}
+            onPress={() => setScannerOpen(true)}
+          >
             <Text style={styles.scanButtonText}>{t("sell.scan")}</Text>
           </Pressable>
         )}
@@ -499,7 +512,12 @@ export default function SellScreen() {
       ) : null}
 
       {shownResults.map((product) => (
-        <Pressable key={product.id} style={styles.result} onPress={() => addProduct(product)}>
+        <Pressable
+          accessibilityRole="button"
+          key={product.id}
+          style={styles.result}
+          onPress={() => addProduct(product)}
+        >
           <Text style={styles.resultName}>{isolateBidi(product.name)}</Text>
           <Text style={styles.resultPrice}>{formatMAD(product.selling_price_cents)}</Text>
         </Pressable>
@@ -620,6 +638,7 @@ export default function SellScreen() {
                 onChangeText={setSaleDiscount}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
+                accessibilityLabel={t("sell.saleDiscount")}
                 autoFocus={discountOpen && saleDiscount.trim() === ""}
               />
             </View>

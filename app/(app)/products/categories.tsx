@@ -319,6 +319,7 @@ export default function CategoriesScreen() {
                       style={styles.input}
                       value={draft}
                       onChangeText={setDraft}
+                      accessibilityLabel={t("products.catRename")}
                       maxLength={MAX_CATEGORY_NAME + 10}
                       autoFocus
                       onSubmitEditing={() => handleRename(category)}
@@ -370,6 +371,7 @@ export default function CategoriesScreen() {
                         value={draft}
                         onChangeText={setDraft}
                         placeholder={t("products.catSubName")}
+                        accessibilityLabel={t("products.catSubName")}
                         maxLength={MAX_CATEGORY_NAME + 10}
                         onSubmitEditing={() => handleAddSubTyped(category)}
                       />
@@ -420,6 +422,7 @@ export default function CategoriesScreen() {
                 {busy && <ActivityIndicator />}
                 {mode !== null && (
                   <Pressable
+                    accessibilityRole="button"
                     onPress={() => {
                       setMode(null);
                       setNote(null);

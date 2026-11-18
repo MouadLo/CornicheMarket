@@ -82,13 +82,18 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
         <TextInput
           style={[styles.input, styles.flex]}
           placeholder={t("stockIn.searchProduct")}
+          accessibilityLabel={t("stockIn.searchProduct")}
           value={term}
           onChangeText={setTerm}
           autoCapitalize="none"
           autoCorrect={false}
         />
         {Platform.OS !== "web" && (
-          <Pressable style={styles.scanButton} onPress={() => setScannerOpen(true)}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.scanButton}
+            onPress={() => setScannerOpen(true)}
+          >
             <Text style={styles.scanButtonText}>{t("productPicker.scan")}</Text>
           </Pressable>
         )}
@@ -100,6 +105,7 @@ export function ProductSearchPicker({ onPick, excludeIds }: Props) {
         const alreadyAdded = excludeIds.includes(product.id);
         return (
           <Pressable
+            accessibilityRole="button"
             key={product.id}
             style={[styles.result, { direction: dir }, alreadyAdded && styles.resultDisabled]}
             disabled={alreadyAdded}

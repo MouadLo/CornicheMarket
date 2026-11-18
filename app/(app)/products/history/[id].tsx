@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: 4,
   },
-  statLabel: { fontSize: 12, color: "#666", textTransform: "uppercase" },
+  statLabel: { fontSize: 13, color: "#666", textTransform: "uppercase" },
   statValue: { fontSize: 18, fontWeight: "700" },
   statNegative: { color: "#b3261e" },
   sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase" },

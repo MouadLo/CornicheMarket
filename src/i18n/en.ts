@@ -232,6 +232,7 @@ const en: Translations = {
     loadError: "Could not load the day.",
     todayClosed: "The day is closed: no sale can be recorded. Ask the owner to reopen it.",
     closeError: "Could not close the day.",
+    reopenError: "Could not reopen the day.",
   },
   sell: {
     basketItems: "{{count}} item(s)",

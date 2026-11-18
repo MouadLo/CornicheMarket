@@ -45,6 +45,7 @@ export function ConfirmDialog({ request }: { request: ConfirmRequest }) {
     >
       {/* A destructive dialog is only closed by one of its two buttons. */}
       <Pressable
+        accessibilityRole="button"
         testID="dialog-scrim"
         style={styles.scrim}
         onPress={danger ? undefined : () => answer(false)}

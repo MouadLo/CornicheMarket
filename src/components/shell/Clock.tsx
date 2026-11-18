@@ -38,5 +38,5 @@ export function Clock({ showDate = true }: { showDate?: boolean }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: "flex-end", paddingHorizontal: 6 },
   time: { fontSize: 20, fontWeight: "600", color: "#ffffff", lineHeight: 22 },
-  date: { fontSize: 12, color: "#b9d3db" },
+  date: { fontSize: 13, color: "#b9d3db" },
 });

@@ -72,6 +72,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.divider,
   },
   item: { flex: 1, minHeight: 64, alignItems: "center", justifyContent: "center", gap: 2 },
-  label: { fontSize: 12, fontWeight: "600", color: colors.ink600 },
+  label: { fontSize: 13, fontWeight: "600", color: colors.ink600 },
   labelOn: { color: colors.brand800 },
 });

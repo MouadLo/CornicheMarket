@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   sheetContent: { padding: 20, gap: 10 },
   title: { fontSize: 18, fontWeight: "700", textAlign: "center" },
-  price: { fontSize: 14, color: colors.ink600, textAlign: "center" },
+  price: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   display: { flexDirection: "row", justifyContent: "center", alignItems: "baseline", gap: 8 },
   entry: { fontSize: 44, fontWeight: "800" },
   unit: { fontSize: 20, fontWeight: "600", color: colors.ink600 },

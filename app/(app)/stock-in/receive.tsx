@@ -207,12 +207,14 @@ export default function ReceiveDeliveryScreen() {
           <TextInput
             style={styles.input}
             placeholder={t("stockIn.supplierName")}
+            accessibilityLabel={t("stockIn.supplierName")}
             value={newSupplierName}
             onChangeText={setNewSupplierName}
           />
           <TextInput
             style={styles.input}
             placeholder={t("stockIn.supplierPhone")}
+            accessibilityLabel={t("stockIn.supplierPhone")}
             value={newSupplierPhone}
             onChangeText={setNewSupplierPhone}
             keyboardType="phone-pad"
@@ -254,6 +256,7 @@ export default function ReceiveDeliveryScreen() {
           <TextInput
             style={styles.input}
             placeholder={t("stockIn.notesPlaceholder")}
+            accessibilityLabel={t("stockIn.notesPlaceholder")}
             value={notes}
             onChangeText={setNotes}
           />
@@ -306,7 +309,12 @@ function Chip({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: selected }}
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={onPress}
+    >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );

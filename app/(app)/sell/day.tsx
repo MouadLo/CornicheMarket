@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { Banner } from "@/src/components/ui/Banner";
 import { Card } from "@/src/components/ui/Card";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { LoadError } from "@/src/components/ui/LoadError";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import {
@@ -22,6 +24,7 @@ import {
   sumCashiers,
   type CashierDay,
 } from "@/src/lib/day/math";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { closeDay, fetchDaySummary, reopenDay, type DaySummary } from "@/src/lib/day/queries";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import { Text } from "@/src/theme/Text";
@@ -38,7 +41,13 @@ export default function DayScreen() {
   const [day, setDay] = useState<string | null>(null);
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Translation keys, never the server's text. A failed load replaces the
+  // figures (it must not look like a day with no sales); a failed close or
+  // reopen shows beside its button.
+  const [loadFailure, setLoadFailure] = useState<{ key: string; target: string | null } | null>(
+    null
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [opening, setOpening] = useState("");
@@ -46,24 +55,22 @@ export default function DayScreen() {
   const [leave, setLeave] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
-  const load = useCallback(
-    (target: string | null) => {
-      setLoading(true);
-      setError(null);
-      fetchDaySummary(target)
-        .then((next) => {
-          setSummary(next);
-          setDay(next.day);
-          setOpening(centsToDisplay(next.suggested_float_cents));
-          setCounted("");
-          setLeave(null);
-          setNote("");
-        })
-        .catch((e) => setError(e instanceof Error ? e.message : t("day.loadError")))
-        .finally(() => setLoading(false));
-    },
-    [t]
-  );
+  const load = useCallback((target: string | null) => {
+    setLoading(true);
+    setLoadFailure(null);
+    setActionError(null);
+    fetchDaySummary(target)
+      .then((next) => {
+        setSummary(next);
+        setDay(next.day);
+        setOpening(centsToDisplay(next.suggested_float_cents));
+        setCounted("");
+        setLeave(null);
+        setNote("");
+      })
+      .catch((e) => setLoadFailure({ key: errorKey(e), target }))
+      .finally(() => setLoading(false));
+  }, []);
 
   // The first load asks for the store's own "today": the server answers with
   // it, whatever time zone this device is set to.
@@ -98,7 +105,7 @@ export default function DayScreen() {
     );
     if (!confirmed) return;
     setSaving(true);
-    setError(null);
+    setActionError(null);
     try {
       await closeDay({
         day,
@@ -109,7 +116,7 @@ export default function DayScreen() {
       });
       load(day);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("day.closeError"));
+      setActionError(errorKeyOr(e, "day.closeError"));
     } finally {
       setSaving(false);
     }
@@ -125,12 +132,12 @@ export default function DayScreen() {
     );
     if (!confirmed) return;
     setSaving(true);
-    setError(null);
+    setActionError(null);
     try {
       await reopenDay(day);
       load(day);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("day.closeError"));
+      setActionError(errorKeyOr(e, "day.reopenError"));
     } finally {
       setSaving(false);
     }
@@ -142,6 +149,7 @@ export default function DayScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.dayBar}>
         <Pressable
+          accessibilityRole="button"
           style={styles.dayButton}
           accessibilityLabel={t("day.previous")}
           onPress={() => day && load(shiftDay(day, -1))}
@@ -157,6 +165,7 @@ export default function DayScreen() {
           )}
         </View>
         <Pressable
+          accessibilityRole="button"
           style={[styles.dayButton, isToday && styles.dayButtonOff]}
           accessibilityLabel={t("day.next")}
           disabled={isToday}
@@ -167,9 +176,15 @@ export default function DayScreen() {
       </View>
 
       {loading && <ActivityIndicator />}
-      {error && <Text style={styles.error}>{error}</Text>}
+      {loadFailure && !loading && (
+        <LoadError
+          title={t("day.loadError")}
+          reasonKey={loadFailure.key}
+          onRetry={() => load(loadFailure.target)}
+        />
+      )}
 
-      {summary && !loading && (
+      {summary && !loading && !loadFailure && (
         <>
           {rows.length === 0 && <Text style={styles.empty}>{t("day.noActivity")}</Text>}
 
@@ -208,6 +223,7 @@ export default function DayScreen() {
                 value={formatMAD(summary.close.leave_in_drawer_cents)}
               />
               {summary.close.note ? <Text style={styles.meta}>{summary.close.note}</Text> : null}
+              {actionError ? <InlineError reasonKey={actionError} /> : null}
               <BigButton
                 label={t("day.reopen")}
                 variant="secondary"
@@ -237,6 +253,7 @@ export default function DayScreen() {
               {(openingCents === null || (counted.trim() !== "" && countedCents === null)) && (
                 <Text style={styles.error}>{t("day.amountInvalid")}</Text>
               )}
+              {actionError ? <InlineError reasonKey={actionError} /> : null}
               <BigButton
                 label={t("day.closeButton")}
                 variant="primary"
@@ -316,6 +333,7 @@ function Field({
         onChangeText={onChangeText}
         keyboardType={text ? "default" : "decimal-pad"}
         placeholder={text ? "" : "0.00"}
+        accessibilityLabel={label}
       />
     </View>
   );
@@ -344,7 +362,7 @@ const styles = StyleSheet.create({
   lineLabel: { fontSize: 15, color: colors.ink700, flexShrink: 1 },
   lineValue: { fontSize: 15, fontWeight: "600" },
   strong: { fontWeight: "800", color: colors.ink900 },
-  meta: { fontSize: 13, color: colors.ink600 },
+  meta: { fontSize: 15, color: colors.ink600 },
   field: { gap: 4, marginTop: 8 },
   input: {
     minHeight: 48,

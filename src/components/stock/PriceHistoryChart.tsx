@@ -70,7 +70,7 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
 const styles = StyleSheet.create({
   wrapper: { gap: 8 },
   scaleRow: { flexDirection: "row", justifyContent: "space-between" },
-  scaleText: { fontSize: 12, color: colors.ink600 },
+  scaleText: { fontSize: 13, color: colors.ink600 },
   chart: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -79,10 +79,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   barColumn: { alignItems: "center", gap: 4, flex: 1, maxWidth: 70 },
-  barValue: { fontSize: 11, color: colors.ink700 },
+  barValue: { fontSize: 13, color: colors.ink700 },
   bar: { width: "100%", minWidth: 18, borderRadius: 6, backgroundColor: colors.brand700 },
   barUp: { backgroundColor: colors.danger600 },
   barDown: { backgroundColor: colors.success600 },
-  barLabel: { fontSize: 11, color: colors.ink600 },
+  barLabel: { fontSize: 13, color: colors.ink600 },
   empty: { color: colors.ink600, fontSize: 15 },
 });

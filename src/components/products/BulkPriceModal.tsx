@@ -134,6 +134,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
             value={percent}
             onChangeText={setPercent}
             placeholder={t("products.bulkPlaceholder")}
+            accessibilityLabel={t("products.bulkPlaceholder")}
             keyboardType="numbers-and-punctuation"
           />
 
@@ -174,7 +175,12 @@ function Chip({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: selected }}
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={onPress}
+    >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );

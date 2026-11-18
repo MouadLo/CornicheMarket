@@ -72,7 +72,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
         <Text style={styles.name} numberOfLines={1}>
           {product.name}
         </Text>
-        <Pressable onPress={onRemove} hitSlop={8}>
+        <Pressable accessibilityRole="button" onPress={onRemove} style={styles.touchTarget}>
           <Text style={styles.remove}>{t("stockLine.remove")}</Text>
         </Pressable>
       </View>
@@ -93,6 +93,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
             onChangeText={(value) => onChange({ ...line, quantity: value })}
             keyboardType="decimal-pad"
             placeholder="0"
+            accessibilityLabel={t("stockLine.quantity")}
           />
         </View>
 
@@ -104,6 +105,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
             onChangeText={(value) => onChange({ ...line, unitCost: value })}
             keyboardType="decimal-pad"
             placeholder="0.00"
+            accessibilityLabel={t("stockLine.buyingPrice")}
           />
         </View>
       </View>
@@ -148,6 +150,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
                 </Text>
                 {line.newSellingPriceCents === null ? (
                   <Pressable
+                    accessibilityRole="button"
                     style={styles.applyButton}
                     onPress={() => onChange({ ...line, newSellingPriceCents: suggested })}
                   >
@@ -157,6 +160,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
                   </Pressable>
                 ) : (
                   <Pressable
+                    accessibilityRole="button"
                     style={styles.undoButton}
                     onPress={() => onChange({ ...line, newSellingPriceCents: null })}
                   >
@@ -188,6 +192,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   name: { fontSize: 16, fontWeight: "700", flex: 1 },
+  touchTarget: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   remove: { color: colors.danger600, fontSize: 14, fontWeight: "600" },
   meta: { fontSize: 13, color: colors.ink600 },
   inputs: { flexDirection: "row", gap: 12 },

@@ -349,6 +349,7 @@ export default function SalesHistory() {
             </View>
           ) : (
             <Pressable
+              accessibilityRole="button"
               style={styles.voidButton}
               onPress={() => {
                 setReason(null);
@@ -486,7 +487,7 @@ const styles = StyleSheet.create({
   dayTitle: { flex: 1, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
   dayTotal: { fontSize: 15, fontWeight: "700", color: "#1d7a46" },
   rowTap: { minHeight: 48, justifyContent: "center" },
-  preview: { fontSize: 13, color: "#444" },
+  preview: { fontSize: 15, color: "#444" },
   lines: { gap: 8, borderTopWidth: 1, borderTopColor: "#eee", paddingTop: 10 },
   line: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   lineName: { fontSize: 14, fontWeight: "600" },
@@ -496,7 +497,7 @@ const styles = StyleSheet.create({
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   rowMain: { flex: 1, gap: 3 },
   time: { fontSize: 15, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#666" },
+  meta: { fontSize: 15, color: "#666" },
   total: { fontSize: 17, fontWeight: "700" },
   totalVoided: { textDecorationLine: "line-through", color: "#999" },
   voidButton: {
@@ -511,6 +512,6 @@ const styles = StyleSheet.create({
   voidBox: { gap: 10 },
   voidTitle: { fontSize: 15, fontWeight: "700", color: "#333" },
   empty: { textAlign: "center", color: "#666", marginTop: 32 },
-  refusal: { fontSize: 14, color: "#666" },
+  refusal: { fontSize: 15, color: "#666" },
   error: { color: "#b3261e" },
 });

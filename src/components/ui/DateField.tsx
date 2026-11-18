@@ -113,6 +113,7 @@ export function DateField({ value, onChange, label, today, min, max, clearable, 
       <Modal transparent visible={open} animationType="fade" onRequestClose={close}>
         <View style={styles.center}>
           <Pressable
+            accessibilityRole="button"
             style={StyleSheet.absoluteFill}
             onPress={close}
             accessibilityLabel={t("common.close")}
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
   mirror: { transform: [{ scaleX: -1 }] },
   weekRow: { flexDirection: "row" },
   weekCell: { flex: 1, height: 32, alignItems: "center", justifyContent: "center" },
-  weekText: { fontSize: 12, fontWeight: "600", color: colors.ink600 },
+  weekText: { fontSize: 13, fontWeight: "600", color: colors.ink600 },
   dayCell: { flex: 1, height: CELL },
   dayButton: { alignItems: "center", justifyContent: "center", borderRadius: radius.control },
   dayToday: { borderWidth: 1, borderColor: colors.brand700 },
