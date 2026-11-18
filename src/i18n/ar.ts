@@ -23,6 +23,7 @@ const ar: Translations = {
     apply: "تطبيق",
   },
   states: {
+    refreshFailed: "تعذر التحديث. قد يكون ما تراه قديماً.",
     loadErrorTitle: "تعذر تحميل {{what}}",
     loadErrorHint: "تحقق من الاتصال ثم حاول مرة أخرى.",
     offlineTitle: "غير متصل",

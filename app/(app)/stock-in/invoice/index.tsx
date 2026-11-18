@@ -4,6 +4,9 @@ import { ActivityIndicator, FlatList, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { listInvoiceDrafts, type InvoiceSummary } from "@/src/lib/stock/invoices";
 import { isolateBidi } from "@/src/lib/text/bidi";
@@ -22,21 +25,22 @@ export default function InvoiceList() {
   const [rows, setRows] = useState<InvoiceSummary[]>([]);
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  // A translation key (see errorKey), never the server's text.
+  const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
   const owner = profile?.role === "owner";
 
   const load = useCallback(async (offset: number) => {
     const version = ++request.current;
     setLoading(true);
-    setError(false);
+    setError(null);
     try {
       const page = await listInvoiceDrafts(offset);
       if (version !== request.current) return;
       setRows((current) => (offset ? [...current, ...page] : page));
       setMore(page.length === 25);
-    } catch {
-      if (version === request.current) setError(true);
+    } catch (failure) {
+      if (version === request.current) setError(errorKey(failure));
     } finally {
       if (version === request.current) setLoading(false);
     }
@@ -63,12 +67,24 @@ export default function InvoiceList() {
       ListEmptyComponent={
         loading ? (
           <ActivityIndicator />
+        ) : error ? (
+          <LoadError title={t("invoices.loadError")} reasonKey={error} onRetry={() => load(0)} />
         ) : (
-          <Text>{t(error ? "invoices.loadError" : "invoices.noDrafts")}</Text>
+          <EmptyState
+            icon="receipt"
+            title={t("invoices.noDrafts")}
+            message={t("invoices.noDraftsHint")}
+            action={
+              <BigButton
+                label={t("invoices.scan")}
+                onPress={() => router.push("/(app)/stock-in/invoice/capture")}
+              />
+            }
+          />
         )
       }
       ListFooterComponent={
-        more || error ? (
+        more || (error && rows.length > 0) ? (
           <BigButton
             variant="secondary"
             disabled={loading}

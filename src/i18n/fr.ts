@@ -21,6 +21,7 @@ const fr = {
     apply: "Appliquer",
   },
   states: {
+    refreshFailed: "Actualisation impossible. Ce que vous voyez est peut-être périmé.",
     loadErrorTitle: "Impossible de charger {{what}}",
     loadErrorHint: "Vérifiez la connexion, puis réessayez.",
     offlineTitle: "Hors ligne",

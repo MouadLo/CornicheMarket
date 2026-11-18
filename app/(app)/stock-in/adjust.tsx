@@ -3,6 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Banner } from "@/src/components/ui/Banner";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
@@ -28,13 +31,16 @@ export default function AdjustScreen() {
   const [reason, setReason] = useState<AdjustmentReason>("damaged");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  // Translation keys (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [history, setHistory] = useState<AdjustmentRecord[]>([]);
 
   const load = useCallback(() => {
+    setHistoryError(null);
     fetchRecentAdjustments(isOwner)
       .then(setHistory)
-      .catch(() => setHistory([]));
+      .catch((failure) => setHistoryError(errorKey(failure)));
   }, [isOwner]);
 
   useEffect(load, [load]);
@@ -74,7 +80,7 @@ export default function AdjustScreen() {
       setNote("");
       load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("common.error"));
+      setError(errorKeyOr(saveError, "errors.generic"));
     } finally {
       setSaving(false);
     }
@@ -137,7 +143,7 @@ export default function AdjustScreen() {
 
           {preview && <Text style={styles.preview}>{preview}</Text>}
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error ? <InlineError reasonKey={error} /> : null}
 
           <BigButton
             label={saving ? t("stockIn.adjustSaving") : t("stockIn.adjustRecord")}
@@ -148,7 +154,13 @@ export default function AdjustScreen() {
       )}
 
       <Text style={styles.sectionLabel}>{t("stockIn.adjustRecent")}</Text>
-      {history.length === 0 ? (
+      {historyError ? (
+        <Banner
+          tone="bad"
+          text={t("stockIn.adjustHistoryLoadError")}
+          action={{ label: t("common.retry"), onPress: load }}
+        />
+      ) : history.length === 0 ? (
         <Text style={styles.empty}>{t("stockIn.adjustNone")}</Text>
       ) : (
         history.map((record) => (

@@ -3,6 +3,8 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { Banner } from "@/src/components/ui/Banner";
+import { isNetworkError } from "@/src/lib/errors/userMessage";
 import { Badge } from "@/src/components/ui/Badge";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -30,6 +32,9 @@ export default function StockHomeScreen() {
   const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
   const [width, setWidth] = useState(0);
+  // Every count failed and one of them for lack of a connection: say so, since
+  // the cards would otherwise just look unremarkable.
+  const [offline, setOffline] = useState(false);
   const [counts, setCounts] = useState<Counts>({
     lowStock: UNKNOWN_BADGE,
     expiring: UNKNOWN_BADGE,
@@ -49,6 +54,11 @@ export default function StockHomeScreen() {
         fetchNegativeStockProducts().then((rows) => rows.length),
       ]).then(([lowStock, expiring, negativeStock]) => {
         if (!active) return;
+        const results = [lowStock, expiring, negativeStock];
+        setOffline(
+          results.every((result) => result.status === "rejected") &&
+            results.some((result) => result.status === "rejected" && isNetworkError(result.reason))
+        );
         setCounts({
           lowStock: badgeFromSettled(lowStock),
           expiring: badgeFromSettled(expiring),
@@ -150,6 +160,7 @@ export default function StockHomeScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t("stockIn.title")}</Text>
+      {offline ? <Banner tone="warn" icon="wifiOff" text={t("errors.countsOffline")} /> : null}
 
       <Text style={styles.sectionLabel}>{t("stockIn.home.mainTitle")}</Text>
       <View style={styles.grid} onLayout={onLayout}>

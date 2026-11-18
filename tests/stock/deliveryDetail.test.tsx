@@ -166,10 +166,12 @@ describe("voiding", () => {
 
     expect(mockConfirm).not.toHaveBeenCalled();
     expect(mockVoid).not.toHaveBeenCalled();
-    expect(textOf(tree.root)).toContain("boom");
+    // Translated, never the server's text.
+    expect(textOf(tree.root)).toContain("errors.generic");
+    expect(textOf(tree.root)).not.toContain("boom");
   });
 
-  it("reloads the delivery after voiding and shows the server's refusal if it fails", async () => {
+  it("reloads the delivery after voiding and explains the server's refusal if it fails", async () => {
     await render();
     await typeReason("typo");
     await pressVoid();
@@ -179,7 +181,8 @@ describe("voiding", () => {
     await typeReason("typo");
     mockVoid.mockRejectedValueOnce(new Error("Only the owner can void a delivery"));
     await pressVoid();
-    expect(textOf(tree.root)).toContain("Only the owner can void a delivery");
+    expect(textOf(tree.root)).toContain("errors.permission");
+    expect(textOf(tree.root)).not.toContain("Only the owner can void a delivery");
   });
 
   it("a second tap while the first void is in flight sends nothing", async () => {

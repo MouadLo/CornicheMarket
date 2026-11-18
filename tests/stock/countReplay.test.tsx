@@ -1,4 +1,5 @@
 import React from "react";
+import { allTexts } from "../sales/sellTestUtils";
 import { TextInput } from "react-native";
 import { act, create, ReactTestRenderer } from "react-test-renderer";
 import Screen from "../../app/(app)/stock-in/count";
@@ -63,6 +64,15 @@ it("mixed failure keeps only failed B retryable", async () => {
   expect(
     tree.root.findAllByType(BigButton).some((x) => x.props.label === "stockIn.countApply")
   ).toBe(true);
+});
+it("a failed line says why in plain words, never the server's text, and keeps its Retry", async () => {
+  await add("A");
+  mockApply.mockRejectedValueOnce(new Error("Failed to fetch"));
+  await apply();
+  const shown = allTexts(tree.root).join("|");
+  expect(shown).toContain("errors.network");
+  expect(shown).not.toContain("Failed to fetch");
+  expect(shown).toContain("common.retry");
 });
 it("completed counts cannot be edited", async () => {
   await add("A");

@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { errorKey } from "@/src/lib/errors/userMessage";
 import { BigButton } from "@/src/components/BigButton";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -402,7 +403,7 @@ export default function StockCountScreen() {
           } catch (error) {
             result = {
               ...line,
-              applied: { error: error instanceof Error ? error.message : t("common.error") },
+              applied: { error: t(errorKey(error)) },
             };
           }
           setLines((current) =>

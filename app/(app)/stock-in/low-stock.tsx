@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
+
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { saveTextFile } from "@/src/lib/files";
 import { BigButton } from "@/src/components/BigButton";
@@ -26,6 +30,7 @@ export default function LowStockScreen() {
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  // A translation key (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -51,12 +56,12 @@ export default function LowStockScreen() {
           };
         })
       );
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("stockIn.lowStockLoadError"));
+    } catch (failure) {
+      setError(errorKey(failure));
     } finally {
       setLoading(false);
     }
-  }, [isOwner, t]);
+  }, [isOwner]);
 
   useEffect(() => {
     load();
@@ -90,12 +95,12 @@ export default function LowStockScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
-
       <Text style={styles.intro}>{t("stockIn.lowStockIntro", { days: COVER_DAYS })}</Text>
 
-      {rows.length === 0 ? (
-        <Text style={styles.empty}>{t("stockIn.lowStockEmpty")}</Text>
+      {error ? (
+        <LoadError title={t("stockIn.lowStockLoadError")} reasonKey={error} onRetry={load} />
+      ) : rows.length === 0 ? (
+        <EmptyState icon="check" title={t("stockIn.lowStockEmpty")} />
       ) : (
         <>
           {rows.map((row) => (

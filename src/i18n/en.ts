@@ -23,6 +23,7 @@ const en: Translations = {
     apply: "Apply",
   },
   states: {
+    refreshFailed: "Could not refresh. What you see may be out of date.",
     loadErrorTitle: "Couldn't load {{what}}",
     loadErrorHint: "Check the connection, then try again.",
     offlineTitle: "Offline",
