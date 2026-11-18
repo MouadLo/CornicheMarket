@@ -11,6 +11,11 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { BigButton } from "@/src/components/BigButton";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { BulkPriceModal } from "@/src/components/products/BulkPriceModal";
 import { PRODUCT_ROW_HEIGHT, ProductRow } from "@/src/components/products/ProductRow";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -47,11 +52,17 @@ export default function ProductsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Translation keys (see errorKey): a failed read replaces the list, so it can
+  // never look like an empty catalog; a failed export sits by its buttons.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
 
   const debouncedSearch = useDebouncedValue(search, 300);
+  // "No match" and "nothing here yet" need different words and different next steps.
+  const filtered =
+    debouncedSearch.trim() !== "" || categoryId !== null || lowStockOnly || status !== "active";
 
   const filters = useMemo<ProductFilters>(
     () => ({
@@ -80,18 +91,18 @@ export default function ProductsScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const rows = await fetchProducts(filters, 0, isOwner);
       setProducts(rows);
       setPage(0);
       setHasMore(rows.length === PAGE_SIZE);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("products.loadError"));
+    } catch (failure) {
+      setLoadError(errorKey(failure));
     } finally {
       setLoading(false);
     }
-  }, [filters, isOwner, t]);
+  }, [filters, isOwner]);
 
   useEffect(() => {
     load();
@@ -115,15 +126,16 @@ export default function ProductsScreen() {
   }, [filters, hasMore, isOwner, loading, loadingMore, page]);
 
   const handleExport = async () => {
+    setExportError(null);
     setBusyMessage(t("products.preparingExport"));
     try {
       const all = await fetchAllProducts(isOwner);
       const csv = toCsv(all, categories, isOwner);
       await saveTextFile(`products-${new Date().toISOString().slice(0, 10)}.csv`, csv);
       setBusyMessage(null);
-    } catch (exportError) {
+    } catch (failure) {
       setBusyMessage(null);
-      setError(exportError instanceof Error ? exportError.message : t("products.exportFailed"));
+      setExportError(errorKeyOr(failure, "products.exportFailed"));
     }
   };
 
@@ -203,30 +215,34 @@ export default function ProductsScreen() {
         </View>
 
         {isOwner && (
-          <View style={styles.actionRow}>
-            <ActionButton
-              label={t("products.addNew")}
-              onPress={() => router.push("/(app)/products/new")}
-            />
-            <ActionButton
-              label={t("products.importCsv")}
-              onPress={() => router.push("/(app)/products/import")}
-            />
-            <ActionButton label={t("products.exportCsv")} onPress={handleExport} />
-            <ActionButton label={t("products.bulkPrice")} onPress={() => setBulkOpen(true)} />
-            <ActionButton
-              label={t("products.manageCategories")}
-              onPress={() => router.push("/(app)/products/categories")}
-            />
-          </View>
+          <>
+            <View style={styles.actionRow}>
+              <ActionButton
+                label={t("products.addNew")}
+                onPress={() => router.push("/(app)/products/new")}
+              />
+              <ActionButton
+                label={t("products.importCsv")}
+                onPress={() => router.push("/(app)/products/import")}
+              />
+              <ActionButton label={t("products.exportCsv")} onPress={handleExport} />
+              <ActionButton label={t("products.bulkPrice")} onPress={() => setBulkOpen(true)} />
+              <ActionButton
+                label={t("products.manageCategories")}
+                onPress={() => router.push("/(app)/products/categories")}
+              />
+            </View>
+            {exportError ? <InlineError reasonKey={exportError} /> : null}
+          </>
         )}
       </View>
 
       {busyMessage && <Text style={styles.busy}>{busyMessage}</Text>}
-      {error && <Text style={styles.error}>{error}</Text>}
 
       {loading ? (
         <ActivityIndicator style={styles.loader} />
+      ) : loadError ? (
+        <LoadError title={t("products.loadError")} reasonKey={loadError} onRetry={load} />
       ) : (
         <FlatList
           data={products}
@@ -245,7 +261,25 @@ export default function ProductsScreen() {
           })}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          ListEmptyComponent={<Text style={styles.empty}>{t("products.empty")}</Text>}
+          ListEmptyComponent={
+            filtered ? (
+              <EmptyState icon="search" title={t("products.empty")} />
+            ) : (
+              <EmptyState
+                icon="package"
+                title={t("products.emptyTitle")}
+                message={t(isOwner ? "products.emptyHintOwner" : "products.emptyHintCashier")}
+                action={
+                  isOwner ? (
+                    <BigButton
+                      label={t("products.emptyAddFirst")}
+                      onPress={() => router.push("/(app)/products/new")}
+                    />
+                  ) : undefined
+                }
+              />
+            )
+          }
           ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loader} /> : null}
           windowSize={10}
           removeClippedSubviews
@@ -314,7 +348,5 @@ const styles = StyleSheet.create({
   },
   actionText: { color: "#fff", fontWeight: "600", fontSize: 15 },
   loader: { marginVertical: 24 },
-  empty: { textAlign: "center", marginTop: 40, color: "#666", fontSize: 15 },
   busy: { textAlign: "center", padding: 12, color: "#1d7a46" },
-  error: { textAlign: "center", padding: 12, color: "#b3261e" },
 });

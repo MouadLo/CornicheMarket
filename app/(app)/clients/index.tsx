@@ -10,6 +10,10 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { Banner } from "@/src/components/ui/Banner";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
 import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
 import { formatMAD } from "@/src/lib/money";
 import { filterCustomers } from "@/src/lib/sales/cashEntry";
@@ -24,36 +28,54 @@ import { colors, radius, touch } from "@/src/theme/tokens";
 
 export default function CreditScreen() {
   const { t } = useTranslation();
-  const [balances, setBalances] = useState<CustomerBalance[]>([]);
+  // null = never read successfully. A failed read must never turn into an
+  // empty list ("nobody owes anything", total 0): it is its own state.
+  const [balances, setBalances] = useState<CustomerBalance[] | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A translation key (see errorKey), never the server's text.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  const load = useCallback(() => {
+    fetchCustomerBalances()
+      .then((rows) => {
+        setBalances(rows);
+        setLoadError(null);
+      })
+      .catch((failure) => setLoadError(errorKey(failure)))
+      .finally(() => setLoaded(true));
+  }, []);
 
   // Re-read on every return to this screen (a payment or sale may have changed
   // a balance in a customer's history).
-  useFocusEffect(
-    useCallback(() => {
-      fetchCustomerBalances()
-        .then((rows) => {
-          setBalances(rows);
-          setError(null);
-        })
-        .catch((loadError) =>
-          setError(loadError instanceof Error ? loadError.message : t("credit.loadError"))
-        )
-        .finally(() => setLoaded(true));
-    }, [t])
-  );
+  useFocusEffect(load);
 
-  const reload = useCallback(() => {
-    fetchCustomerBalances()
-      .then(setBalances)
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t("credit.loadError"))
-      );
-  }, [t]);
+  const retry = useCallback(() => {
+    setLoaded(false);
+    load();
+  }, [load]);
 
   if (!loaded) return <ActivityIndicator style={{ marginTop: 40 }} />;
+
+  if (balances === null) {
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <LoadError
+          title={t("credit.loadError")}
+          reasonKey={loadError ?? "errors.generic"}
+          onRetry={retry}
+        />
+      </ScrollView>
+    );
+  }
+
+  if (balances.length === 0 && !loadError) {
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <EmptyState icon="users" title={t("credit.emptyTitle")} message={t("credit.emptyHint")} />
+      </ScrollView>
+    );
+  }
 
   const open = (id: string) => router.push({ pathname: "/(app)/clients/[id]", params: { id } });
 
@@ -68,7 +90,13 @@ export default function CreditScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      {error && <Text style={styles.error}>{error}</Text>}
+      {loadError ? (
+        <Banner
+          tone="warn"
+          text={t("credit.refreshFailed")}
+          action={{ label: t("common.retry"), onPress: retry }}
+        />
+      ) : null}
 
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>{t("credit.totalOwed")}</Text>
@@ -113,7 +141,7 @@ export default function CreditScreen() {
             onRecord={(paymentId, cents) =>
               recordCustomerPayment(paymentId, balance.id, cents, "cash")
             }
-            onRecorded={reload}
+            onRecorded={load}
           />
         </View>
       ))}
@@ -195,5 +223,4 @@ const styles = StyleSheet.create({
   settledName: { flex: 1, fontSize: 15, color: colors.ink900 },
   settledValue: { fontSize: 14, color: colors.ink600 },
   empty: { textAlign: "center", color: colors.ink600, marginVertical: 20 },
-  error: { color: colors.danger600 },
 });

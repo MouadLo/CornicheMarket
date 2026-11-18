@@ -41,7 +41,12 @@ export type ParsedRow = {
   opening: { quantity: number; unit_cost_cents: number } | null;
 };
 
-export type RowError = { rowNumber: number; messages: string[] };
+// What is wrong with a row, as a translation key plus values: the screen
+// translates it, so the person reads it in their own language and still sees
+// the row number, the value and the column that failed.
+export type RowIssue = { key: string; params?: Record<string, string | number> };
+
+export type RowError = { rowNumber: number; issues: RowIssue[] };
 
 export type ValidationResult = { rows: ParsedRow[]; errors: RowError[] };
 
@@ -117,25 +122,25 @@ export function validateRows(
   rows.forEach((row, index) => {
     // +2: the header is row 1, so data starts at row 2 in the user's file.
     const rowNumber = index + 2;
-    const messages: string[] = [];
+    const issues: RowIssue[] = [];
 
     const name = cell(row, mapping.name);
-    if (!name) messages.push("Name is required");
+    if (!name) issues.push({ key: "products.importIssue.nameRequired" });
 
     const priceRaw = cell(row, mapping.selling_price);
     const sellingPriceCents = priceRaw ? parseMoneyToCents(priceRaw) : null;
     if (!priceRaw) {
-      messages.push("Selling price is required");
+      issues.push({ key: "products.importIssue.priceRequired" });
     } else if (sellingPriceCents === null) {
-      messages.push(`Selling price "${priceRaw}" is not a valid amount`);
+      issues.push({ key: "products.importIssue.priceInvalid", params: { value: priceRaw } });
     }
 
     const barcode = cell(row, mapping.barcode) || null;
     if (barcode) {
       if (context.existingBarcodes.has(barcode)) {
-        messages.push(`Barcode ${barcode} already exists`);
+        issues.push({ key: "products.importIssue.barcodeExists", params: { value: barcode } });
       } else if (barcodesInFile.has(barcode)) {
-        messages.push(`Barcode ${barcode} appears more than once in this file`);
+        issues.push({ key: "products.importIssue.barcodeInFile", params: { value: barcode } });
       }
     }
 
@@ -145,7 +150,7 @@ export function validateRows(
       if (UNITS.includes(unitRaw as ProductUnit)) {
         unit = unitRaw as ProductUnit;
       } else {
-        messages.push(`Unit "${unitRaw}" must be piece, kg or pack`);
+        issues.push({ key: "products.importIssue.unitInvalid", params: { value: unitRaw } });
       }
     }
 
@@ -153,13 +158,20 @@ export function validateRows(
     let categoryId: string | null = null;
     if (categoryRaw) {
       categoryId = categoriesByName.get(normalizeHeader(categoryRaw)) ?? null;
-      if (!categoryId) messages.push(`Unknown category "${categoryRaw}"`);
+      if (!categoryId)
+        issues.push({
+          key: "products.importIssue.categoryUnknown",
+          params: { value: categoryRaw },
+        });
     }
 
     const thresholdRaw = cell(row, mapping.low_stock_threshold);
     const threshold = thresholdRaw ? parseQuantity(thresholdRaw) : 0;
     if (thresholdRaw && threshold === null) {
-      messages.push(`Low stock threshold "${thresholdRaw}" is not a valid number`);
+      issues.push({
+        key: "products.importIssue.thresholdInvalid",
+        params: { value: thresholdRaw },
+      });
     }
 
     const costRaw = cell(row, mapping.cost);
@@ -168,17 +180,17 @@ export function validateRows(
     const quantity = quantityRaw ? parseQuantity(quantityRaw) : null;
 
     if (costRaw && costCents === null) {
-      messages.push(`Buying price "${costRaw}" is not a valid amount`);
+      issues.push({ key: "products.importIssue.costInvalid", params: { value: costRaw } });
     }
     if (quantityRaw && quantity === null) {
-      messages.push(`Opening stock "${quantityRaw}" is not a valid number`);
+      issues.push({ key: "products.importIssue.quantityInvalid", params: { value: quantityRaw } });
     }
     if (quantity !== null && quantity > 0 && costCents === null) {
-      messages.push("Opening stock needs a buying price, otherwise cost would be recorded as zero");
+      issues.push({ key: "products.importIssue.openingNeedsCost" });
     }
 
-    if (messages.length > 0) {
-      errors.push({ rowNumber, messages });
+    if (issues.length > 0) {
+      errors.push({ rowNumber, issues });
       return;
     }
 

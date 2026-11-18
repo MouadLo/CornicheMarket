@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { isolateBidi } from "@/src/lib/text/bidi";
@@ -9,6 +9,9 @@ import { Text } from "@/src/theme/Text";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
+import { Banner } from "@/src/components/ui/Banner";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { StockInLine, type LineState } from "@/src/components/stock/StockInLine";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, lineTotalCents } from "@/src/lib/money";
@@ -41,7 +44,11 @@ export default function ReceiveDeliveryScreen() {
   const [lines, setLines] = useState<LineState[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  // Translation keys (see errorKey), never the server's text: the save error
+  // sits above the save button, the supplier ones by the supplier controls.
   const [error, setError] = useState<string | null>(null);
+  const [supplierError, setSupplierError] = useState<string | null>(null);
+  const [suppliersLoadError, setSuppliersLoadError] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   // One id per delivery, kept across failed or unanswered saves so the
   // server recognises a retry instead of receiving the stock again. Cleared
@@ -58,11 +65,14 @@ export default function ReceiveDeliveryScreen() {
   }, []);
   const today = storeDayKey(new Date().toISOString(), timeZone);
 
-  useEffect(() => {
+  const loadSuppliers = useCallback(() => {
+    setSuppliersLoadError(false);
     fetchSuppliers()
       .then(setSuppliers)
-      .catch(() => setSuppliers([]));
+      .catch(() => setSuppliersLoadError(true));
   }, []);
+
+  useEffect(loadSuppliers, [loadSuppliers]);
 
   // Typed lines are unsaved work: leaving asks first. A confirmed save empties
   // the draft, which clears the flag.
@@ -99,6 +109,7 @@ export default function ReceiveDeliveryScreen() {
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) return;
+    setSupplierError(null);
     try {
       const supplier = await createSupplier(
         newSupplierName.trim(),
@@ -109,8 +120,8 @@ export default function ReceiveDeliveryScreen() {
       setAddingSupplier(false);
       setNewSupplierName("");
       setNewSupplierPhone("");
-    } catch (supplierError) {
-      setError(supplierError instanceof Error ? supplierError.message : t("common.error"));
+    } catch (failure) {
+      setSupplierError(errorKeyOr(failure, "errors.generic"));
     }
   };
 
@@ -146,10 +157,8 @@ export default function ReceiveDeliveryScreen() {
     } catch (saveError) {
       setError(
         saveError instanceof ReceiveDeliveryError && saveError.kind === "already_saved"
-          ? t("stockIn.alreadySaved")
-          : saveError instanceof Error
-            ? saveError.message
-            : t("common.error")
+          ? "stockIn.alreadySaved"
+          : errorKey(saveError)
       );
     } finally {
       savingNow.current = false;
@@ -177,6 +186,13 @@ export default function ReceiveDeliveryScreen() {
           />
         ))}
       </View>
+      {suppliersLoadError ? (
+        <Banner
+          tone="warn"
+          text={t("stockIn.suppliersLoadError")}
+          action={{ label: t("common.retry"), onPress: loadSuppliers }}
+        />
+      ) : null}
       <Pressable
         style={styles.addSupplier}
         accessibilityRole="button"
@@ -202,6 +218,7 @@ export default function ReceiveDeliveryScreen() {
             keyboardType="phone-pad"
           />
           <View style={styles.supplierButtons}>
+            {supplierError ? <InlineError reasonKey={supplierError} /> : null}
             <BigButton label={t("stockIn.saveSupplier")} onPress={handleAddSupplier} />
             <BigButton
               label={t("common.cancel")}
@@ -261,7 +278,7 @@ export default function ReceiveDeliveryScreen() {
             </View>
           )}
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error ? <InlineError reasonKey={error} /> : null}
 
           <BigButton
             label={

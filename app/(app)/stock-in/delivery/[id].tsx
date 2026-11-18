@@ -4,6 +4,10 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Banner } from "@/src/components/ui/Banner";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { findPurchaseInvoice } from "@/src/lib/stock/invoices";
@@ -27,6 +31,9 @@ export default function DeliveryDetail() {
 
   const [purchase, setPurchase] = useState<PurchaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // Translation keys (see errorKey), never the server's text: one for reading
+  // the delivery, one for the void that failed.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,14 +42,15 @@ export default function DeliveryDetail() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       setPurchase(await fetchPurchase(id));
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("stockIn.deliveryLoadError"));
+    } catch (failure) {
+      setLoadError(errorKey(failure));
     } finally {
       setLoading(false);
     }
-  }, [id, t]);
+  }, [id]);
 
   useEffect(() => {
     if (isOwner) load();
@@ -73,7 +81,15 @@ export default function DeliveryDetail() {
     );
   }
   if (loading && !purchase) return <ActivityIndicator style={{ marginTop: 40 }} />;
-  if (!purchase) return <Text style={styles.error}>{error}</Text>;
+  if (!purchase) {
+    return (
+      <LoadError
+        title={t("stockIn.deliveryLoadError")}
+        reasonKey={loadError ?? "errors.generic"}
+        onRetry={load}
+      />
+    );
+  }
 
   const voided = purchase.voidedAt !== null;
   const canVoid = reason.trim().length > 0 && !saving;
@@ -99,7 +115,7 @@ export default function DeliveryDetail() {
       setReason("");
       await load();
     } catch (voidError) {
-      setError(voidError instanceof Error ? voidError.message : t("common.error"));
+      setError(errorKeyOr(voidError, "errors.generic"));
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -108,6 +124,13 @@ export default function DeliveryDetail() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {loadError ? (
+        <Banner
+          tone="warn"
+          text={t("states.refreshFailed")}
+          action={{ label: t("common.retry"), onPress: load }}
+        />
+      ) : null}
       {invoiceLink && invoiceLink.purchaseId === id && (
         <BigButton
           variant="secondary"
@@ -177,7 +200,7 @@ export default function DeliveryDetail() {
             onChangeText={setReason}
             placeholder={t("stockIn.deliveryVoidReason")}
           />
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error ? <InlineError reasonKey={error} /> : null}
           <BigButton
             label={saving ? t("stockIn.deliveryVoiding") : t("stockIn.deliveryVoidButton")}
             variant="danger"
@@ -186,7 +209,6 @@ export default function DeliveryDetail() {
           />
         </View>
       )}
-      {voided && error && <Text style={styles.error}>{error}</Text>}
     </ScrollView>
   );
 }

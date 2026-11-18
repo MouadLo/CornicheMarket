@@ -21,12 +21,38 @@ const fr = {
     apply: "Appliquer",
   },
   states: {
+    refreshFailed: "Actualisation impossible. Ce que vous voyez est peut-être périmé.",
     loadErrorTitle: "Impossible de charger {{what}}",
     loadErrorHint: "Vérifiez la connexion, puis réessayez.",
     offlineTitle: "Hors ligne",
     offlineHint: "Les ventes sont gardées sur l'appareil et partiront au retour du réseau.",
     offlinePrices: "Hors ligne · prix du {{time}}",
     offlineNeeded: "Connexion requise pour {{action}}. Votre saisie est gardée sur l'appareil.",
+  },
+  errors: {
+    network: "Pas de connexion au serveur.",
+    tryAgainOnline: "Votre saisie est toujours là : réessayez au retour du réseau.",
+    offlineExplain:
+      "Cet écran a besoin d'une connexion. La vente continue hors ligne et les ventes partent au retour du réseau.",
+    busy: "Trop de demandes. Patientez un instant, puis réessayez.",
+    sessionExpired: "Votre session est terminée. Reconnectez-vous.",
+    emailTaken: "Cette adresse e-mail a déjà un compte.",
+    permission: "Vous n'avez pas le droit de faire cela. Demandez au propriétaire.",
+    notYours: "Cela appartient à un autre utilisateur.",
+    dayClosed: "La journée est clôturée : cela ne peut plus être modifié.",
+    duplicateBarcode: "Un autre produit a déjà ce code-barres.",
+    duplicateName: "Ce nom est déjà utilisé.",
+    duplicateInvoice: "Ce numéro de facture a déjà été saisi pour ce fournisseur.",
+    duplicate: "Cela existe déjà.",
+    alreadyRecorded: "C'est déjà enregistré. Rien n'a été fait deux fois.",
+    changedElsewhere:
+      "Cela a été modifié entre-temps. Rechargez l'écran et vérifiez avant de réessayer.",
+    notFound: "Cet élément n'existe plus.",
+    diversItem: "L'article Divers ne peut pas être modifié ainsi.",
+    invalidEntry: "Une valeur saisie n'est pas valide. Vérifiez puis réessayez.",
+    generic: "Un problème est survenu. Réessayez.",
+    countsOffline:
+      "Pas de connexion : les compteurs ci-dessous ne peuvent pas être mis à jour. La vente continue.",
   },
   shell: {
     storeName: "Corniche Market",
@@ -132,6 +158,7 @@ const fr = {
     language: "Langue",
   },
   settings: {
+    timezoneLoadError: "Impossible de charger le fuseau horaire du magasin.",
     title: "Paramètres",
     account: "Compte",
     timezoneConfirmTitle: "Changer le fuseau horaire ?",
@@ -356,6 +383,27 @@ const fr = {
     },
   },
   products: {
+    emptyTitle: "Aucun produit pour le moment",
+    emptyHintOwner: "Ajoutez vos produits un par un, ou importez une liste.",
+    emptyHintCashier: "Le propriétaire n'a pas encore ajouté de produits.",
+    emptyAddFirst: "Ajouter votre premier produit",
+    importIssue: {
+      nameRequired: "Le nom est obligatoire",
+      priceRequired: "Le prix de vente est obligatoire",
+      priceInvalid: "Le prix de vente « {{value}} » n'est pas un montant valide",
+      barcodeExists: "Le code-barres {{value}} existe déjà",
+      barcodeInFile: "Le code-barres {{value}} apparaît plusieurs fois dans ce fichier",
+      unitInvalid: "L'unité « {{value}} » doit être piece, kg ou pack",
+      categoryUnknown: "Catégorie inconnue « {{value}} »",
+      thresholdInvalid: "Le seuil de stock bas « {{value}} » n'est pas un nombre valide",
+      costInvalid: "Le prix d'achat « {{value}} » n'est pas un montant valide",
+      quantityInvalid: "Le stock d'ouverture « {{value}} » n'est pas un nombre valide",
+      openingNeedsCost:
+        "Le stock d'ouverture demande un prix d'achat, sinon le coût serait enregistré à zéro",
+      openingFailedAll:
+        "Les produits ont été créés mais leur stock d'ouverture n'a pas été enregistré",
+      openingFailedChunk: "Le stock d'ouverture de {{count}} produits n'a pas été enregistré",
+    },
     loadError: "Impossible de charger les produits.",
     searchPlaceholder: "Nom ou code-barres",
     allCategories: "Toutes catégories",
@@ -526,6 +574,8 @@ const fr = {
     importRowErrorNoNum: "{{messages}}",
   },
   invoices: {
+    noDraftsHint:
+      "Photographiez une facture fournisseur et l'application lit les lignes pour vous.",
     scan: "Scanner une facture",
     drafts: "Brouillons de factures",
     reviewTitle: "Vérifier la facture",
@@ -674,6 +724,12 @@ const fr = {
     approve: "Approuver et réceptionner",
   },
   stockIn: {
+    suppliersLoadError: "Impossible de charger les fournisseurs.",
+    adjustHistoryLoadError: "Impossible de charger les derniers ajustements.",
+    historyEmptyTitle: "Aucune livraison pour le moment",
+    historyEmptyHint:
+      "Les livraisons reçues, ou validées depuis une facture scannée, apparaissent ici.",
+    historyEmptyAction: "Recevoir une livraison",
     title: "Stock",
     supplier: "Fournisseur",
     noSupplier: "Sans fournisseur",
@@ -825,6 +881,9 @@ const fr = {
     barcodeError: "Impossible de lire ce code-barres.",
   },
   credit: {
+    emptyTitle: "Aucun client pour le moment",
+    emptyHint: "Un client apparaît ici dès la première vente à crédit.",
+    refreshFailed: "Actualisation impossible. Ces chiffres sont peut-être périmés.",
     totalOwed: "Total dû à la boutique",
     nobody: "Personne ne doit quoi que ce soit.",
     settled: "Soldé",

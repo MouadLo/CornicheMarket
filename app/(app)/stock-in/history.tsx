@@ -1,8 +1,13 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { BigButton } from "@/src/components/BigButton";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { errorKey } from "@/src/lib/errors/userMessage";
 import { formatMAD } from "@/src/lib/money";
 import {
   fetchMonthlyTotals,
@@ -17,28 +22,35 @@ type Tab = "deliveries" | "months" | "suppliers";
 
 export default function PurchaseHistory() {
   const { t } = useTranslation();
+  const { profile } = useAuth();
+  const isOwner = profile?.role === "owner";
   const [tab, setTab] = useState<Tab>("deliveries");
   const [purchases, setPurchases] = useState<PurchaseSummary[]>([]);
   const [months, setMonths] = useState<MonthlyTotal[]>([]);
   const [bySupplier, setBySupplier] = useState<SupplierTotal[]>([]);
   const [loading, setLoading] = useState(true);
+  // A translation key (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     Promise.all([fetchPurchases(0), fetchMonthlyTotals(), fetchSupplierTotals()])
       .then(([loadedPurchases, loadedMonths, loadedSuppliers]) => {
         setPurchases(loadedPurchases);
         setMonths(loadedMonths);
         setBySupplier(loadedSuppliers);
       })
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t("stockIn.historyLoadError"))
-      )
+      .catch((failure) => setError(errorKey(failure)))
       .finally(() => setLoading(false));
-  }, [t]);
+  }, []);
+
+  useEffect(load, [load]);
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (error) {
+    return <LoadError title={t("stockIn.historyLoadError")} reasonKey={error} onRetry={load} />;
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -62,7 +74,19 @@ export default function PurchaseHistory() {
 
       {tab === "deliveries" &&
         (purchases.length === 0 ? (
-          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
+          <EmptyState
+            icon="truck"
+            title={t("stockIn.historyEmptyTitle")}
+            message={t("stockIn.historyEmptyHint")}
+            action={
+              isOwner ? (
+                <BigButton
+                  label={t("stockIn.historyEmptyAction")}
+                  onPress={() => router.push("/(app)/stock-in/receive")}
+                />
+              ) : undefined
+            }
+          />
         ) : (
           purchases.map((purchase) => {
             const voided = purchase.voided_at !== null;
@@ -99,7 +123,7 @@ export default function PurchaseHistory() {
 
       {tab === "months" &&
         (months.length === 0 ? (
-          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
+          <EmptyState icon="truck" title={t("stockIn.historyEmptyTitle")} />
         ) : (
           months.map((month) => (
             <View key={month.month} style={styles.row}>
@@ -119,7 +143,7 @@ export default function PurchaseHistory() {
 
       {tab === "suppliers" &&
         (bySupplier.length === 0 ? (
-          <Text style={styles.empty}>{t("stockIn.historyEmpty")}</Text>
+          <EmptyState icon="truck" title={t("stockIn.historyEmptyTitle")} />
         ) : (
           bySupplier.map((supplier) => (
             <View key={supplier.supplier_id ?? "none"} style={styles.row}>
@@ -187,6 +211,4 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 16, fontWeight: "600" },
   rowMeta: { fontSize: 13, color: "#666" },
   rowValue: { fontSize: 17, fontWeight: "700" },
-  empty: { textAlign: "center", marginTop: 32, color: "#666" },
-  error: { padding: 20, color: "#b3261e" },
 });

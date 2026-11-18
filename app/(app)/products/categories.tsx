@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { decideCategory, inTreeOrder, MAX_CATEGORY_NAME } from "@/src/lib/products/categories";
@@ -64,12 +66,12 @@ export default function CategoriesScreen() {
     setError(null);
     try {
       setCategories(await fetchCategoriesWithCounts());
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("products.catError"));
+    } catch (failure) {
+      setError(errorKey(failure));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,8 +128,10 @@ export default function CategoriesScreen() {
       close();
       showToast({ text: done, tone: "success" });
       await load();
-    } catch {
-      setNote(t("products.catError"));
+    } catch (failure) {
+      // Next to the panel that failed: a recognised cause (duplicate name,
+      // permission, offline) is said plainly, the rest keeps the screen's text.
+      setNote(t(errorKeyOr(failure, "products.catError")));
     } finally {
       setBusy(false);
     }
@@ -226,12 +230,12 @@ export default function CategoriesScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error ? <LoadError title={t("products.catError")} reasonKey={error} onRetry={load} /> : null}
       {!error && categories.length === 0 && (
         <Text style={styles.muted}>{t("products.catEmpty")}</Text>
       )}
 
-      {sorted.map((category) => {
+      {(error ? [] : sorted).map((category) => {
         const open = openId === category.id;
         const standard = Boolean(findCatalogEntry(category.code));
         const isSub = Boolean(category.parent_id);

@@ -1,8 +1,10 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
 import { PriceHistoryChart } from "@/src/components/stock/PriceHistoryChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
@@ -21,25 +23,30 @@ export default function ProductPriceHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // A translation key (see errorKey), never the server's text.
+  const load = useCallback(() => {
     if (!id || !isOwner) return;
 
+    setLoading(true);
+    setError(null);
     Promise.all([fetchProduct(id, true), fetchPriceHistory(id)])
       .then(([loadedProduct, loadedPoints]) => {
         setProduct(loadedProduct);
         setPoints(loadedPoints);
       })
-      .catch((loadError) =>
-        setError(
-          loadError instanceof Error ? loadError.message : t("products.priceHistoryLoadError")
-        )
-      )
+      .catch((failure) => setError(errorKey(failure)))
       .finally(() => setLoading(false));
-  }, [id, isOwner, t]);
+  }, [id, isOwner]);
+
+  useEffect(load, [load]);
 
   if (profile && !isOwner) return <Redirect href="/(app)/products" />;
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (error) {
+    return (
+      <LoadError title={t("products.priceHistoryLoadError")} reasonKey={error} onRetry={load} />
+    );
+  }
   if (!product) return <Text style={styles.error}>{t("products.formProductNotFound")}</Text>;
 
   const first = points[0]?.unit_cost_cents ?? null;

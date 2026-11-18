@@ -4,6 +4,8 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } 
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
 import {
   centsToDisplay,
@@ -183,8 +185,8 @@ export function ProductForm({
     setError(null);
 
     const priceCents = parseMoneyToCents(price);
-    if (!name.trim()) return setError(t("products.formNameRequired"));
-    if (priceCents === null) return setError(t("products.formPriceInvalid"));
+    if (!name.trim()) return setError("products.formNameRequired");
+    if (priceCents === null) return setError("products.formPriceInvalid");
 
     const thresholdValue = parseQuantity(threshold) ?? 0;
 
@@ -226,7 +228,7 @@ export function ProductForm({
       showToast({ text: t("products.formSavedToast"), tone: "success" });
     } catch (submitError) {
       onDirtyChange?.(true);
-      setError(submitError instanceof Error ? submitError.message : t("products.formSaveError"));
+      setError(errorKeyOr(submitError, "products.formSaveError"));
     } finally {
       setSubmitting(false);
     }
@@ -401,7 +403,7 @@ export function ProductForm({
 
       {initial && <CostSummary product={initial} price={price} />}
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error ? <InlineError reasonKey={error} /> : null}
 
       <BigButton
         label={submitting ? t("products.formSaving") : submitLabel}

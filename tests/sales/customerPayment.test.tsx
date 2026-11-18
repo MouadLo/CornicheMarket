@@ -68,7 +68,9 @@ describe("CustomerPaymentAction", () => {
     type("5");
     onRecord.mockRejectedValueOnce(new Error("network"));
     await press("credit.recordPayment");
-    expect(allTexts(tree.root)).toContain("network");
+    // The screen's own translated text, never the server's.
+    expect(allTexts(tree.root)).toContain("credit.payError");
+    expect(allTexts(tree.root)).not.toContain("network");
     await press("credit.recordPayment");
     expect(onRecord.mock.calls.map((c) => c[0])).toEqual(["pay-1", "pay-1"]);
     expect(onRecorded).toHaveBeenCalledTimes(1);
@@ -77,6 +79,20 @@ describe("CustomerPaymentAction", () => {
     type("5");
     await press("credit.recordPayment");
     expect(onRecord.mock.calls[2][0]).toBe("pay-2");
+  });
+
+  it("says plainly that the connection is down, keeps the id, and keeps the entry", async () => {
+    render();
+    await open();
+    type("5");
+    onRecord.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await press("credit.recordPayment");
+    const shown = allTexts(tree.root).join(" ");
+    expect(shown).toContain("errors.network");
+    expect(shown).not.toContain("Failed to fetch");
+    expect(tree.root.findByType(TextInput).props.value).toBe("5");
+    await press("credit.recordPayment");
+    expect(onRecord.mock.calls.map((c) => c[0])).toEqual(["pay-1", "pay-1"]);
   });
 
   it("starts a new id when the amount is typed differently after a failure", async () => {

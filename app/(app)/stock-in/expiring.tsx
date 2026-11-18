@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
+
 import { fetchExpiringBatches, type ExpiringBatch } from "@/src/lib/inventory/queries";
 import { EXPIRING_DEFAULT_DAYS } from "@/src/lib/inventory/stockHome";
 
@@ -12,17 +16,17 @@ export default function ExpiringScreen() {
   const [withinDays, setWithinDays] = useState<number>(EXPIRING_DEFAULT_DAYS);
   const [batches, setBatches] = useState<ExpiringBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  // A translation key (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     fetchExpiringBatches(withinDays)
       .then(setBatches)
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : t("stockIn.expiringLoadError"))
-      )
+      .catch((failure) => setError(errorKey(failure)))
       .finally(() => setLoading(false));
-  }, [withinDays, t]);
+  }, [withinDays]);
 
   useEffect(load, [load]);
 
@@ -42,11 +46,12 @@ export default function ExpiringScreen() {
         ))}
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
       {loading ? (
         <ActivityIndicator style={{ marginTop: 24 }} />
+      ) : error ? (
+        <LoadError title={t("stockIn.expiringLoadError")} reasonKey={error} onRetry={load} />
       ) : batches.length === 0 ? (
-        <Text style={styles.empty}>{t("stockIn.expiringNone", { days: withinDays })}</Text>
+        <EmptyState icon="check" title={t("stockIn.expiringNone", { days: withinDays })} />
       ) : (
         batches.map((batch) => {
           const expired = batch.days_left < 0;

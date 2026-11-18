@@ -118,6 +118,17 @@ it("shows a load failure instead of applying", async () => {
   await open();
   type("5");
   await apply();
-  expect(JSON.stringify(tree.toJSON())).toContain("network down");
+  // Translated, and never the server's own text.
+  expect(JSON.stringify(tree.toJSON())).toContain("products.bulkUpdateError");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("network down");
   expect(bulkAdjustSellingPrice).not.toHaveBeenCalled();
+});
+
+it("says plainly when the failure is the connection", async () => {
+  jest.mocked(fetchBulkPriceTargets).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+  await open();
+  type("5");
+  await apply();
+  expect(JSON.stringify(tree.toJSON())).toContain("errors.network");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("Failed to fetch");
 });

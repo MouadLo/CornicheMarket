@@ -188,6 +188,25 @@ describe("Stock In save", () => {
     expect(mockReceiveDelivery.mock.calls[1][0]).toBe("op-1");
   });
 
+  it("says the connection is down in plain words, never the server's text, and keeps the entry", async () => {
+    mockReceiveDelivery.mockRejectedValueOnce(new Error("Network request failed"));
+    await addLine({ quantity: "10", unitCost: "6" });
+    await pressSave();
+    expect(texts().join("|")).toContain("errors.network");
+    expect(texts().join("|")).toContain("errors.tryAgainOnline");
+    expect(texts().join("|")).not.toContain("Network request failed");
+    // the line is still there, ready for the retry
+    expect(texts().join("|")).toContain("stockIn.recordDelivery");
+  });
+
+  it("an unknown refusal shows the generic text, not the raw one", async () => {
+    mockReceiveDelivery.mockRejectedValueOnce(new Error("weird internal failure 0x80"));
+    await addLine({ quantity: "10", unitCost: "6" });
+    await pressSave();
+    expect(texts()).toContain("errors.generic");
+    expect(texts().join("|")).not.toContain("weird internal");
+  });
+
   it("keeps the operation id when the draft is edited after a failure", async () => {
     mockReceiveDelivery.mockRejectedValueOnce(new Error("Network request failed"));
     mockReceiveDelivery.mockResolvedValueOnce("purchase-1");

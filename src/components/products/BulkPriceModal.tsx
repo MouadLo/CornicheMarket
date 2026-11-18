@@ -3,6 +3,8 @@ import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { categoryPathLabel } from "@/src/lib/products/categoryCatalog";
 import { familyIds, inTreeOrder } from "@/src/lib/products/categories";
 import { confirm, showToast } from "@/src/lib/dialog/store";
@@ -57,12 +59,12 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
         categoryId ? familyIds(categories, categoryId) : undefined
       );
       if (targets.length === 0) {
-        setError(t("products.bulkNone"));
+        setError("products.bulkNone");
         return;
       }
       const preview = previewBulkPrice(targets, percentValue);
       if (preview.changed === 0) {
-        setError(t("products.bulkNoChange"));
+        setError("products.bulkNoChange");
         return;
       }
       const lines = [
@@ -91,7 +93,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
       setPercent("");
       onApplied();
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : t("products.bulkUpdateError"));
+      setError(errorKeyOr(applyError, "products.bulkUpdateError"));
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +150,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
             </Text>
           ) : null}
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error ? <InlineError reasonKey={error} /> : null}
 
           <BigButton
             label={submitting ? t("products.bulkChecking") : t("common.apply")}

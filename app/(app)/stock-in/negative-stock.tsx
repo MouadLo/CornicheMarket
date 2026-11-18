@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { LoadError } from "@/src/components/ui/LoadError";
+import { errorKey } from "@/src/lib/errors/userMessage";
+
 import { fetchNegativeStockProducts, type NegativeStockProduct } from "@/src/lib/inventory/queries";
 import { daysNegative } from "@/src/lib/inventory/reorder";
 import { formatMAD } from "@/src/lib/money";
@@ -11,6 +15,7 @@ export default function NegativeStockScreen() {
 
   const [rows, setRows] = useState<NegativeStockProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  // A translation key (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -18,14 +23,12 @@ export default function NegativeStockScreen() {
     setError(null);
     try {
       setRows(await fetchNegativeStockProducts());
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : t("stockIn.negativeStockLoadError")
-      );
+    } catch (failure) {
+      setError(errorKey(failure));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -35,12 +38,12 @@ export default function NegativeStockScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
-
       <Text style={styles.intro}>{t("stockIn.negativeStockIntro")}</Text>
 
-      {rows.length === 0 ? (
-        <Text style={styles.empty}>{t("stockIn.negativeStockEmpty")}</Text>
+      {error ? (
+        <LoadError title={t("stockIn.negativeStockLoadError")} reasonKey={error} onRetry={load} />
+      ) : rows.length === 0 ? (
+        <EmptyState icon="check" title={t("stockIn.negativeStockEmpty")} />
       ) : (
         rows.map((row) => {
           const days = daysNegative(row.stock_went_negative_at);

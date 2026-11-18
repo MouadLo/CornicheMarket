@@ -1,3 +1,4 @@
+import { errorKey } from "@/src/lib/errors/userMessage";
 import type { ParsedRow, RowError } from "@/src/lib/products/csv";
 import { supabase } from "@/src/lib/supabase/client";
 
@@ -23,7 +24,10 @@ export async function importProducts(rows: ParsedRow[], ownerId: string): Promis
       .select("id");
 
     if (error) {
-      chunk.forEach((row) => errors.push({ rowNumber: row.rowNumber, messages: [error.message] }));
+      // The server's text is technical English: keep only what it means.
+      chunk.forEach((row) =>
+        errors.push({ rowNumber: row.rowNumber, issues: [{ key: errorKey(error) }] })
+      );
       continue;
     }
 
@@ -54,7 +58,10 @@ export async function importProducts(rows: ParsedRow[], ownerId: string): Promis
     if (purchaseError) {
       errors.push({
         rowNumber: 0,
-        messages: [`Products were created but opening stock failed: ${purchaseError.message}`],
+        issues: [
+          { key: "products.importIssue.openingFailedAll" },
+          { key: errorKey(purchaseError) },
+        ],
       });
       return { inserted, openingLines: 0, errors };
     }
@@ -70,7 +77,10 @@ export async function importProducts(rows: ParsedRow[], ownerId: string): Promis
       if (itemsError) {
         errors.push({
           rowNumber: 0,
-          messages: [`Opening stock for ${chunk.length} products failed: ${itemsError.message}`],
+          issues: [
+            { key: "products.importIssue.openingFailedChunk", params: { count: chunk.length } },
+            { key: errorKey(itemsError) },
+          ],
         });
       }
     }
