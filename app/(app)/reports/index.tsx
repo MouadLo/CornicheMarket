@@ -1,11 +1,13 @@
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 
+import { Chip } from "@/src/components/ui/Chip";
 import { DateField } from "@/src/components/ui/DateField";
+import { Icon } from "@/src/components/ui/Icon";
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
@@ -31,10 +33,14 @@ import {
 } from "@/src/lib/reports/queries";
 import {
   DEFAULT_STORE_TIMEZONE,
+  isSingleStoreDay,
   isValidDateInput,
   resolveRange,
   type RangeKey,
 } from "@/src/lib/reports/ranges";
+import { historyRangeParams } from "@/src/lib/sales/historyRange";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 import { storeDayKey } from "@/src/lib/sales/historyView";
 import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
@@ -171,6 +177,17 @@ export default function ReportsScreen() {
     )
     .slice(0, 20);
 
+  // Revenue and Transactions open the sales behind them, for the same range.
+  const openSales = (target: { from: Date; to: Date }) =>
+    router.push({ pathname: "/(app)/sell/history", params: historyRangeParams(target) });
+  const singleDay = isSingleStoreDay(range, timeZone);
+
+  const hourPoints = hours.map<ChartPoint>((row) => ({
+    key: String(row.hour),
+    label: `${String(row.hour).padStart(2, "0")}h`,
+    value: row.revenue_cents,
+  }));
+
   const buildTables = () =>
     buildReportTables(
       {
@@ -203,6 +220,8 @@ export default function ReportsScreen() {
               label={t("reports.metricRevenue")}
               value={formatMAD(today.revenue_cents)}
               large
+              onPress={() => openSales(resolveRange("today", undefined, undefined, timeZone))}
+              hint={t("reports.openSalesHint")}
             />
             <Metric
               label={t("reports.profit")}
@@ -213,6 +232,8 @@ export default function ReportsScreen() {
             <Metric
               label={t("reports.metricTransactions")}
               value={String(today.transaction_count)}
+              onPress={() => openSales(resolveRange("today", undefined, undefined, timeZone))}
+              hint={t("reports.openSalesHint")}
             />
             <Metric
               label={t("reports.metricAvgBasket")}
@@ -224,15 +245,12 @@ export default function ReportsScreen() {
 
       <View style={styles.chips}>
         {RANGE_KEYS.map((option) => (
-          <Pressable
+          <Chip
             key={option.key}
-            style={[styles.chip, rangeKey === option.key && styles.chipActive]}
+            label={t(option.tKey)}
+            selected={rangeKey === option.key}
             onPress={() => setRangeKey(option.key)}
-          >
-            <Text style={[styles.chipText, rangeKey === option.key && styles.chipTextActive]}>
-              {t(option.tKey)}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
 
@@ -267,6 +285,8 @@ export default function ReportsScreen() {
                 label={t("reports.metricRevenue")}
                 value={formatMAD(summary.revenue_cents)}
                 large
+                onPress={() => openSales(range)}
+                hint={t("reports.openSalesHint")}
               />
               <Metric label={t("reports.metricCogs")} value={formatMAD(summary.cogs_cents)} />
               <Metric
@@ -282,6 +302,8 @@ export default function ReportsScreen() {
               <Metric
                 label={t("reports.metricTransactions")}
                 value={String(summary.transaction_count)}
+                onPress={() => openSales(range)}
+                hint={t("reports.openSalesHint")}
               />
               <Metric
                 label={t("reports.metricAvgBasket")}
@@ -295,25 +317,29 @@ export default function ReportsScreen() {
             </View>
           </Section>
 
-          <Section title={t("reports.dailySales")}>
-            <MiniBarChart
-              points={daily.map<ChartPoint>((point) => ({
-                key: point.day,
-                label: point.day.slice(5),
-                value: point.revenue_cents,
-                secondary: point.profit_cents,
-              }))}
-              secondaryLabel={t("reports.profit")}
-            />
-          </Section>
+          {singleDay ? (
+            <Section title={t("reports.byHour")}>
+              <MiniBarChart columnWidth={56} points={hourPoints} />
+            </Section>
+          ) : (
+            <Section title={t("reports.dailySales")}>
+              <MiniBarChart
+                points={daily.map<ChartPoint>((point) => ({
+                  key: point.day,
+                  label: point.day.slice(5),
+                  value: point.revenue_cents,
+                  secondary: point.profit_cents,
+                }))}
+                secondaryLabel={t("reports.profit")}
+              />
+            </Section>
+          )}
 
           <Section title={t("reports.byCategory")}>
             <MiniBarChart
               points={categories.map<ChartPoint>((row) => ({
                 key: row.category_id ?? row.category_name,
-                label: isolateBidi(
-                  localizeCategoryName(row.category_name, i18n.language).slice(0, 10)
-                ),
+                label: isolateBidi(localizeCategoryName(row.category_name, i18n.language)),
                 value: row.revenue_cents,
                 secondary: row.profit_cents,
               }))}
@@ -321,15 +347,11 @@ export default function ReportsScreen() {
             />
           </Section>
 
-          <Section title={t("reports.byHour")}>
-            <MiniBarChart
-              points={hours.map<ChartPoint>((row) => ({
-                key: String(row.hour),
-                label: `${String(row.hour).padStart(2, "0")}h`,
-                value: row.revenue_cents,
-              }))}
-            />
-          </Section>
+          {!singleDay && (
+            <Section title={t("reports.byHour")}>
+              <MiniBarChart columnWidth={56} points={hourPoints} />
+            </Section>
+          )}
 
           {inventory && (
             <Section title={t("reports.inventoryValue")}>
@@ -483,27 +505,46 @@ function Metric({
   large,
   accent,
   negative,
+  onPress,
+  hint,
 }: {
   label: string;
   value: string;
   large?: boolean;
   accent?: boolean;
   negative?: boolean;
+  onPress?: () => void;
+  hint?: string;
 }) {
-  return (
-    <View style={styles.metric}>
+  const body = (
+    <>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.metricValue,
-          large && styles.metricValueLarge,
-          accent && styles.metricAccent,
-          negative && styles.metricNegative,
-        ]}
-      >
-        {value}
-      </Text>
-    </View>
+      <View style={styles.metricValueRow}>
+        <Text
+          style={[
+            styles.metricValue,
+            large && styles.metricValueLarge,
+            accent && styles.metricAccent,
+            negative && styles.metricNegative,
+          ]}
+        >
+          {value}
+        </Text>
+        {onPress ? <Icon name="chevron" size={20} color={colors.brand700} /> : null}
+      </View>
+    </>
+  );
+  if (!onPress) return <View style={styles.metric}>{body}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      accessibilityHint={hint}
+      onPress={onPress}
+      style={({ pressed }) => [styles.metric, styles.metricTap, pressed && styles.pressed]}
+    >
+      {body}
+    </Pressable>
   );
 }
 
@@ -619,25 +660,29 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   title: { fontSize: 26, fontWeight: "800" },
-  todayCard: { backgroundColor: "#f3f7f4", borderRadius: 14, padding: 16, gap: 10 },
-  todayLabel: { fontSize: 13, fontWeight: "700", color: "#1d7a46", textTransform: "uppercase" },
+  todayCard: { backgroundColor: colors.brand50, borderRadius: 14, padding: 16, gap: 10 },
+  todayLabel: { fontSize: 13, fontWeight: "700", color: colors.ink600, textTransform: "uppercase" },
   todayGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
-  oversoldWarning: { color: "#b3261e", fontSize: 13, marginTop: 4 },
+  oversoldWarning: { color: colors.danger600, fontSize: 13, marginTop: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
-  chipActive: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
   customRow: { flexDirection: "row", gap: 10 },
   section: { gap: 10 },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#444", textTransform: "uppercase" },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.ink700,
+    textTransform: "uppercase",
+  },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   metric: { minWidth: 120, flexGrow: 1, gap: 3 },
-  metricLabel: { fontSize: 12, color: "#666", textTransform: "uppercase" },
+  metricValueRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metricTap: { minHeight: 48, justifyContent: "center" },
+  pressed: { opacity: 0.85 },
+  metricLabel: { fontSize: 13, color: colors.ink600, textTransform: "uppercase" },
   metricValue: { fontSize: 18, fontWeight: "700" },
   metricValueLarge: { fontSize: 24, fontWeight: "800" },
-  metricAccent: { color: "#1d7a46" },
-  metricNegative: { color: "#b3261e" },
+  metricAccent: { color: colors.success700 },
+  metricNegative: { color: colors.danger600 },
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -648,17 +693,22 @@ const styles = StyleSheet.create({
   },
   tableHeaderMain: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
-    color: "#888",
+    color: colors.ink600,
     textTransform: "uppercase",
   },
-  tableHeaderMeta: { fontSize: 11, fontWeight: "700", color: "#888", textTransform: "uppercase" },
+  tableHeaderMeta: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.ink600,
+    textTransform: "uppercase",
+  },
   tableHeaderValue: {
     minWidth: 72,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
-    color: "#888",
+    color: colors.ink600,
     textTransform: "uppercase",
     textAlign: "right",
   },
@@ -669,31 +719,31 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
-  tableRowOdd: { backgroundColor: "#fafafa" },
+  tableRowOdd: { backgroundColor: colors.bg },
   tableMain: { flex: 1, gap: 2 },
   rowName: { fontSize: 15, fontWeight: "600" },
-  rowMeta: { fontSize: 12, color: "#666" },
+  rowMeta: { fontSize: 13, color: colors.ink600 },
   // Currency/number values stay right-aligned regardless of UI direction --
   // numbers are read left-to-right internally no matter the surrounding
   // language, which is the standard convention this mirrors.
   rowValue: { fontSize: 15, fontWeight: "700", minWidth: 72, textAlign: "right" },
-  rowValueNegative: { color: "#b3261e" },
-  empty: { color: "#666", fontSize: 14 },
-  deadStockTotal: { color: "#444", fontSize: 13, fontWeight: "600", marginBottom: 6 },
-  snapshotLabel: { color: "#888", fontSize: 12, fontStyle: "italic", marginBottom: 8 },
+  rowValueNegative: { color: colors.danger600 },
+  empty: { color: colors.ink600, fontSize: 14 },
+  deadStockTotal: { color: colors.ink700, fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  snapshotLabel: { color: colors.ink600, fontSize: 13, fontStyle: "italic", marginBottom: 8 },
   showAllButton: { paddingVertical: 10, alignItems: "center" },
-  showAllText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
+  showAllText: { color: colors.brand700, fontWeight: "700", fontSize: 14 },
   exportRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   exportButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: "#1d7a46",
+    backgroundColor: colors.brand700,
     alignItems: "center",
   },
-  exportText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  error: { color: "#b3261e" },
+  exportText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  error: { color: colors.danger600 },
 });

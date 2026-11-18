@@ -11,6 +11,7 @@ const MIN = 48;
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn(), push: jest.fn() },
+  useLocalSearchParams: () => ({}),
   useFocusEffect: (cb: () => void) => {
     const React = require("react");
     React.useEffect(cb, [cb]);

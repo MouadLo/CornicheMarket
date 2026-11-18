@@ -12,6 +12,13 @@ const mockFetchRecent = jest.fn();
 const mockFetchLines = jest.fn();
 let mockRole: "owner" | "cashier" = "owner";
 
+let mockParams: Record<string, unknown> = {};
+const mockReplace = jest.fn();
+jest.mock("expo-router", () => ({
+  router: { replace: (...a: unknown[]) => mockReplace(...a) },
+  useLocalSearchParams: () => mockParams,
+}));
+
 const mockT = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}:${JSON.stringify(options)}` : key;
 jest.mock("react-i18next", () => ({
@@ -78,6 +85,8 @@ const lines = [
 let tree: ReactTestRenderer;
 beforeEach(() => {
   mockRole = "owner";
+  mockParams = {};
+  mockReplace.mockReset();
   mockFetchRecent.mockReset();
   mockFetchRecent.mockResolvedValue(page1);
   mockFetchLines.mockReset();
@@ -126,7 +135,7 @@ describe("sales history", () => {
     await render();
     mockFetchRecent.mockResolvedValueOnce([sale("last", "2026-11-15T10:00:00Z", 100)]);
     await act(async () => pressableByText(tree.root, "sell.historyMore").props.onPress());
-    expect(mockFetchRecent).toHaveBeenLastCalledWith(50, 50);
+    expect(mockFetchRecent).toHaveBeenLastCalledWith(50, 50, null);
     expect(() => pressableByText(tree.root, "sell.historyMore")).toThrow();
   });
 
@@ -135,5 +144,70 @@ describe("sales history", () => {
     expect(
       tree.root.findAll((n) => allTexts(n).join("") === "sell.voidRefund" && n.props.onPress).length
     ).toBeGreaterThan(0);
+  });
+
+  describe("opened on a report's range", () => {
+    const from = "2026-11-16T00:00:00.000Z";
+    const to = "2026-11-18T00:00:00.000Z";
+
+    it("passes the range to every fetch and shows the banner with the non-voided total", async () => {
+      mockParams = { rangeFrom: from, rangeTo: to };
+      await render();
+      const range = mockFetchRecent.mock.calls[0][2];
+      expect(range.from.toISOString()).toBe(from);
+      expect(range.to.toISOString()).toBe(to);
+      const texts = allTexts(tree.root).join("|");
+      expect(texts).toContain("sell.historyRangeBanner:");
+      expect(texts).toContain("sell.historyRangeClear");
+      // 1250 + 300; the voided 999 is listed but not counted.
+      expect(texts).toContain('sell.historyRangeTotal:{"amount":"15.50 DH"}');
+      expect(texts).toContain("sell.historyVoided");
+    });
+
+    it("clears the filter back to the plain history", async () => {
+      mockParams = { rangeFrom: from, rangeTo: to };
+      await render();
+      act(() => pressableByText(tree.root, "sell.historyRangeClear").props.onPress());
+      expect(mockReplace).toHaveBeenCalledWith("/(app)/sell/history");
+    });
+
+    it.each([
+      ["garbage", { rangeFrom: "x", rangeTo: "y" }],
+      ["inverted", { rangeFrom: to, rangeTo: from }],
+      ["one side only", { rangeFrom: from }],
+    ])("treats %s params as no filter without crashing", async (_n, params) => {
+      mockParams = params;
+      await render();
+      expect(mockFetchRecent.mock.calls[0][2]).toBeNull();
+      expect(allTexts(tree.root).join("|")).not.toContain("sell.historyRangeBanner");
+    });
+
+    it("says so, differently, when the range has no sales", async () => {
+      mockParams = { rangeFrom: from, rangeTo: to };
+      mockFetchRecent.mockResolvedValue([]);
+      await render();
+      const texts = allTexts(tree.root).join("|");
+      expect(texts).toContain("sell.historyEmptyRange");
+      expect(texts).toContain("sell.historyEmptyRangeHint");
+    });
+  });
+
+  it("shows the plain empty state without a filter", async () => {
+    mockFetchRecent.mockResolvedValue([]);
+    await render();
+    const texts = allTexts(tree.root).join("|");
+    expect(texts).toContain("sell.historyEmpty");
+    expect(texts).not.toContain("sell.historyEmptyRange");
+  });
+
+  it("shows a translated message and Retry, never the server's text, when loading fails", async () => {
+    mockFetchRecent.mockRejectedValueOnce(new Error("PGRST301 raw server text"));
+    await render();
+    const texts = allTexts(tree.root).join("|");
+    expect(texts).not.toContain("PGRST301");
+    expect(texts).toContain("states.loadErrorTitle");
+    mockFetchRecent.mockResolvedValueOnce(page1);
+    await act(async () => pressableByText(tree.root, "common.retry").props.onPress());
+    expect(allTexts(tree.root).join("|")).toContain("sell.historyDayTotal");
   });
 });
