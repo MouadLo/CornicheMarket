@@ -15,7 +15,7 @@ import { BigButton } from "@/src/components/BigButton";
 import { Banner } from "@/src/components/ui/Banner";
 import { InlineError } from "@/src/components/ui/InlineError";
 import { inviteCashier } from "@/src/lib/auth/inviteCashier";
-import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { useSignOut } from "@/src/lib/auth/useSignOut";
 import { confirm } from "@/src/lib/dialog/store";
