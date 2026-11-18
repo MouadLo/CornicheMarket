@@ -27,6 +27,9 @@ jest.mock("react-i18next", () => {
     options?.barcode ? `${key}:${options.barcode}` : options?.name ? `${key}:${options.name}` : key;
   return { useTranslation: () => ({ t }) };
 });
+jest.mock("expo-router", () => ({
+  useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
+}));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner", role: "owner" } }),
 }));

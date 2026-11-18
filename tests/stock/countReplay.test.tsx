@@ -7,12 +7,16 @@ import { BigButton } from "../../src/components/BigButton";
 const mockApply = jest.fn();
 let mockSequence = 0;
 jest.mock("expo-crypto", () => ({ randomUUID: () => `operation-${++mockSequence}` }));
+jest.mock("expo-router", () => ({
+  useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
+}));
 jest.mock("../../src/lib/products/queries", () => ({ fetchProductByBarcode: jest.fn() }));
 jest.mock("../../src/lib/inventory/queries", () => ({
   applyStockCount: (...args: unknown[]) => mockApply(...args),
+  fetchCurrentStock: async (ids: string[]) => new Map(ids.map((id) => [id, 10])),
 }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
-  useAuth: () => ({ profile: { id: "owner" } }),
+  useAuth: () => ({ profile: { id: "owner", role: "owner" } }),
 }));
 jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 jest.mock("../../src/lib/confirmDestructive", () => ({ confirmDestructive: async () => true }));

@@ -16,7 +16,7 @@ const LOCALE_BY_LANGUAGE: Record<string, string> = {
   ar: "ar-MA-u-nu-latn",
 };
 
-function resolveLocale(language: string): string {
+export function resolveLocale(language: string): string {
   return LOCALE_BY_LANGUAGE[language] ?? "fr-FR";
 }
 

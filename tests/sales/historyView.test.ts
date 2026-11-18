@@ -1,9 +1,11 @@
 import {
+  composeVoidReason,
   groupSalesByDay,
   itemsPreview,
   parseVoidReason,
   saleInstant,
   storeDayKey,
+  voidReasonDisplay,
 } from "../../src/lib/sales/historyView";
 
 const sale = (id: string, at: string, total: number, voided = false) => ({
@@ -93,5 +95,74 @@ describe("parseVoidReason", () => {
   it("leaves a reason typed by the owner alone", () => {
     expect(parseVoidReason("retour client")).toBeNull();
     expect(parseVoidReason(null)).toBeNull();
+  });
+});
+
+describe("the owner's own void reason (O9)", () => {
+  it("composes '<code>' or '<code> - <note>' without a requester", () => {
+    expect(composeVoidReason("wrong_item", "")).toBe("wrong_item");
+    expect(composeVoidReason("wrong_item", "   ")).toBe("wrong_item");
+    expect(composeVoidReason("other", "  deux fois\n payé ")).toBe("other - deux fois payé");
+  });
+
+  it("reads back what it composed", () => {
+    expect(parseVoidReason(composeVoidReason("customer_changed_mind", ""))).toEqual({
+      code: "customer_changed_mind",
+      note: null,
+      requestedBy: null,
+    });
+    expect(parseVoidReason(composeVoidReason("other", "client parti"))).toEqual({
+      code: "other",
+      note: "client parti",
+      requestedBy: null,
+    });
+  });
+
+  it("does not misread free text that only begins like a code", () => {
+    for (const text of [
+      "other people complained",
+      "wrong_item_x",
+      "wrong_itemfoo",
+      "Wrong_item",
+      "other-ish",
+      "wrong_quantity: 3",
+      "retour client (requested by Amina)",
+    ]) {
+      expect(parseVoidReason(text)).toBeNull();
+    }
+  });
+});
+
+describe("voidReasonDisplay", () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    options ? `${key}:${JSON.stringify(options)}` : key;
+  const plain = (text: string) => text;
+
+  it("translates the new owner format", () => {
+    expect(voidReasonDisplay("wrong_item", t, plain)).toBe("sell.voidReasonWrongItem");
+    expect(voidReasonDisplay("other - deux fois", t, plain)).toBe(
+      "sell.voidReasonOther: deux fois"
+    );
+  });
+
+  it("keeps approved requests, with who asked", () => {
+    expect(
+      voidReasonDisplay("wrong_quantity - 3 au lieu de 2 (requested by Amina)", t, plain)
+    ).toBe(
+      'sell.voidReasonWrongQuantity: 3 au lieu de 2 · sell.historyRequestedBy:{"name":"Amina"}'
+    );
+  });
+
+  it("shows an older free-text reason exactly as stored", () => {
+    expect(voidReasonDisplay("retour client", t, plain)).toBe("retour client");
+    expect(voidReasonDisplay("other people complained", t, plain)).toBe("other people complained");
+    expect(voidReasonDisplay(null, t, plain)).toBe("");
+  });
+
+  it("isolates the note and the name so mixed scripts stay in place", () => {
+    const mark = (text: string) => `<${text}>`;
+    expect(voidReasonDisplay("other - مرحبا (requested by Amina)", t, mark)).toContain(
+      "sell.voidReasonOther: <مرحبا>"
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { productsSource, type Product } from "@/src/lib/products/queries";
+import { PAGE_SIZE, fetchProducts, productsSource, type Product } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
 export type AdjustmentReason = "damaged" | "expired" | "theft" | "count_correction";
@@ -183,4 +183,51 @@ export async function fetchNegativeStockProducts(): Promise<NegativeStockProduct
 
   if (error) throw new Error(error.message);
   return (data ?? []) as NegativeStockProduct[];
+}
+
+// Every active product of these categories, for starting a stock count from a
+// list. Reads page by page (fetchProducts caps a page) up to a safety limit.
+const COUNT_LIST_MAX = 1000;
+
+export async function fetchProductsForCount(
+  categoryIds: string[],
+  isOwner: boolean
+): Promise<Product[]> {
+  if (categoryIds.length === 0) return [];
+  const all: Product[] = [];
+  for (let page = 0; all.length < COUNT_LIST_MAX; page++) {
+    const rows = await fetchProducts(
+      { search: "", categoryId: null, categoryIds, lowStockOnly: false, status: "active" },
+      page,
+      isOwner
+    );
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return all;
+}
+
+// The stock on the shelf right now, per product. A count's discrepancy is
+// counted minus the system quantity, so it must be measured against current
+// stock, not the quantity read when the list was loaded. Read in chunks: a
+// long list would overflow the request URL.
+const STOCK_CHUNK = 100;
+
+export async function fetchCurrentStock(
+  productIds: string[],
+  isOwner: boolean
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  for (let start = 0; start < productIds.length; start += STOCK_CHUNK) {
+    const chunk = productIds.slice(start, start + STOCK_CHUNK);
+    const { data, error } = await supabase
+      .from(productsSource(isOwner))
+      .select("id, stock_quantity")
+      .in("id", chunk);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      result.set(row.id as string, Number(row.stock_quantity));
+    }
+  }
+  return result;
 }

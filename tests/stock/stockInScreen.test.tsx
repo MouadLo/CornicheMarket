@@ -50,6 +50,9 @@ jest.mock("../../src/lib/stock/queries", () => {
 jest.mock("../../src/components/stock/ProductSearchPicker", () => ({
   ProductSearchPicker: () => null,
 }));
+jest.mock("../../src/lib/reports/queries", () => ({
+  fetchStoreTimezone: jest.fn(async () => "Africa/Casablanca"),
+}));
 jest.mock("../../src/components/stock/StockInLine", () => ({ StockInLine: () => null }));
 
 const milk = {

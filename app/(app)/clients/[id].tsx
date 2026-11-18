@@ -25,6 +25,7 @@ import {
   fetchSaleLines,
   recordCustomerPayment,
   type CustomerBalance,
+  type CustomerCreditSale,
   type SaleLine,
 } from "@/src/lib/sales/queries";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
@@ -33,6 +34,17 @@ import { Text } from "@/src/theme/Text";
 import { colors, radius, touch } from "@/src/theme/tokens";
 
 const PAGE_SIZE = 30;
+
+const toLedgerSale = (sale: CustomerCreditSale): LedgerSale => ({
+  kind: "sale",
+  id: sale.id,
+  instant: saleInstant(sale),
+  total_cents: sale.total_cents,
+  voided_at: sale.voided_at,
+  void_reason: null,
+  cashier_name: sale.cashier_name,
+  is_own: sale.is_own,
+});
 
 export default function CustomerHistory() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -71,16 +83,7 @@ export default function CustomerHistory() {
     ])
       .then(([row, saleRows, paymentRows]) => {
         setBalance(row);
-        setSales(
-          saleRows.map((sale) => ({
-            kind: "sale",
-            id: sale.id,
-            instant: saleInstant(sale),
-            total_cents: sale.total_cents,
-            voided_at: sale.voided_at,
-            void_reason: sale.void_reason,
-          }))
-        );
+        setSales(saleRows.map(toLedgerSale));
         setPayments(
           paymentRows.map((payment) => ({
             kind: "payment",
@@ -108,17 +111,7 @@ export default function CustomerHistory() {
         salesMore ? fetchCustomerCreditSales(id, PAGE_SIZE, sales.length) : Promise.resolve([]),
         paymentsMore ? fetchCustomerPayments(id, PAGE_SIZE, payments.length) : Promise.resolve([]),
       ]);
-      setSales((prev) => [
-        ...prev,
-        ...saleRows.map((sale): LedgerSale => ({
-          kind: "sale",
-          id: sale.id,
-          instant: saleInstant(sale),
-          total_cents: sale.total_cents,
-          voided_at: sale.voided_at,
-          void_reason: sale.void_reason,
-        })),
-      ]);
+      setSales((prev) => [...prev, ...saleRows.map(toLedgerSale)]);
       setPayments((prev) => [
         ...prev,
         ...paymentRows.map((payment): LedgerPayment => ({
@@ -219,27 +212,42 @@ export default function CustomerHistory() {
     }
     const isOpen = openId === entry.id;
     const voided = entry.voided_at !== null;
+    // Product lines: the owner opens every sale, a cashier only their own (RLS
+    // hides the lines of other people's sales).
+    const canOpen = isOwner || entry.is_own === true;
+    const rowTop = (
+      <View style={styles.rowTop}>
+        <View style={styles.rowMain}>
+          <Text style={styles.entryTitle}>{t("credit.timelineSale")}</Text>
+          <Text style={styles.meta}>{time}</Text>
+          {entry.cashier_name ? (
+            <Text style={styles.meta}>
+              {t("credit.rungUpBy", { name: isolateBidi(entry.cashier_name) })}
+            </Text>
+          ) : null}
+          {voided ? <StatusPill label={t("credit.voidedTag")} tone="neutral" icon="x" /> : null}
+        </View>
+        <Text style={[styles.saleAmount, voided && styles.amountVoided]}>
+          {isolateLtr(formatMAD(entry.total_cents))}
+        </Text>
+      </View>
+    );
     return (
       <View key={`s-${entry.id}`} style={[styles.row, voided && styles.rowVoided]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isOpen ? t("credit.hideLines") : t("credit.showLines")}
-          accessibilityState={{ expanded: isOpen }}
-          style={styles.rowTap}
-          onPress={() => toggleSale(entry.id)}
-        >
-          <View style={styles.rowTop}>
-            <View style={styles.rowMain}>
-              <Text style={styles.entryTitle}>{t("credit.timelineSale")}</Text>
-              <Text style={styles.meta}>{time}</Text>
-              {voided ? <StatusPill label={t("credit.voidedTag")} tone="neutral" icon="x" /> : null}
-            </View>
-            <Text style={[styles.saleAmount, voided && styles.amountVoided]}>
-              {isolateLtr(formatMAD(entry.total_cents))}
-            </Text>
-          </View>
-        </Pressable>
-        {isOpen ? <View style={styles.lines}>{renderLines(entry.id)}</View> : null}
+        {canOpen ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isOpen ? t("credit.hideLines") : t("credit.showLines")}
+            accessibilityState={{ expanded: isOpen }}
+            style={styles.rowTap}
+            onPress={() => toggleSale(entry.id)}
+          >
+            {rowTop}
+          </Pressable>
+        ) : (
+          rowTop
+        )}
+        {canOpen && isOpen ? <View style={styles.lines}>{renderLines(entry.id)}</View> : null}
       </View>
     );
   };
@@ -281,7 +289,6 @@ export default function CustomerHistory() {
       ) : null}
 
       <Text style={styles.sectionLabel}>{t("credit.historySection")}</Text>
-      {!isOwner ? <Text style={styles.meta}>{t("credit.cashierNote")}</Text> : null}
       {entries.length === 0 && <Text style={styles.empty}>{t("credit.noHistory")}</Text>}
 
       {days.map((day) => (

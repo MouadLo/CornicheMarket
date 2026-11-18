@@ -35,6 +35,9 @@ export type LedgerSale = {
   total_cents: number;
   voided_at: string | null;
   void_reason: string | null;
+  // Who rang the sale up, and whether it is the signed-in user's own sale.
+  cashier_name?: string | null;
+  is_own?: boolean;
 };
 export type LedgerPayment = {
   kind: "payment";

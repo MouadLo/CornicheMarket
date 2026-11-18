@@ -129,17 +129,14 @@ describe("clients list", () => {
 });
 
 describe("customer history", () => {
-  const sale = (id: string, at: string, total: number, voided = false) => ({
+  const sale = (id: string, at: string, total: number, voided = false, own = true) => ({
     id,
     created_at: at,
     occurred_at: at,
-    payment_method: "credit",
     total_cents: total,
-    discount_cents: 0,
-    customer_id: "c1",
-    cashier_id: "u-2",
     voided_at: voided ? at : null,
-    void_reason: null,
+    cashier_name: own ? "Amina" : "Youssef",
+    is_own: own,
   });
   beforeEach(() => {
     mockBalance.mockResolvedValue(bal("c1", "Hélène", 1000, "0661 23 45 67"));
@@ -177,7 +174,15 @@ describe("customer history", () => {
     expect(texts.some((x) => x.includes("10.00 DH"))).toBe(true);
   });
 
-  it("loads product lines through the role's view when a sale is opened", async () => {
+  const showLinesRows = () =>
+    tree.root.findAll(
+      (n) =>
+        n.props.accessibilityLabel === "credit.showLines" &&
+        typeof n.props.onPress === "function" &&
+        n.parent?.props.accessibilityLabel !== "credit.showLines"
+    );
+
+  it("loads product lines through the role's view when the cashier opens their own sale", async () => {
     mockRole = "cashier";
     await render(<CustomerHistory />);
     const row = tree.root.find(
@@ -189,7 +194,35 @@ describe("customer history", () => {
     await act(async () => row.props.onPress());
     expect(mockLines).toHaveBeenCalledWith(["s1"], false);
     expect(allTexts(tree.root).join("|")).toContain("Huile");
-    expect(allTexts(tree.root)).toContain("credit.cashierNote");
+    expect(allTexts(tree.root).join("|")).not.toContain("credit.cashierNote");
+  });
+
+  it("a cashier sees another person's credit sale and who rang it up, with no expand control", async () => {
+    mockRole = "cashier";
+    mockSales.mockResolvedValue([
+      sale("s9", "2026-11-17T10:00:00Z", 900, false, false),
+      sale("s1", "2026-11-15T10:00:00Z", 1500),
+    ]);
+    await render(<CustomerHistory />);
+    const texts = allTexts(tree.root).join("|");
+    expect(texts).toContain("9.00 DH");
+    expect(texts).toContain('credit.rungUpBy{"name":"\u2068Youssef\u2069"}');
+    // only the cashier's own sale can be opened, and nothing is fetched for the other
+    expect(showLinesRows()).toHaveLength(1);
+    expect(mockLines).not.toHaveBeenCalled();
+  });
+
+  it("the owner can open every sale", async () => {
+    mockRole = "owner";
+    mockSales.mockResolvedValue([
+      sale("s9", "2026-11-17T10:00:00Z", 900, false, false),
+      sale("s1", "2026-11-15T10:00:00Z", 1500),
+    ]);
+    await render(<CustomerHistory />);
+    const rows = showLinesRows();
+    expect(rows).toHaveLength(2);
+    await act(async () => rows[0].props.onPress());
+    expect(mockLines).toHaveBeenCalledWith(["s9"], true);
   });
 
   it("pages: a full page shows load more and asks for the next offset", async () => {

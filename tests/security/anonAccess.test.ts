@@ -71,6 +71,7 @@ const FUNCTIONS: [string, Record<string, unknown>][] = [
     { p_payment_id: NIL, p_customer_id: NIL, p_amount_cents: 1, p_method: "cash" },
   ],
   ["void_sale", { p_sale_id: NIL, p_reason: "probe" }],
+  ["customer_credit_sales", { p_customer_id: NIL, p_limit: 1, p_offset: 0 }],
   [
     "receive_delivery",
     {
