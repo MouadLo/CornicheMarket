@@ -17,6 +17,7 @@ jest.mock("react-i18next", () => {
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner", role: "owner" } }),
 }));
+jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/lib/sales/queries", () => ({
   fetchCustomerBalances: async () => [
     {

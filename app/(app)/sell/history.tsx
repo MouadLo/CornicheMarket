@@ -11,12 +11,22 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
+import { StatusPill } from "@/src/components/ui/StatusPill";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { formatMAD } from "@/src/lib/money";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { fetchRecentSales, voidSale, type SaleSummary } from "@/src/lib/sales/queries";
 import { voidSaleConfirmMessage } from "@/src/lib/sales/voidConfirm";
+import {
+  describeVoidRequestError,
+  fetchMyVoidRequests,
+  latestRequestBySale,
+  requestVoid,
+  type MyVoidRequest,
+  type VoidReason,
+} from "@/src/lib/sales/voidRequests";
 
 export default function SalesHistory() {
   const { profile } = useAuth();
@@ -29,16 +39,26 @@ export default function SalesHistory() {
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  // Cashier: the sale being asked about, and what the owner has answered so far.
+  const [askingId, setAskingId] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [requests, setRequests] = useState<Map<string, MyVoidRequest>>(new Map());
 
   const load = useCallback(() => {
     setLoading(true);
+    // The status badges are a nicety: if they cannot load, the list still shows.
+    if (!isOwner) {
+      fetchMyVoidRequests()
+        .then((list) => setRequests(latestRequestBySale(list)))
+        .catch(() => {});
+    }
     fetchRecentSales()
       .then(setSales)
       .catch((loadError) =>
         setError(loadError instanceof Error ? loadError.message : t("sell.historyLoadError"))
       )
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [t, isOwner]);
 
   useEffect(load, [load]);
 
@@ -65,6 +85,52 @@ export default function SalesHistory() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAsk = async (saleId: string, reasonCode: VoidReason, note: string) => {
+    setSaving(true);
+    setAskError(null);
+    try {
+      await requestVoid(saleId, reasonCode, note);
+      setAskingId(null);
+      load();
+    } catch (askFailure) {
+      setAskError(describeVoidRequestError(askFailure, t));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Cashier: a status once the owner has been asked, otherwise the ask button.
+  const renderAsk = (saleId: string) => {
+    const request = requests.get(saleId);
+    if (request?.status === "pending") {
+      return <StatusPill label={t("sell.voidRequested")} tone="warn" icon="clock" />;
+    }
+    return (
+      <View style={styles.voidBox}>
+        {request?.status === "refused" ? (
+          <>
+            <StatusPill label={t("sell.voidRefused")} tone="bad" icon="x" />
+            {request.refusalNote ? (
+              <Text style={styles.refusal}>
+                {t("sell.voidRefusedNote", { note: request.refusalNote })}
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.voidButton}
+          onPress={() => {
+            setAskError(null);
+            setAskingId(saleId);
+          }}
+        >
+          <Text style={styles.voidButtonText}>{t("sell.askVoid")}</Text>
+        </Pressable>
+      </View>
+    );
   };
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
@@ -123,10 +189,24 @@ export default function SalesHistory() {
                 <Text style={styles.voidButtonText}>{t("sell.voidRefund")}</Text>
               </Pressable>
             ))}
+
+          {!isOwner && !sale.voided_at && (!sale.cashier_id || sale.cashier_id === profile?.id)
+            ? renderAsk(sale.id)
+            : null}
         </View>
       ))}
 
-      {!isOwner && sales.length > 0 && <Text style={styles.note}>{t("sell.ownerOnlyVoid")}</Text>}
+      {askingId && (
+        <VoidRequestSheet
+          key={askingId}
+          visible
+          amountLabel={formatMAD(sales.find((s) => s.id === askingId)?.total_cents ?? 0)}
+          saving={saving}
+          error={askError}
+          onSubmit={(reasonCode, note) => handleAsk(askingId, reasonCode, note)}
+          onClose={() => setAskingId(null)}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -160,6 +240,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   empty: { textAlign: "center", color: "#666", marginTop: 32 },
-  note: { fontSize: 13, color: "#666", fontStyle: "italic", textAlign: "center", marginTop: 10 },
+  refusal: { fontSize: 14, color: "#666" },
   error: { color: "#b3261e" },
 });

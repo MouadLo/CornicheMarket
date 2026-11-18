@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 
 import { colors, radius } from "@/src/theme/tokens";
 
@@ -19,10 +19,13 @@ export function Popover({
   top?: number;
   width?: number;
 }) {
+  // Never wider than the screen minus its 12 px margins (a 380 menu on a 375 phone).
+  const screen = useWindowDimensions().width;
+  const fit = Math.min(width, Math.max(0, screen - 24));
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="close" />
-      <View style={[styles.card, { top, width }]} accessibilityViewIsModal>
+      <View style={[styles.card, { top, width: fit }]} accessibilityViewIsModal>
         {children}
       </View>
     </Modal>

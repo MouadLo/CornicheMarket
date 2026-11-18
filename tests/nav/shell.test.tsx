@@ -19,10 +19,11 @@ let mockSync = {
   syncing: false,
   lastError: null as string | null,
 };
-let mockCounts = { price: 0, discount: 0, negativeStock: 0 };
+let mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
 const mockNavigate = jest.fn();
 const mockFetchReview = jest.fn();
 const mockDismiss = jest.fn();
+const mockFetchVoidRequests = jest.fn();
 
 jest.mock("expo-router", () => {
   const React = require("react");
@@ -71,7 +72,7 @@ jest.mock("../../src/lib/sales/useSaleSync", () => ({
 }));
 jest.mock("../../src/lib/alerts/useOwnerAlerts", () => ({
   useOwnerAlerts: (enabled: boolean) => ({
-    counts: enabled ? mockCounts : { price: 0, discount: 0, negativeStock: 0 },
+    counts: enabled ? mockCounts : { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 },
     refresh: jest.fn(),
   }),
 }));
@@ -79,6 +80,10 @@ jest.mock("../../src/lib/alerts/queries", () => ({
   ...jest.requireActual("../../src/lib/alerts/queries"),
   fetchReviewSales: (...a: unknown[]) => mockFetchReview(...a),
   dismissReview: (...a: unknown[]) => mockDismiss(...a),
+}));
+jest.mock("../../src/lib/sales/voidRequests", () => ({
+  ...jest.requireActual("../../src/lib/sales/voidRequests"),
+  fetchPendingVoidRequests: (...a: unknown[]) => mockFetchVoidRequests(...a),
 }));
 jest.mock("../../src/lib/products/offlineCache", () => ({
   getProductCacheMeta: async () => ({ refreshedAt: "2026-11-01T14:20:00" }),
@@ -125,10 +130,11 @@ beforeEach(() => {
   mockPathname = "/sell";
   mockProfile = cashier;
   mockSync = { online: true, pending: 0, stuck: 0, syncing: false, lastError: null };
-  mockCounts = { price: 0, discount: 0, negativeStock: 0 };
+  mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
   mockNavigate.mockClear();
   mockFetchReview.mockReset();
   mockDismiss.mockReset();
+  mockFetchVoidRequests.mockReset();
   setWidth(1366);
 });
 afterEach(() => {
@@ -298,7 +304,7 @@ describe("the top bar", () => {
     expect(byLabel(r, /^shell\.alertsLabel/)).toHaveLength(0);
 
     mockProfile = owner;
-    mockCounts = { price: 2, discount: 1, negativeStock: 3 };
+    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0 };
     mockSync = { ...mockSync, stuck: 1 };
     r = await render(
       <AppShell>
@@ -360,7 +366,7 @@ describe("the top bar", () => {
 describe("the owner's alerts", () => {
   beforeEach(() => {
     mockProfile = owner;
-    mockCounts = { price: 2, discount: 1, negativeStock: 3 };
+    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0 };
     mockSync = { ...mockSync, stuck: 1 };
   });
 
@@ -390,13 +396,13 @@ describe("the owner's alerts", () => {
   });
 
   it("hides kinds with nothing to do, and says so when all are clear", async () => {
-    mockCounts = { price: 0, discount: 1, negativeStock: 0 };
+    mockCounts = { price: 0, discount: 1, negativeStock: 0, voidRequests: 0 };
     mockSync = { ...mockSync, stuck: 0 };
     let r = await openAlerts();
     expect(texts(r.root)).not.toContain("shell.alertPrice");
     expect(texts(r.root)).toContain("shell.alertDiscount");
 
-    mockCounts = { price: 0, discount: 0, negativeStock: 0 };
+    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
     r = await openAlerts();
     expect(texts(r.root)).toContain("shell.alertsNone");
   });
@@ -441,6 +447,21 @@ describe("the owner's alerts", () => {
     await act(async () => dismiss[dismiss.length - 1].props.onPress());
     expect(mockDismiss).toHaveBeenCalledWith("price", "s1");
     expect(texts(r.root)).toContain("shell.reviewEmpty");
+  });
+
+  it("pending void requests are listed, counted in the badge, and open their panel", async () => {
+    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 2 };
+    mockSync = { ...mockSync, stuck: 0 };
+    mockFetchVoidRequests.mockResolvedValue([]);
+    const r = await openAlerts();
+    expect(byLabel(r, 'shell.alertsLabel{"count":2}').length).toBeGreaterThan(0);
+    expect(texts(r.root)).toContain("shell.alertVoidRequests");
+    const row = r.root.findAll(
+      (n) => typeof n.props.onPress === "function" && texts(n).includes("shell.alertVoidRequests")
+    );
+    await act(async () => row[row.length - 1].props.onPress());
+    expect(mockFetchVoidRequests).toHaveBeenCalled();
+    expect(texts(r.root)).toContain("shell.voidRequestsEmpty");
   });
 
   it("a failed load shows the retry state, never a raw error", async () => {

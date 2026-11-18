@@ -29,6 +29,7 @@ import { BottomTabs } from "./BottomTabs";
 import { formatClock } from "./Clock";
 import { Rail } from "./Rail";
 import { ReviewPanel } from "./ReviewPanel";
+import { VoidRequestsPanel } from "./VoidRequestsPanel";
 import { SyncMenu } from "./SyncMenu";
 import { syncPill } from "./syncState";
 import { TOPBAR_HEIGHT, TopBar } from "./TopBar";
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { counts, refresh: refreshAlerts } = useOwnerAlerts(isOwner, sync.online);
   const [menu, setMenu] = useState<Menu>(null);
   const [review, setReview] = useState<ReviewKind | null>(null);
+  const [voidPanel, setVoidPanel] = useState(false);
 
   // The age of the prices a cashier is selling at while offline.
   const [priceTime, setPriceTime] = useState<string | undefined>();
@@ -129,6 +131,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {compact ? null : <Rail sections={sections} active={active} />}
         <View style={styles.content}>{children}</View>
         <ReviewPanel kind={review} onClose={() => setReview(null)} onChanged={refreshAlerts} />
+        <VoidRequestsPanel
+          visible={voidPanel}
+          onClose={() => setVoidPanel(false)}
+          onChanged={refreshAlerts}
+        />
       </View>
 
       {compact ? (
@@ -158,6 +165,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         onReview={(kind) => {
           close();
           setReview(kind);
+        }}
+        onVoidRequests={() => {
+          close();
+          setVoidPanel(true);
         }}
         onStuck={() => openMenu("sync")}
       />
