@@ -87,11 +87,11 @@ export default function ProductsScreen() {
       setPage(0);
       setHasMore(rows.length === PAGE_SIZE);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load products.");
+      setError(loadError instanceof Error ? loadError.message : t("leftovers.productsLoadError"));
     } finally {
       setLoading(false);
     }
-  }, [filters, isOwner]);
+  }, [filters, isOwner, t]);
 
   useEffect(() => {
     load();

@@ -3,11 +3,12 @@ import { supabase } from "@/src/lib/supabase/client";
 
 export type AdjustmentReason = "damaged" | "expired" | "theft" | "count_correction";
 
-export const ADJUSTMENT_REASONS: { value: AdjustmentReason; label: string }[] = [
-  { value: "damaged", label: "Damaged" },
-  { value: "expired", label: "Expired" },
-  { value: "theft", label: "Theft" },
-  { value: "count_correction", label: "Count correction" },
+// Display names live in src/i18n (see reasonLabel.ts); only the stored codes are here.
+export const ADJUSTMENT_REASONS: AdjustmentReason[] = [
+  "damaged",
+  "expired",
+  "theft",
+  "count_correction",
 ];
 
 export type SalesVelocity = { product_id: string; quantity_sold: number; sale_count: number };

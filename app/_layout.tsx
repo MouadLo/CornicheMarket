@@ -3,7 +3,7 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { I18nextProvider } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
@@ -18,6 +18,9 @@ import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
 SplashScreen.preventAutoHideAsync();
 
 function NavigationGuard({ children }: { children: React.ReactNode }) {
+  // Rendered inside I18nextProvider, which only mounts once the saved language
+  // has loaded (see RootLayout), so these screens use the user's language.
+  const { t } = useTranslation();
   const { session, loading, profileError, loadTimedOut, retryProfile, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -50,15 +53,10 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   if (loading && loadTimedOut) {
     return (
       <View style={guardStyles.container}>
-        <Text style={guardStyles.title}>Le chargement prend trop de temps</Text>
-        <Text style={guardStyles.message}>
-          Impossible de contacter Supabase. Si vous utilisez Supabase local, vérifiez que `npx
-          supabase start` est lancé et que EXPO_PUBLIC_SUPABASE_URL (dans .env ou .env.local) est
-          bien l&apos;URL affichée par `npx supabase status` — pas la chaîne de connexion
-          postgresql://. Sinon, vérifiez votre connexion internet.
-        </Text>
+        <Text style={guardStyles.title}>{t("leftovers.guard.slowTitle")}</Text>
+        <Text style={guardStyles.message}>{t("leftovers.guard.slowMessage")}</Text>
         <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
-          <Text style={guardStyles.retryText}>Réessayer</Text>
+          <Text style={guardStyles.retryText}>{t("leftovers.guard.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -67,13 +65,13 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   if (!loading && profileError) {
     return (
       <View style={guardStyles.container}>
-        <Text style={guardStyles.title}>Impossible de charger le profil</Text>
+        <Text style={guardStyles.title}>{t("leftovers.guard.profileTitle")}</Text>
         <Text style={guardStyles.message}>{profileError}</Text>
         <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
-          <Text style={guardStyles.retryText}>Réessayer</Text>
+          <Text style={guardStyles.retryText}>{t("leftovers.guard.retry")}</Text>
         </Pressable>
         <Pressable onPress={signOut}>
-          <Text style={guardStyles.signOutText}>Se déconnecter</Text>
+          <Text style={guardStyles.signOutText}>{t("leftovers.guard.signOut")}</Text>
         </Pressable>
       </View>
     );
@@ -128,7 +126,10 @@ export default function RootLayout() {
             <Stack>
               <Stack.Screen name="(app)" options={{ headerShown: false }} />
               <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-              <Stack.Screen name="accept-invite" options={{ title: "Set your password" }} />
+              <Stack.Screen
+                name="accept-invite"
+                options={{ title: i18n.t("leftovers.accept.screenTitle") }}
+              />
               <Stack.Screen name="+not-found" />
             </Stack>
           </NavigationGuard>

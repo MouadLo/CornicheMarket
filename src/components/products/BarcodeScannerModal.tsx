@@ -1,6 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
 import { Modal, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { colors } from "@/src/theme/tokens";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   // The camera fires continuously while a code is in frame; one scan is enough.
   const handled = useRef(false);
@@ -33,9 +35,9 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
       <View style={styles.container}>
         {!permission?.granted ? (
           <View style={styles.center}>
-            <Text style={styles.message}>Camera access is needed to scan barcodes.</Text>
-            <BigButton label="Allow camera" onPress={requestPermission} />
-            <BigButton label="Cancel" variant="secondary" onPress={close} />
+            <Text style={styles.message}>{t("leftovers.scanner.cameraNeeded")}</Text>
+            <BigButton label={t("leftovers.scanner.allowCamera")} onPress={requestPermission} />
+            <BigButton label={t("leftovers.scanner.cancel")} variant="secondary" onPress={close} />
           </View>
         ) : (
           <>
@@ -47,8 +49,12 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: Props) {
               onBarcodeScanned={({ data }) => handleScan(data)}
             />
             <View style={styles.overlay}>
-              <Text style={styles.hint}>Point the camera at the barcode</Text>
-              <BigButton label="Cancel" variant="secondary" onPress={close} />
+              <Text style={styles.hint}>{t("leftovers.scanner.pointCamera")}</Text>
+              <BigButton
+                label={t("leftovers.scanner.cancel")}
+                variant="secondary"
+                onPress={close}
+              />
             </View>
           </>
         )}

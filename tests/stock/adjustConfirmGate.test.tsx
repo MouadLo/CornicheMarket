@@ -29,12 +29,7 @@ jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner-1", role: "owner" } }),
 }));
 jest.mock("../../src/lib/inventory/queries", () => ({
-  ADJUSTMENT_REASONS: [
-    { value: "damaged", label: "Damaged" },
-    { value: "expired", label: "Expired" },
-    { value: "theft", label: "Theft" },
-    { value: "count_correction", label: "Count correction" },
-  ],
+  ADJUSTMENT_REASONS: ["damaged", "expired", "theft", "count_correction"],
   createAdjustment: (...args: unknown[]) => mockCreateAdjustment(...args),
   fetchRecentAdjustments: async () => [],
 }));

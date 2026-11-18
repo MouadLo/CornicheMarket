@@ -14,6 +14,7 @@ import {
   type AdjustmentReason,
   type AdjustmentRecord,
 } from "@/src/lib/inventory/queries";
+import { reasonLabel } from "@/src/lib/inventory/reasonLabel";
 import { adjustmentPreviewMessage, lossValueCents } from "@/src/lib/inventory/reorder";
 import type { Product } from "@/src/lib/products/queries";
 
@@ -105,12 +106,12 @@ export default function AdjustScreen() {
           <View style={styles.chips}>
             {ADJUSTMENT_REASONS.map((option) => (
               <Pressable
-                key={option.value}
-                style={[styles.chip, reason === option.value && styles.chipActive]}
-                onPress={() => setReason(option.value)}
+                key={option}
+                style={[styles.chip, reason === option && styles.chipActive]}
+                onPress={() => setReason(option)}
               >
-                <Text style={[styles.chipText, reason === option.value && styles.chipTextActive]}>
-                  {option.label}
+                <Text style={[styles.chipText, reason === option && styles.chipTextActive]}>
+                  {reasonLabel(option, t)}
                 </Text>
               </Pressable>
             ))}
@@ -155,8 +156,7 @@ export default function AdjustScreen() {
             <View style={styles.rowMain}>
               <Text style={styles.historyName}>{record.product_name}</Text>
               <Text style={styles.meta}>
-                {record.reason.replace("_", " ")} ·{" "}
-                {new Date(record.created_at).toLocaleDateString()}
+                {reasonLabel(record.reason, t)} · {new Date(record.created_at).toLocaleDateString()}
                 {record.note ? ` · ${record.note}` : ""}
               </Text>
             </View>

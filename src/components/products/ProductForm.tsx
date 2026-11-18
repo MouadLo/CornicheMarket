@@ -38,6 +38,7 @@ import {
 } from "@/src/lib/products/queries";
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { priceWarning } from "@/src/lib/products/pricing";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -364,7 +365,7 @@ export function ProductForm({
           {UNITS.map((value) => (
             <Chip
               key={value}
-              label={value}
+              label={unitLabel(value, 1, t)}
               selected={unit === value}
               onPress={() => setUnit(value)}
             />

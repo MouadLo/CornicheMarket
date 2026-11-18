@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { router } from "expo-router";
 import { StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -9,7 +11,8 @@ import { supabase } from "@/src/lib/supabase/client";
 // session from the URL before this screen mounts (see detectSessionInUrl
 // in src/lib/supabase/client.ts); the cashier just has to pick a password.
 export default function AcceptInvite() {
-  const { session } = useAuth();
+  const { t } = useTranslation();
+  const { session, signOut } = useAuth();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,32 +30,45 @@ export default function AcceptInvite() {
     }
   };
 
-  if (!session) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>
-          This invite link has expired or was already used. Ask the owner to send a new one.
-        </Text>
-      </View>
-    );
-  }
+  // The invited user was signed in by the link only to set a password. Sign
+  // them out first so the sign-in page does not bounce them straight into the
+  // app on the invite session.
+  const goToSignIn = async () => {
+    try {
+      await signOut();
+    } catch {}
+    router.replace("/sign-in");
+  };
 
   if (done) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Password set. You can now sign in.</Text>
+        <Text style={styles.message}>{t("leftovers.accept.done")}</Text>
+        <View style={styles.buttonWrap}>
+          <BigButton label={t("leftovers.accept.goSignIn")} onPress={goToSignIn} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!session) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>{t("leftovers.accept.expired")}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Corniche Market</Text>
-      <Text style={styles.subtitle}>Choose a password for {session.user.email}</Text>
+      <Text style={styles.title}>{t("leftovers.accept.welcome")}</Text>
+      <Text style={styles.subtitle}>
+        {t("leftovers.accept.choose", { email: session.user.email })}
+      </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="New password"
+        placeholder={t("leftovers.accept.newPassword")}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -62,7 +78,7 @@ export default function AcceptInvite() {
 
       <View style={styles.buttonWrap}>
         <BigButton
-          label={submitting ? "Saving..." : "Set password"}
+          label={submitting ? t("leftovers.accept.saving") : t("leftovers.accept.setPassword")}
           onPress={handleSetPassword}
           disabled={submitting || password.length < 6}
         />
