@@ -126,6 +126,10 @@ const en: Translations = {
     signingIn: "Signing in...",
     invalidCredentials: "Wrong email or password.",
     signInError: "Could not sign in. Check your connection and try again.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    forgotPasswordHelp: "Forgot your password? Ask the store owner to send you a new invite.",
+    language: "Language",
   },
   settings: {
     title: "Settings",

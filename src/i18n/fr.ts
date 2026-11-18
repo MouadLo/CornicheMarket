@@ -125,6 +125,11 @@ const fr = {
     signingIn: "Connexion...",
     invalidCredentials: "Email ou mot de passe incorrect.",
     signInError: "Impossible de se connecter. Vérifiez votre connexion et réessayez.",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
+    forgotPasswordHelp:
+      "Mot de passe oublié ? Demandez au propriétaire du magasin de vous envoyer une nouvelle invitation.",
+    language: "Langue",
   },
   settings: {
     title: "Paramètres",
