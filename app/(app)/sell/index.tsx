@@ -23,7 +23,7 @@ import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
 import { PendingAttemptCard } from "@/src/components/sell/PendingAttemptCard";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
-import { confirm } from "@/src/lib/dialog/store";
+import { confirm, showToast } from "@/src/lib/dialog/store";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
   findCachedByBarcode,
@@ -60,6 +60,7 @@ import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { ProductGrid } from "@/src/components/sell/ProductGrid";
 import { useBasket } from "@/src/lib/sales/basketStore";
+import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -532,8 +533,58 @@ export default function SellScreen() {
       )}
     </>
   );
+  const removeLine = (index: number) => {
+    const removed = lines[index];
+    if (!removed) return;
+    setLines((current) => current.filter((line) => line.product_id !== removed.product_id));
+    showToast({
+      text: t("sell.lineRemoved", { name: isolateBidi(removed.name) }),
+      action: {
+        label: t("common.undo"),
+        onPress: () => setLines((current) => restoreLine(current, removed, index)),
+      },
+    });
+  };
+
+  const emptyBasket = async () => {
+    const ok = await confirm({
+      title: t("sell.emptyBasket"),
+      message: t("sell.emptyBasketConfirm"),
+      confirmLabel: t("sell.emptyBasketYes"),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    const removed = lines;
+    const previousDiscount = saleDiscount;
+    setLines([]);
+    setSaleDiscount("");
+    setDiscountOpen(false);
+    showToast({
+      text: t("sell.basketEmptied"),
+      action: {
+        label: t("common.undo"),
+        onPress: () => {
+          setLines((current) => restoreLines(current, removed));
+          setSaleDiscount((current) => restoreSaleDiscount(current, previousDiscount));
+        },
+      },
+    });
+  };
+
   const cartListNode = (
     <>
+      {lines.length > 0 && (
+        <View style={styles.basketHeader}>
+          <Pressable
+            style={styles.emptyLink}
+            onPress={() => void emptyBasket()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.emptyLinkText}>{t("sell.emptyBasket")}</Text>
+          </Pressable>
+        </View>
+      )}
       <FlatList
         data={lines}
         keyExtractor={(line) => line.product_id}
@@ -543,7 +594,7 @@ export default function SellScreen() {
             onChange={(next) =>
               setLines((current) => current.map((line, i) => (i === index ? next : line)))
             }
-            onRemove={() => setLines((current) => current.filter((_, i) => i !== index))}
+            onRemove={() => removeLine(index)}
           />
         )}
         ListEmptyComponent={
@@ -809,6 +860,9 @@ const styles = StyleSheet.create({
   },
   discountInputInvalid: { borderColor: "#b3261e" },
   discountError: { color: "#b3261e", fontSize: 13 },
+  basketHeader: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 14 },
+  emptyLink: { minHeight: 48, justifyContent: "center" },
+  emptyLinkText: { fontSize: 14, color: "#9a1f18", fontWeight: "600" },
   discountLink: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
   discountLinkText: { fontSize: 15, color: "#1a5fb4", fontWeight: "600" },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

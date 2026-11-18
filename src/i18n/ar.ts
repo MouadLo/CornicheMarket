@@ -4,6 +4,7 @@ const ar: Translations = {
   common: {
     save: "حفظ",
     cancel: "إلغاء",
+    undo: "تراجع",
     delete: "حذف",
     edit: "تعديل",
     add: "إضافة",
@@ -263,6 +264,11 @@ const ar: Translations = {
     lineDiscountTooHigh: "الخصم يتجاوز سعر هذا المنتج.",
     saleDiscountTooHigh: "الخصم يتجاوز إجمالي السلة.",
     remove: "إزالة",
+    emptyBasket: "إفراغ السلة",
+    emptyBasketConfirm: "ستتم إزالة جميع المنتجات من السلة.",
+    emptyBasketYes: "إفراغ",
+    lineRemoved: "تمت إزالة {{name}}",
+    basketEmptied: "تم إفراغ السلة",
     weightRequired: "أدخل الوزن.",
     grid: {
       favorites: "المفضلة",
