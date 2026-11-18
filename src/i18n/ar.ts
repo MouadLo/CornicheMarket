@@ -230,6 +230,7 @@ const ar: Translations = {
     loadError: "تعذر تحميل اليوم.",
     todayClosed: "اليوم مغلق: لا يمكن تسجيل أي عملية بيع. اطلب من المالك إعادة فتحه.",
     closeError: "تعذر إغلاق اليوم.",
+    reopenError: "تعذر إعادة فتح اليوم.",
   },
   sell: {
     basketItems: "{{count}} منتج",

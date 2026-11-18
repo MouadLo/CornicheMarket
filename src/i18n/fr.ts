@@ -234,6 +234,7 @@ const fr = {
     todayClosed:
       "La journée est clôturée : aucune vente ne peut être enregistrée. Demandez au propriétaire de la rouvrir.",
     closeError: "Impossible de clôturer la journée.",
+    reopenError: "Impossible de rouvrir la journée.",
   },
   sell: {
     basketItems: "{{count}} article(s)",
