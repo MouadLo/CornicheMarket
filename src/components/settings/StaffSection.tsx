@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: "600", color: colors.ink900 },
   meta: { fontSize: 13, color: colors.ink600 },
   pill: { paddingHorizontal: spacing.s3, paddingVertical: spacing.s1, borderRadius: radius.pill },
-  pillText: { fontSize: 12, fontWeight: "700" },
+  pillText: { fontSize: 13, fontWeight: "700" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.s2 },
   action: {
     minHeight: touch.min,
