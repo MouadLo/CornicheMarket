@@ -190,6 +190,29 @@ suite("a cashier token cannot reach cost, WAC or profit", () => {
     }
   });
 
+  // ── Staff management (migration 040): owner only ─────────────────────────
+
+  it("cannot list staff or deactivate anyone, and cannot clear its own deactivation", async () => {
+    const list = await client.rpc("list_staff");
+    expect(list.error?.message ?? "executed").toMatch(/only an owner/i);
+
+    const other = await client.rpc("set_staff_active", {
+      p_user_id: "00000000-0000-0000-0000-000000000000",
+      p_active: false,
+    });
+    expect(other.error?.message ?? "executed").toMatch(/only an owner/i);
+
+    const self = await client.rpc("set_staff_active", { p_user_id: cashierId, p_active: true });
+    expect(self.error?.message ?? "executed").toMatch(/only an owner/i);
+
+    // The two columns are not writable through the table at all.
+    const direct = await client
+      .from("profiles")
+      .update({ deactivated_at: null })
+      .eq("id", cashierId);
+    expect(direct.error).toBeTruthy();
+  });
+
   // ── The cashier's own read path must work, and carry no cost ─────────────
 
   it("can read products_cashier_view, and it exposes no cost column", async () => {

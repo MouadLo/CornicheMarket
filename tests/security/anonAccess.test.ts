@@ -55,6 +55,8 @@ const READABLE = [
 
 // Every function the app or the owner calls, with harmless arguments.
 const FUNCTIONS: [string, Record<string, unknown>][] = [
+  ["set_staff_active", { p_user_id: NIL, p_active: false }],
+  ["list_staff", {}],
   [
     "record_sale",
     {
