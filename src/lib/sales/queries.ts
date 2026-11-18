@@ -1,3 +1,4 @@
+import { productsSource } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
 import type { PendingSale } from "@/src/lib/sales/offlineQueue";
@@ -32,6 +33,24 @@ export type SaleSummary = {
   cashier_id?: string;
   voided_at: string | null;
   void_reason: string | null;
+  // The real sale time (an offline sale is stamped on the device).
+  occurred_at?: string | null;
+  // Names for the history rows; null when unknown or not readable.
+  customer_name?: string | null;
+  cashier_name?: string | null;
+};
+
+// One line of a sale as the history shows it. No cost column, ever: a cashier
+// must not see it, and the history has no use for it.
+export type SaleLine = {
+  id: string;
+  sale_id: string;
+  product_name: string | null;
+  unit: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  discount_cents: number;
+  line_total_cents: number;
 };
 
 // The part of the payload both record_sale and recover_sale take.
@@ -140,16 +159,64 @@ export async function recordCustomerPayment(
   if (error) throw new Error(error.message);
 }
 
-export async function fetchRecentSales(limit = 50): Promise<SaleSummary[]> {
+type SaleRow = Omit<SaleSummary, "customer_name" | "cashier_name"> & {
+  customers: { name: string } | null;
+  profiles: { full_name: string | null } | null;
+};
+
+// One page of the history, newest first. Visibility is unchanged: RLS shows a
+// cashier their own sales and the owner everyone's. The customer and cashier
+// names ride along as embedded selects (a cashier can only read their own
+// profile, which is exactly the sales they can see).
+export async function fetchRecentSales(limit = 50, offset = 0): Promise<SaleSummary[]> {
   const { data, error } = await supabase
     .from("sales")
     .select(
-      "id, created_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason"
+      "id, created_at, occurred_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason, customers(name), profiles!sales_cashier_id_fkey(full_name)"
     )
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .order("occurred_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
-  return (data ?? []) as SaleSummary[];
+  return ((data ?? []) as unknown as SaleRow[]).map(({ customers, profiles, ...sale }) => ({
+    ...sale,
+    customer_name: customers?.name ?? null,
+    cashier_name: profiles?.full_name ?? null,
+  }));
+}
+
+// Lines for a batch of sales, with product names. Owner reads sale_items, a
+// cashier the cashier view; neither query selects a cost column.
+export async function fetchSaleLines(saleIds: string[], isOwner: boolean): Promise<SaleLine[]> {
+  if (saleIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from(isOwner ? "sale_items" : "sale_items_cashier_view")
+    .select("id, sale_id, product_id, quantity, unit_price_cents, discount_cents, line_total_cents")
+    .in("sale_id", saleIds)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as unknown as (Omit<SaleLine, "product_name" | "unit"> & {
+    product_id: string;
+  })[];
+
+  const productIds = [...new Set(rows.map((r) => r.product_id))];
+  const names = new Map<string, { name: string; unit: string }>();
+  if (productIds.length > 0) {
+    const { data: products, error: productError } = await supabase
+      .from(productsSource(isOwner))
+      .select("id, name, unit")
+      .in("id", productIds);
+    if (productError) throw new Error(productError.message);
+    for (const p of (products ?? []) as unknown as { id: string; name: string; unit: string }[]) {
+      names.set(p.id, p);
+    }
+  }
+  return rows.map(({ product_id, ...line }) => ({
+    ...line,
+    quantity: Number(line.quantity),
+    product_name: names.get(product_id)?.name ?? null,
+    unit: names.get(product_id)?.unit ?? null,
+  }));
 }
 
 export async function voidSale(saleId: string, reason: string): Promise<void> {
