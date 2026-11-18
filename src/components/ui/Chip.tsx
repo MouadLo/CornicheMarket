@@ -21,8 +21,14 @@ export function Chip({ label, selected, onPress, icon, count }: Props) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
-      style={({ pressed }) => [styles.chip, selected && styles.on, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.chip,
+        selected && styles.on,
+        pressed && (selected ? styles.pressedOn : styles.pressed),
+      ]}
     >
+      {/* In the flow of the row, not absolutely placed: it flips with the writing direction. */}
+      {selected ? <Icon name="check" size={18} color={fg} /> : null}
       {icon ? <Icon name={icon} size={18} color={fg} /> : null}
       <Text style={[styles.label, { color: fg }]}>{label}</Text>
       {count !== undefined ? (
@@ -45,6 +51,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   on: { backgroundColor: colors.brand700, borderColor: colors.brand700 },
-  pressed: { opacity: 0.85 },
+  pressed: { backgroundColor: colors.brand100, borderColor: colors.brand600 },
+  pressedOn: { backgroundColor: colors.brand800, borderColor: colors.brand800 },
   label: { fontSize: 15, fontWeight: "600" },
 });

@@ -199,6 +199,7 @@ export default function DeliveryDetail() {
             value={reason}
             onChangeText={setReason}
             placeholder={t("stockIn.deliveryVoidReason")}
+            accessibilityLabel={t("stockIn.deliveryVoidReason")}
           />
           {error ? <InlineError reasonKey={error} /> : null}
           <BigButton

@@ -282,7 +282,12 @@ function Chip({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: selected }}
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={onPress}
+    >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );

@@ -55,7 +55,11 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       <View style={guardStyles.container}>
         <Text style={guardStyles.title}>{t("startup.slowTitle")}</Text>
         <Text style={guardStyles.message}>{t("startup.slowMessage")}</Text>
-        <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
+        <Pressable
+          accessibilityRole="button"
+          style={guardStyles.retryButton}
+          onPress={retryProfile}
+        >
           <Text style={guardStyles.retryText}>{t("startup.retry")}</Text>
         </Pressable>
       </View>
@@ -67,10 +71,14 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       <View style={guardStyles.container}>
         <Text style={guardStyles.title}>{t("startup.profileTitle")}</Text>
         <Text style={guardStyles.message}>{profileError}</Text>
-        <Pressable style={guardStyles.retryButton} onPress={retryProfile}>
+        <Pressable
+          accessibilityRole="button"
+          style={guardStyles.retryButton}
+          onPress={retryProfile}
+        >
           <Text style={guardStyles.retryText}>{t("startup.retry")}</Text>
         </Pressable>
-        <Pressable onPress={signOut}>
+        <Pressable accessibilityRole="button" onPress={signOut}>
           <Text style={guardStyles.signOutText}>{t("startup.signOut")}</Text>
         </Pressable>
       </View>

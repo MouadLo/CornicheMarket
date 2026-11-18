@@ -145,6 +145,7 @@ export default function ProductsScreen() {
         <TextInput
           style={styles.search}
           placeholder={t("products.searchPlaceholder")}
+          accessibilityLabel={t("products.searchPlaceholder")}
           value={search}
           onChangeText={setSearch}
           autoCapitalize="none"
@@ -309,7 +310,12 @@ function FilterChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: selected }}
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={onPress}
+    >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );
@@ -317,7 +323,7 @@ function FilterChip({
 
 function ActionButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable style={styles.action} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.action} onPress={onPress}>
       <Text style={styles.actionText}>{label}</Text>
     </Pressable>
   );

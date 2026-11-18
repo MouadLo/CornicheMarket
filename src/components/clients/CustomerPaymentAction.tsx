@@ -107,6 +107,7 @@ export function CustomerPaymentAction({ customerId, balanceCents, onRecord, onRe
         onChangeText={changeAmount}
         keyboardType="decimal-pad"
         placeholder={t("credit.amountReceived")}
+        accessibilityLabel={t("credit.amountReceived")}
         placeholderTextColor={colors.ink600}
         autoFocus
       />

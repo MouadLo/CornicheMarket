@@ -32,6 +32,7 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
 
   return (
     <Pressable
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.row,
         { direction: dir },

@@ -40,7 +40,7 @@ export function ListRow({ title, subtitle, leading, trailing, selected, onPress 
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
-      style={style}
+      style={({ pressed }) => [style, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   selected: { backgroundColor: colors.brand50 },
+  pressed: { backgroundColor: colors.brand100 },
   bar: {
     position: "absolute",
     top: 0,

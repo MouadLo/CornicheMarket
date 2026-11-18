@@ -64,11 +64,15 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
           />
         ) : (
           <View style={styles.stepper}>
-            <Pressable style={styles.stepButton} onPress={() => step(-1)}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.stepButton}
+              onPress={() => step(-1)}
+            >
               <Text style={styles.stepText}>−</Text>
             </Pressable>
             <Text style={styles.quantity}>{line.quantity}</Text>
-            <Pressable style={styles.stepButton} onPress={() => step(1)}>
+            <Pressable accessibilityRole="button" style={styles.stepButton} onPress={() => step(1)}>
               <Text style={styles.stepText}>+</Text>
             </Pressable>
           </View>
@@ -84,10 +88,11 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
             <DiscountField
               cents={line.discount_cents}
               invalid={discountTooHigh}
+              label={t("sell.discount")}
               onCents={(discount_cents) => onChange({ ...line, discount_cents })}
             />
           </View>
-          <Pressable onPress={onRemove} style={styles.removeButton}>
+          <Pressable accessibilityRole="button" onPress={onRemove} style={styles.removeButton}>
             <Text style={styles.remove}>{t("sell.remove")}</Text>
           </Pressable>
         </View>
@@ -110,10 +115,12 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
 function DiscountField({
   cents,
   invalid,
+  label,
   onCents,
 }: {
   cents: number;
   invalid: boolean;
+  label: string;
   onCents: (cents: number) => void;
 }) {
   const [text, setText] = useState(cents ? centsToDisplay(cents) : "");
@@ -129,6 +136,7 @@ function DiscountField({
       }}
       keyboardType="decimal-pad"
       placeholder="0.00"
+      accessibilityLabel={label}
     />
   );
 }

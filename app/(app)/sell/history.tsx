@@ -349,6 +349,7 @@ export default function SalesHistory() {
             </View>
           ) : (
             <Pressable
+              accessibilityRole="button"
               style={styles.voidButton}
               onPress={() => {
                 setReason(null);

@@ -139,6 +139,8 @@ export function PaymentSheet({
             <View style={styles.methods}>
               {METHODS.map((value) => (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: method === value }}
                   key={value}
                   style={[styles.method, method === value && styles.methodActive]}
                   onPress={() => setMethod(value)}
@@ -176,6 +178,7 @@ export function PaymentSheet({
 
                 <View style={styles.quickRow}>
                   <Pressable
+                    accessibilityRole="button"
                     style={[styles.quick, styles.quickExact]}
                     onPress={() => setTendered(centsToDisplay(totalCents))}
                   >
@@ -185,6 +188,7 @@ export function PaymentSheet({
                   </Pressable>
                   {quickAmounts(totalCents).map((amount) => (
                     <Pressable
+                      accessibilityRole="button"
                       key={amount}
                       style={styles.quick}
                       onPress={() => setTendered(centsToDisplay(amount))}
@@ -222,6 +226,7 @@ export function PaymentSheet({
                     value={search}
                     onChangeText={setSearch}
                     placeholder={t("sell.searchCustomer")}
+                    accessibilityLabel={t("sell.searchCustomer")}
                   />
                 )}
                 <View style={styles.customers}>
@@ -230,6 +235,8 @@ export function PaymentSheet({
                     const selected = customerId === customer.id;
                     return (
                       <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: selected }}
                         key={customer.id}
                         style={[styles.chip, selected && styles.chipActive]}
                         onPress={() => setCustomerId(customer.id)}
@@ -256,8 +263,13 @@ export function PaymentSheet({
                     value={newCustomer}
                     onChangeText={setNewCustomer}
                     placeholder={t("sell.newCustomerName")}
+                    accessibilityLabel={t("sell.newCustomerName")}
                   />
-                  <Pressable style={styles.addCustomer} onPress={handleCreateCustomer}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.addCustomer}
+                    onPress={handleCreateCustomer}
+                  >
                     <Text style={styles.addCustomerText}>{t("common.add")}</Text>
                   </Pressable>
                 </View>

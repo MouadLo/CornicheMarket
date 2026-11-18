@@ -98,7 +98,11 @@ export default function AdjustScreen() {
               {product.stock_quantity} {product.unit} {t("stockIn.adjustOnRecord")}
             </Text>
           </View>
-          <Pressable onPress={() => setProduct(null)} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setProduct(null)}
+            style={styles.touchTarget}
+          >
             <Text style={styles.change}>{t("stockIn.adjustChange")}</Text>
           </Pressable>
         </View>
@@ -112,6 +116,8 @@ export default function AdjustScreen() {
           <View style={styles.chips}>
             {ADJUSTMENT_REASONS.map((option) => (
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: reason === option }}
                 key={option}
                 style={[styles.chip, reason === option && styles.chipActive]}
                 onPress={() => setReason(option)}
@@ -132,6 +138,9 @@ export default function AdjustScreen() {
             onChangeText={setQuantity}
             keyboardType={isLoss ? "decimal-pad" : "numbers-and-punctuation"}
             placeholder="0"
+            accessibilityLabel={
+              isLoss ? t("stockIn.adjustQuantityLost") : t("stockIn.adjustDifference")
+            }
           />
 
           <TextInput
@@ -139,6 +148,7 @@ export default function AdjustScreen() {
             value={note}
             onChangeText={setNote}
             placeholder={t("stockIn.adjustNote")}
+            accessibilityLabel={t("stockIn.adjustNote")}
           />
 
           {preview && <Text style={styles.preview}>{preview}</Text>}
@@ -211,6 +221,7 @@ const styles = StyleSheet.create({
   selectedMain: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "700" },
   meta: { fontSize: 13, color: "#666" },
+  touchTarget: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   change: { color: "#1d7a46", fontWeight: "600" },
   label: { fontSize: 14, fontWeight: "600", color: "#444" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

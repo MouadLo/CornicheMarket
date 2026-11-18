@@ -16,6 +16,7 @@ type Props = {
 export function BigButton({ label, onPress, variant = "primary", disabled, tall }: Props) {
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [

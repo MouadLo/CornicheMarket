@@ -67,6 +67,7 @@ export default function AcceptInvite() {
       <TextInput
         style={styles.input}
         placeholder={t("invite.newPassword")}
+        accessibilityLabel={t("invite.newPassword")}
         secureTextEntry
         value={password}
         onChangeText={setPassword}

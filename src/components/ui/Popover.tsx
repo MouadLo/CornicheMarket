@@ -27,6 +27,7 @@ export function Popover({
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable
+        accessibilityRole="button"
         style={StyleSheet.absoluteFill}
         onPress={onClose}
         accessibilityLabel={t("common.close")}

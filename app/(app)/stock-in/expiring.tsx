@@ -35,6 +35,8 @@ export default function ExpiringScreen() {
       <View style={styles.chips}>
         {RANGES.map((range) => (
           <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: withinDays === range }}
             key={range}
             style={[styles.chip, withinDays === range && styles.chipActive]}
             onPress={() => setWithinDays(range)}

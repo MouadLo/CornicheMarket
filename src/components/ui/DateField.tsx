@@ -113,6 +113,7 @@ export function DateField({ value, onChange, label, today, min, max, clearable, 
       <Modal transparent visible={open} animationType="fade" onRequestClose={close}>
         <View style={styles.center}>
           <Pressable
+            accessibilityRole="button"
             style={StyleSheet.absoluteFill}
             onPress={close}
             accessibilityLabel={t("common.close")}

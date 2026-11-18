@@ -91,7 +91,12 @@ const CountRow = memo(function CountRow({
     >
       <View style={styles.rowTop}>
         <Text style={styles.name}>{isolateBidi(product.name)}</Text>
-        <Pressable disabled={locked || frozen} onPress={() => onRemove(product.id)} hitSlop={8}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={locked || frozen}
+          onPress={() => onRemove(product.id)}
+          style={styles.touchTarget}
+        >
           <Text style={styles.remove}>{t("stockIn.countRemove")}</Text>
         </Pressable>
       </View>
@@ -109,6 +114,7 @@ const CountRow = memo(function CountRow({
           onChangeText={(value) => onChange(product.id, value)}
           keyboardType="decimal-pad"
           placeholder={t("stockIn.countCounted")}
+          accessibilityLabel={t("stockIn.countCounted")}
           placeholderTextColor={colors.ink400}
         />
       </View>
@@ -487,6 +493,7 @@ export default function StockCountScreen() {
         <View style={styles.chips}>
           {main.map((category) => (
             <Pressable
+              accessibilityRole="button"
               key={category.id}
               style={styles.chip}
               disabled={applying || loading}
@@ -512,7 +519,12 @@ export default function StockCountScreen() {
           <Text style={styles.progress}>
             {t("stockIn.countProgress", { counted: progress.counted, total: progress.total })}
           </Text>
-          <Pressable onPress={() => setOnlyUncounted((on) => !on)} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: onlyUncounted }}
+            onPress={() => setOnlyUncounted((on) => !on)}
+            style={styles.touchTarget}
+          >
             <Text style={styles.toggle}>
               {onlyUncounted ? t("stockIn.countShowAll") : t("stockIn.countOnlyUncounted")}
             </Text>
@@ -606,6 +618,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   progress: { fontSize: 15, fontWeight: "700", color: colors.ink900 },
+  touchTarget: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   toggle: { fontSize: 14, fontWeight: "600", color: colors.brand700 },
   completed: { backgroundColor: colors.success100, borderColor: colors.success600 },
   highlighted: { backgroundColor: colors.brand100, borderColor: colors.brand600 },

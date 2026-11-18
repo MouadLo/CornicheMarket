@@ -32,7 +32,12 @@ export function VoidRequestSheet({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel={t("common.cancel")} />
+      <Pressable
+        accessibilityRole="button"
+        style={styles.scrim}
+        onPress={onClose}
+        accessibilityLabel={t("common.cancel")}
+      />
       <View style={styles.sheet} accessibilityViewIsModal>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>{t("sell.voidRequestTitle")}</Text>

@@ -446,6 +446,7 @@ export default function ReportsScreen() {
                 ))}
                 {deadStock.length > 20 && (
                   <Pressable
+                    accessibilityRole="button"
                     style={styles.showAllButton}
                     onPress={() => setShowAllDeadStock((prev) => !prev)}
                   >
@@ -462,12 +463,14 @@ export default function ReportsScreen() {
 
           <View style={styles.exportRow}>
             <Pressable
+              accessibilityRole="button"
               style={styles.exportButton}
               onPress={() => exportTablesAsCsv(`report-${fileStamp}.csv`, buildTables())}
             >
               <Text style={styles.exportText}>{t("reports.exportCsv")}</Text>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
               style={styles.exportButton}
               onPress={() =>
                 exportTablesAsPdf(
