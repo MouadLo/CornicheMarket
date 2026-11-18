@@ -62,6 +62,7 @@ import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { ProductGrid } from "@/src/components/sell/ProductGrid";
 import { useBasket } from "@/src/lib/sales/basketStore";
 import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
+import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -133,6 +134,8 @@ export default function SellScreen() {
   useEffect(() => {
     void loadGrid();
   }, [loadGrid]);
+  // The owner changed a tile (colour, favourite) on this device: reload it now.
+  useEffect(() => subscribeGridRefresh(() => void loadGrid()), [loadGrid]);
   const gridTabs: ResolvedTab[] = useMemo(
     () =>
       cachedGrid
