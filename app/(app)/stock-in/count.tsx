@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { errorKey } from "@/src/lib/errors/userMessage";
@@ -39,6 +39,7 @@ import {
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
+import { useCameraScanAvailable } from "@/src/lib/scanner/scanMode";
 import { useKeyboardWedge } from "@/src/lib/sales/useKeyboardWedge";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
@@ -169,6 +170,7 @@ export default function StockCountScreen() {
   const linesRef = useRef(lines);
   linesRef.current = lines;
   const [scannerOpen, setScannerOpen] = useState(false);
+  const cameraScan = useCameraScanAvailable();
   const [applying, setApplying] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -466,7 +468,7 @@ export default function StockCountScreen() {
     <View style={styles.header}>
       <Text style={styles.intro}>{t("stockIn.countIntro")}</Text>
 
-      {Platform.OS !== "web" && (
+      {cameraScan && (
         <BigButton label={t("stockIn.countScanItems")} onPress={() => setScannerOpen(true)} />
       )}
 
