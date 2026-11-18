@@ -244,6 +244,7 @@ const ar: Translations = {
     historyPayLater: "الدفع لاحقاً",
     historyDiscount: "· خصم {{amount}}",
     historyVoided: "· ملغي ({{reason}})",
+    historyRequestedBy: "بطلب من {{name}}",
     historyDayTotal: "المجموع {{amount}}",
     historyMore: "عرض المزيد من المبيعات",
     historyLoadingMore: "جاري التحميل...",

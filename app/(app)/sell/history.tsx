@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -19,7 +20,14 @@ import { formatMAD } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
 import { fetchStoreTimezone } from "@/src/lib/reports/queries";
-import { groupSalesByDay, itemsPreview, saleInstant } from "@/src/lib/sales/historyView";
+import {
+  groupSalesByDay,
+  itemsPreview,
+  parseVoidReason,
+  saleInstant,
+  type VoidReasonCode,
+} from "@/src/lib/sales/historyView";
+import { isolateBidi } from "@/src/lib/text/bidi";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import {
   fetchRecentSales,
@@ -222,7 +230,9 @@ export default function SalesHistory() {
                 {sale.discount_cents > 0
                   ? ` ${t("sell.historyDiscount", { amount: formatMAD(sale.discount_cents) })}`
                   : ""}
-                {sale.voided_at ? ` ${t("sell.historyVoided", { reason: sale.void_reason })}` : ""}
+                {sale.voided_at
+                  ? ` ${t("sell.historyVoided", { reason: voidReasonText(sale.void_reason, t) })}`
+                  : ""}
               </Text>
               {sale.customer_name ? (
                 <Text style={styles.meta}>
@@ -235,8 +245,18 @@ export default function SalesHistory() {
                 </Text>
               ) : null}
               {preview ? (
-                <Text style={styles.preview} numberOfLines={1}>
-                  {preview.shown.join(", ")}
+                <Text
+                  style={[
+                    styles.preview,
+                    // The first product name must not set the line's direction
+                    // (an Arabic name pushed a French line to the right).
+                    language === "ar"
+                      ? { writingDirection: "rtl", textAlign: "right" }
+                      : { writingDirection: "ltr", textAlign: "left" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {preview.shown.map((name) => isolateBidi(name)).join(", ")}
                   {preview.more > 0
                     ? ` ${t("sell.historyItemsMore", { count: preview.more })}`
                     : ""}
@@ -385,7 +405,7 @@ const styles = StyleSheet.create({
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   rowMain: { flex: 1, gap: 3 },
   time: { fontSize: 15, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#666", textTransform: "capitalize" },
+  meta: { fontSize: 13, color: "#666" },
   total: { fontSize: 17, fontWeight: "700" },
   totalVoided: { textDecorationLine: "line-through", color: "#999" },
   voidButton: {
@@ -410,3 +430,22 @@ const styles = StyleSheet.create({
   refusal: { fontSize: 14, color: "#666" },
   error: { color: "#b3261e" },
 });
+
+const REASON_KEYS: Record<VoidReasonCode, string> = {
+  wrong_item: "sell.voidReasonWrongItem",
+  wrong_quantity: "sell.voidReasonWrongQuantity",
+  customer_changed_mind: "sell.voidReasonChangedMind",
+  other: "sell.voidReasonOther",
+};
+
+// A reason from an approved void request, translated; anything else as stored.
+function voidReasonText(reason: string | null, t: TFunction) {
+  const parsed = parseVoidReason(reason);
+  if (!parsed) return reason ?? "";
+  const label = parsed.note
+    ? `${t(REASON_KEYS[parsed.code])}: ${parsed.note}`
+    : t(REASON_KEYS[parsed.code]);
+  return parsed.requestedBy
+    ? `${label} · ${t("sell.historyRequestedBy", { name: isolateBidi(parsed.requestedBy) })}`
+    : label;
+}

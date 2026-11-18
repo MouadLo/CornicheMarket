@@ -245,6 +245,7 @@ const en: Translations = {
     historyPayLater: "pay later",
     historyDiscount: "· discount {{amount}}",
     historyVoided: "· VOIDED ({{reason}})",
+    historyRequestedBy: "requested by {{name}}",
     historyDayTotal: "Total {{amount}}",
     historyMore: "Load more sales",
     historyLoadingMore: "Loading...",

@@ -245,6 +245,7 @@ const fr = {
     historyPayLater: "crédit",
     historyDiscount: "· remise {{amount}}",
     historyVoided: "· ANNULÉ ({{reason}})",
+    historyRequestedBy: "demandée par {{name}}",
     historyDayTotal: "Total {{amount}}",
     historyMore: "Charger plus de ventes",
     historyLoadingMore: "Chargement...",

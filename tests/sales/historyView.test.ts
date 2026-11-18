@@ -1,6 +1,7 @@
 import {
   groupSalesByDay,
   itemsPreview,
+  parseVoidReason,
   saleInstant,
   storeDayKey,
 } from "../../src/lib/sales/historyView";
@@ -69,5 +70,25 @@ describe("itemsPreview", () => {
   });
   it("handles an empty list", () => {
     expect(itemsPreview([])).toEqual({ shown: [], more: 0 });
+  });
+});
+
+describe("parseVoidReason", () => {
+  it("reads a reason written by an approved void request", () => {
+    expect(parseVoidReason("wrong_quantity (requested by Amina Cashier)")).toEqual({
+      code: "wrong_quantity",
+      note: null,
+      requestedBy: "Amina Cashier",
+    });
+    expect(parseVoidReason("other - client a payé deux fois (requested by Amina)")).toEqual({
+      code: "other",
+      note: "client a payé deux fois",
+      requestedBy: "Amina",
+    });
+  });
+
+  it("leaves a reason typed by the owner alone", () => {
+    expect(parseVoidReason("retour client")).toBeNull();
+    expect(parseVoidReason(null)).toBeNull();
   });
 });

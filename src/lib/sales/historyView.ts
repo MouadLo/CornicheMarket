@@ -57,6 +57,31 @@ export function groupSalesByDay<S extends HistorySale>(
 }
 
 // First `max` distinct names and how many more there are ("Oil, Rice +3").
+// An approved void request stores its reason as
+// "<code>[ - <note>] (requested by <name>)" (migration 038, decide_void_request).
+// Parsed back so the history can show it translated; any other reason (typed
+// by the owner) is shown as it is.
+export type VoidReasonCode = "wrong_item" | "wrong_quantity" | "customer_changed_mind" | "other";
+export type ParsedVoidReason = {
+  code: VoidReasonCode;
+  note: string | null;
+  requestedBy: string | null;
+};
+
+const REQUEST_REASON =
+  /^(wrong_item|wrong_quantity|customer_changed_mind|other)(?: - (.*?))?(?: \(requested by (.+)\))?$/s;
+
+export function parseVoidReason(reason: string | null): ParsedVoidReason | null {
+  if (!reason) return null;
+  const match = REQUEST_REASON.exec(reason.trim());
+  if (!match) return null;
+  return {
+    code: match[1] as VoidReasonCode,
+    note: match[2]?.trim() || null,
+    requestedBy: match[3]?.trim() || null,
+  };
+}
+
 export function itemsPreview(names: string[], max = 2): { shown: string[]; more: number } {
   const distinct = [...new Set(names)];
   return { shown: distinct.slice(0, max), more: Math.max(0, distinct.length - max) };
