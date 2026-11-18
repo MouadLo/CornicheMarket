@@ -1,5 +1,5 @@
 import React from "react";
-import { Dimensions, FlatList } from "react-native";
+import { Dimensions, FlatList, StyleSheet } from "react-native";
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 
 import SellScreen from "../../app/(app)/sell/index";
@@ -270,6 +270,36 @@ describe("ProductGrid", () => {
     expect(labelOf(coca)).toContain('"count":3');
   });
 
+  it("overlays the badge on the corner, so the name's row never changes", () => {
+    const find = (cart: Record<string, number>) => {
+      act(() => {
+        tree = create(<ProductGrid tabs={tabs} inCart={cart} onAdd={() => {}} />);
+      });
+      const coca = tiles(tree.root).find(
+        (n) => labelOf(n).startsWith("sell.grid.tileLabel") && nameOf(n) === "Coca"
+      )!;
+      const name = coca.findAll((n) => n.props.numberOfLines === 2)[0];
+      const badge = coca.findAll(
+        (n) => typeof n.type === "string" && n.props.testID === "tile-qty-badge"
+      );
+      return { name, badge, row: name.parent! };
+    };
+    const before = find({});
+    expect(before.badge).toHaveLength(0);
+    const nameStyle = StyleSheet.flatten(before.name.props.style);
+    const rowStyle = StyleSheet.flatten(before.row.props.style);
+    act(() => tree.unmount());
+
+    const after = find({ a: 1 });
+    expect(after.badge).toHaveLength(1);
+    const badgeStyle = StyleSheet.flatten(after.badge[0].props.style);
+    expect(badgeStyle.position).toBe("absolute");
+    expect(badgeStyle.end).toBeDefined();
+    expect(after.row.findAll((n) => n.props.testID === "tile-qty-badge")).toHaveLength(0);
+    expect(StyleSheet.flatten(after.name.props.style)).toEqual(nameStyle);
+    expect(StyleSheet.flatten(after.row.props.style)).toEqual(rowStyle);
+  });
+
   it("renders nothing when there are no tabs", () => {
     act(() => {
       tree = create(<ProductGrid tabs={[]} inCart={{}} onAdd={() => {}} />);
@@ -349,5 +379,17 @@ describe("Sell with the grid", () => {
     )[0];
     await act(async () => back.props.onPress());
     expect(pain()).toBeDefined();
+  });
+
+  it("centres the empty-basket hint across the full pane width", async () => {
+    mockWidth = 1366;
+    await render();
+    const hint = tree.root.findAll(
+      (n) => typeof n.type === "function" && n.props.children === "sell.empty"
+    )[0];
+    const style = StyleSheet.flatten(hint.props.style);
+    expect(style.textAlign).toBe("center");
+    expect(style.alignSelf).toBe("stretch");
+    expect(style.width).toBe("100%");
   });
 });

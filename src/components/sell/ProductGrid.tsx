@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/src/components/ui/Icon";
@@ -96,6 +103,20 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange }: P
   );
 }
 
+// On web, Arabic only sets dir="rtl" on the page, and absolutely positioned
+// start/end do not follow it, so the corner side is chosen here. Native flips
+// left/right itself once RTL is forced (src/i18n), so it keeps start/end.
+function cornerSide(language: string | undefined, inset: number) {
+  if (Platform.OS === "web") return language === "ar" ? { left: inset } : { right: inset };
+  return { end: inset };
+}
+
+// The name keeps the corner free on the same side (see styles.name).
+function namePad(language: string | undefined) {
+  if (Platform.OS === "web") return language === "ar" ? { paddingLeft: 16 } : { paddingRight: 16 };
+  return { paddingEnd: 16 };
+}
+
 function Tile({
   tile,
   width,
@@ -107,7 +128,8 @@ function Tile({
   count: number;
   onPress: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n?.language;
   const { product } = tile;
   const palette = tilePalette[tile.color ?? "grey"];
   const kg = product.unit === "kg";
@@ -133,17 +155,26 @@ function Tile({
     >
       <View style={[styles.strip, { backgroundColor: palette.strip }]} />
       <View style={styles.tileTop}>
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={[styles.name, namePad(language)]} numberOfLines={2}>
           {isolateBidi(tile.label)}
         </Text>
-        {count > 0 ? (
-          <View style={styles.qty}>
-            <Text style={[styles.qtyText, tabularNumbers]}>{kg ? "✓" : `×${count}`}</Text>
-          </View>
-        ) : kg ? (
-          <Icon name="scale" size={18} color={colors.ink600} />
-        ) : null}
       </View>
+      {/* The end corner holds the basket badge, or the scale for a weighed
+          product not yet in the basket. Overlaid, so the name's width never
+          changes (C16). */}
+      {count > 0 ? (
+        <View
+          style={[styles.qty, cornerSide(language, 3)]}
+          testID="tile-qty-badge"
+          pointerEvents="none"
+        >
+          <Text style={[styles.qtyText, tabularNumbers]}>{kg ? "✓" : `×${count}`}</Text>
+        </View>
+      ) : kg ? (
+        <View style={[styles.corner, cornerSide(language, 5)]} pointerEvents="none">
+          <Icon name="scale" size={18} color={colors.ink600} />
+        </View>
+      ) : null}
       <View style={styles.tileBottom}>
         <View style={styles.priceLine}>
           <Text
@@ -223,12 +254,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 4,
   },
-  name: { flex: 1, fontSize: 17, fontWeight: "600", color: colors.ink900, lineHeight: 20 },
+  // namePad() always reserves the badge's corner, so the name never runs
+  // under it and its width does not change when the badge appears (C16).
+  name: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    color: colors.ink900,
+    lineHeight: 20,
+  },
+  corner: { position: "absolute", top: 6 },
   qty: {
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 7,
-    borderRadius: 12,
+    position: "absolute",
+    top: 4,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
     backgroundColor: colors.brand700,
     alignItems: "center",
     justifyContent: "center",
