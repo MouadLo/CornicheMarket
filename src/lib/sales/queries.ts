@@ -4,7 +4,14 @@ import type { PendingSale } from "@/src/lib/sales/offlineQueue";
 
 export type PaymentMethod = "cash" | "card" | "credit";
 
-export type Customer = { id: string; name: string; phone: string | null };
+// balance_cents: what the customer owes (credit not yet repaid); absent on a
+// customer just created, who owes nothing.
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  balance_cents?: number;
+};
 
 export type CustomerBalance = {
   id: string;
@@ -86,7 +93,11 @@ export async function fetchCashierNames(ids: string[]): Promise<Record<string, s
 }
 
 export async function fetchCustomers(): Promise<Customer[]> {
-  const { data, error } = await supabase.from("customers").select("id, name, phone").order("name");
+  // The balances view (cashiers may read it) so the counter sees who owes what.
+  const { data, error } = await supabase
+    .from("customer_balances")
+    .select("id, name, phone, balance_cents")
+    .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Customer[];
 }

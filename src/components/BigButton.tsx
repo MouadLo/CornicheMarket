@@ -9,15 +9,18 @@ type Props = {
   // "pay" is the one green button: money coming in (Encaisser, complete sale).
   variant?: "primary" | "secondary" | "danger" | "pay";
   disabled?: boolean;
+  // The main action of a sheet: the 72 px pay height (touch.pay).
+  tall?: boolean;
 };
 
-export function BigButton({ label, onPress, variant = "primary", disabled }: Props) {
+export function BigButton({ label, onPress, variant = "primary", disabled, tall }: Props) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.base,
+        tall && styles.tall,
         disabled ? styles.disabled : styles[variant],
         pressed && !disabled && styles.pressed,
       ]}
@@ -43,6 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
   },
+  tall: { minHeight: touch.pay },
   primary: { backgroundColor: colors.brand700 },
   pay: { backgroundColor: colors.success600 },
   secondary: {

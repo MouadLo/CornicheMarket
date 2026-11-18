@@ -1,13 +1,16 @@
-import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
+import { filterCustomers, findCustomerByName, pressCashKey } from "@/src/lib/sales/cashEntry";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { changeDue, isShortPayment } from "@/src/lib/sales/totals";
+import { isScannerBurst, keyFromKeyboardEvent, type WeightKey } from "@/src/lib/sales/weightEntry";
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
-import { colors, radius } from "@/src/theme/tokens";
+import { isolateBidi } from "@/src/lib/text/bidi";
+import { colors, radius, touch } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
 type Props = {
@@ -24,6 +27,16 @@ type Props = {
 
 const METHODS: PaymentMethod[] = ["cash", "card", "credit"];
 
+// Past this many customers the list gets a search box.
+const SEARCH_FROM = 6;
+
+const KEY_ROWS: WeightKey[][] = [
+  ["7", "8", "9"],
+  ["4", "5", "6"],
+  ["1", "2", "3"],
+  [".", "0", "back"],
+];
+
 export function PaymentSheet({
   visible,
   totalCents,
@@ -39,6 +52,7 @@ export function PaymentSheet({
   const [tendered, setTendered] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [newCustomer, setNewCustomer] = useState("");
+  const [search, setSearch] = useState("");
 
   // The sheet stays mounted between sales, so its state would otherwise carry
   // over: after a credit sale the next customer's sheet opened on "Pay later"
@@ -54,147 +68,252 @@ export function PaymentSheet({
       setTendered("");
       setCustomerId(null);
       setNewCustomer("");
+      setSearch("");
     }
   }
 
   const tenderedCents = parseMoneyToCents(tendered) ?? 0;
   const short = method === "cash" && tendered !== "" && isShortPayment(tenderedCents, totalCents);
   const change = changeDue(tenderedCents, totalCents);
-  const needsCustomer = method === "credit" && !customerId;
+  const chosen = customers.find((customer) => customer.id === customerId) ?? null;
+  const needsCustomer = method === "credit" && !chosen;
+
+  // Physical keyboard on web: digits, the decimal point and Backspace fill the
+  // cash amount. Enter is left alone (a scanner ends with it), and keys that
+  // arrive scanner-fast are ignored.
+  const active = visible && method === "cash";
+  const lastKeyAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (!active || Platform.OS !== "web" || typeof document === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = keyFromKeyboardEvent(event.key);
+      if (key === null || key === "enter" || key === "escape") return;
+      const scanned =
+        key !== "back" && (event.repeat || isScannerBurst(lastKeyAt.current, event.timeStamp));
+      lastKeyAt.current = event.timeStamp;
+      event.preventDefault();
+      if (!scanned) setTendered((current) => pressCashKey(current, key));
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [active]);
 
   const handleCreateCustomer = async () => {
-    if (!newCustomer.trim()) return;
-    const created = await onCreateCustomer(newCustomer.trim());
+    const name = newCustomer.trim();
+    if (!name) return;
+    // Typing someone who already exists selects them: a second record would
+    // split their debt in two.
+    const existing = findCustomerByName(customers, name);
+    if (existing) {
+      setCustomerId(existing.id);
+      setNewCustomer("");
+      return;
+    }
+    const created = await onCreateCustomer(name);
     if (created) {
       setCustomerId(created.id);
       setNewCustomer("");
     }
   };
 
+  const shown = filterCustomers(customers, search);
+
+  const confirmLabel = saving
+    ? t("common.saving")
+    : method === "credit" && chosen
+      ? t("sell.putOnCredit", { amount: formatMAD(totalCents), name: isolateBidi(chosen.name) })
+      : t("sell.completeSale");
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <ScrollView style={styles.sheet} contentContainerStyle={styles.sheetContent}>
-          <Text style={styles.total}>{formatMAD(totalCents)}</Text>
+        <View style={styles.sheet}>
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.sheetContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.total}>{formatMAD(totalCents)}</Text>
 
-          <View style={styles.methods}>
-            {METHODS.map((value) => (
-              <Pressable
-                key={value}
-                style={[styles.method, method === value && styles.methodActive]}
-                onPress={() => setMethod(value)}
-              >
-                <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
-                  {value === "credit" ? t("sell.payLater") : t(paymentMethodKey(value))}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {method === "cash" && (
-            <View style={styles.block}>
-              <Text style={styles.label}>{t("sell.cashReceived")}</Text>
-              <TextInput
-                style={styles.input}
-                value={tendered}
-                onChangeText={setTendered}
-                keyboardType="decimal-pad"
-                placeholder={centsToDisplay(totalCents)}
-              />
-              <View style={styles.quickRow}>
-                {quickAmounts(totalCents).map((amount) => (
-                  <Pressable
-                    key={amount}
-                    style={styles.quick}
-                    onPress={() => setTendered(centsToDisplay(amount))}
-                  >
-                    <Text style={styles.quickText}>{centsToDisplay(amount)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {short ? (
-                <Text style={styles.short}>
-                  {t("sell.shortBy", { amount: formatMAD(totalCents - tenderedCents) })}
-                </Text>
-              ) : (
-                <View style={styles.changeBox}>
-                  <Text style={styles.changeLabel}>{t("sell.change")}</Text>
-                  <Text style={styles.changeValue}>{formatMAD(change)}</Text>
-                </View>
-              )}
+            <View style={styles.methods}>
+              {METHODS.map((value) => (
+                <Pressable
+                  key={value}
+                  style={[styles.method, method === value && styles.methodActive]}
+                  onPress={() => setMethod(value)}
+                >
+                  <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
+                    {value === "credit" ? t("sell.payLater") : t(paymentMethodKey(value))}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-          )}
 
-          {method === "credit" && (
-            <View style={styles.block}>
-              <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
-              <View style={styles.customers}>
-                {customers.map((customer) => (
-                  <Pressable
-                    key={customer.id}
-                    style={[styles.chip, customerId === customer.id && styles.chipActive]}
-                    onPress={() => setCustomerId(customer.id)}
+            {method === "cash" && (
+              <View style={styles.block}>
+                <Text style={styles.label}>{t("sell.cashReceived")}</Text>
+                {/* Not a text field: the system keyboard would cover the sheet. */}
+                <View style={styles.display}>
+                  <Text
+                    testID="cash-entry"
+                    style={[styles.entry, tendered === "" && styles.entryEmpty]}
                   >
-                    <Text
-                      style={[styles.chipText, customerId === customer.id && styles.chipTextActive]}
-                    >
-                      {customer.name}
+                    {tendered === "" ? "—" : tendered}
+                  </Text>
+                  <Text style={styles.unit}>DH</Text>
+                </View>
+                {short ? (
+                  <Text style={styles.short}>
+                    {t("sell.shortBy", { amount: formatMAD(totalCents - tenderedCents) })}
+                  </Text>
+                ) : (
+                  <View style={styles.changeBox}>
+                    <Text style={styles.changeLabel}>{t("sell.change")}</Text>
+                    <Text style={styles.changeValue}>{formatMAD(change)}</Text>
+                  </View>
+                )}
+
+                <View style={styles.quickRow}>
+                  <Pressable
+                    style={[styles.quick, styles.quickExact]}
+                    onPress={() => setTendered(centsToDisplay(totalCents))}
+                  >
+                    <Text style={[styles.quickText, styles.quickExactText]}>
+                      {t("sell.exactAmount")}
                     </Text>
                   </Pressable>
+                  {quickAmounts(totalCents).map((amount) => (
+                    <Pressable
+                      key={amount}
+                      style={styles.quick}
+                      onPress={() => setTendered(centsToDisplay(amount))}
+                    >
+                      <Text style={styles.quickText}>{centsToDisplay(amount)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {KEY_ROWS.map((row) => (
+                  <View key={row.join("")} style={styles.keyRow}>
+                    {row.map((key) => (
+                      <Pressable
+                        key={key}
+                        testID={`cash-key-${key}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={key === "back" ? t("common.back") : key}
+                        style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
+                        onPress={() => setTendered((current) => pressCashKey(current, key))}
+                      >
+                        <Text style={styles.keyText}>{key === "back" ? "⌫" : key}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 ))}
               </View>
+            )}
 
-              <View style={styles.newCustomerRow}>
-                <TextInput
-                  style={[styles.input, styles.flex]}
-                  value={newCustomer}
-                  onChangeText={setNewCustomer}
-                  placeholder={t("sell.newCustomerName")}
-                />
-                <Pressable style={styles.addCustomer} onPress={handleCreateCustomer}>
-                  <Text style={styles.addCustomerText}>{t("common.add")}</Text>
-                </Pressable>
+            {method === "credit" && (
+              <View style={styles.block}>
+                <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
+                {customers.length > SEARCH_FROM && (
+                  <TextInput
+                    style={styles.input}
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder={t("sell.searchCustomer")}
+                  />
+                )}
+                <View style={styles.customers}>
+                  {shown.map((customer) => {
+                    const owed = customer.balance_cents ?? 0;
+                    const selected = customerId === customer.id;
+                    return (
+                      <Pressable
+                        key={customer.id}
+                        style={[styles.chip, selected && styles.chipActive]}
+                        onPress={() => setCustomerId(customer.id)}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                          {customer.name}
+                        </Text>
+                        {owed > 0 && (
+                          <Text style={[styles.chipOwes, selected && styles.chipTextActive]}>
+                            {t("sell.owes", { amount: formatMAD(owed) })}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                  {shown.length === 0 && (
+                    <Text style={styles.hint}>{t("sell.noCustomerFound")}</Text>
+                  )}
+                </View>
+
+                <View style={styles.newCustomerRow}>
+                  <TextInput
+                    style={[styles.input, styles.flex]}
+                    value={newCustomer}
+                    onChangeText={setNewCustomer}
+                    placeholder={t("sell.newCustomerName")}
+                  />
+                  <Pressable style={styles.addCustomer} onPress={handleCreateCustomer}>
+                    <Text style={styles.addCustomerText}>{t("common.add")}</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {error && <Text style={styles.error}>{error}</Text>}
+            {error && <Text style={styles.error}>{error}</Text>}
+          </ScrollView>
 
-          <BigButton
-            label={saving ? t("common.saving") : t("sell.completeSale")}
-            variant="pay"
-            onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
-            disabled={saving || needsCustomer || short}
-          />
-          <BigButton label={t("common.back")} variant="secondary" onPress={onClose} />
-        </ScrollView>
+          {/* Pinned: Complete sale is always in the same place, whatever the method. */}
+          <View style={styles.footer}>
+            {needsCustomer && <Text style={styles.hint}>{t("sell.chooseCustomer")}</Text>}
+            <BigButton
+              label={confirmLabel}
+              variant="pay"
+              tall
+              onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
+              disabled={saving || needsCustomer || short}
+            />
+            <Pressable style={styles.back} onPress={onClose} accessibilityRole="button">
+              <Text style={styles.backText}>{t("common.back")}</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
     </Modal>
   );
 }
 
-// Note amounts a customer is likely to hand over for this total.
+// Notes a customer is likely to hand over above this total (the exact amount has its own button).
 function quickAmounts(totalCents: number): number[] {
   const notes = [2000, 5000, 10000, 20000];
-  const options = notes.filter((note) => note > totalCents);
-  return [totalCents, ...options].slice(0, 4);
+  return notes.filter((note) => note > totalCents).slice(0, 3);
 }
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  // A centred panel (like the weight keypad), not the full width: the basket
+  // stays visible behind it on a wide screen.
   sheet: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "92%",
+    maxHeight: "96%",
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
   },
-  sheetContent: { padding: 20, gap: 14 },
+  body: { flexShrink: 1 },
+  sheetContent: { padding: 20, paddingBottom: 8, gap: 12 },
   total: { fontSize: 34, fontWeight: "800", textAlign: "center" },
   methods: { flexDirection: "row", gap: 8 },
   method: {
     flex: 1,
-    paddingVertical: 16,
+    minHeight: touch.lg,
+    justifyContent: "center",
     borderRadius: radius.control,
     backgroundColor: colors.divider,
     alignItems: "center",
@@ -218,38 +337,66 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   flex: { flex: 1 },
+  display: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "baseline",
+    gap: 8,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.ink400,
+    paddingVertical: 8,
+  },
+  entry: { fontSize: 40, fontWeight: "800" },
+  entryEmpty: { color: colors.ink400 },
+  unit: { fontSize: 20, fontWeight: "600", color: colors.ink600 },
   quickRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   quick: {
-    minHeight: 48,
+    flexGrow: 1,
+    minHeight: touch.lg,
+    alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: radius.control,
     backgroundColor: colors.brand100,
   },
-  quickText: { fontSize: 15, fontWeight: "600", color: colors.brand700 },
+  quickExact: { backgroundColor: colors.brand700 },
+  quickExactText: { color: colors.white },
+  quickText: { fontSize: 18, fontWeight: "700", color: colors.brand700 },
+  keyRow: { flexDirection: "row", gap: 8 },
+  key: {
+    flex: 1,
+    minHeight: touch.lg,
+    borderRadius: radius.control,
+    backgroundColor: colors.brand100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyPressed: { opacity: 0.7 },
+  keyText: { fontSize: 24, fontWeight: "700", color: colors.ink900 },
   changeBox: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: colors.brand50,
     borderRadius: radius.control,
-    padding: 16,
+    padding: 14,
   },
   changeLabel: { fontSize: 16, fontWeight: "600" },
   changeValue: { fontSize: 26, fontWeight: "800", color: colors.success700 },
   short: { color: colors.danger600, fontSize: 16, fontWeight: "600" },
   customers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    minHeight: 48,
+    minHeight: touch.min,
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
     backgroundColor: colors.divider,
   },
   chipActive: { backgroundColor: colors.brand700 },
   chipText: { fontSize: 14, color: colors.ink700 },
+  chipOwes: { fontSize: 12, color: colors.danger600 },
   chipTextActive: { color: colors.white, fontWeight: "600" },
   newCustomerRow: { flexDirection: "row", gap: 8 },
   addCustomer: {
@@ -261,4 +408,15 @@ const styles = StyleSheet.create({
   },
   addCustomerText: { color: colors.white, fontWeight: "700", fontSize: 15 },
   error: { color: colors.danger600, fontSize: 14 },
+  footer: {
+    padding: 20,
+    paddingTop: 10,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  hint: { fontSize: 14, color: colors.ink600, textAlign: "center" },
+  // Small and apart from Complete sale: a slip must not leave the payment.
+  back: { minHeight: touch.min, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  backText: { fontSize: 16, fontWeight: "600", color: colors.ink600 },
 });
