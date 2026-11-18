@@ -10,6 +10,7 @@ import {
   parseQuantity,
 } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 import { normalizeExpiryDate } from "@/src/lib/stock/receive";
 import {
   isSignificantPriceChange,
@@ -69,18 +70,20 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
           {product.name}
         </Text>
         <Pressable onPress={onRemove} hitSlop={8}>
-          <Text style={styles.remove}>Remove</Text>
+          <Text style={styles.remove}>{t("stockLine.remove")}</Text>
         </Pressable>
       </View>
 
       <Text style={styles.meta}>
-        stock {product.stock_quantity} {product.unit} · sells at {formatMAD(effectiveSellingPrice)}
-        {line.newSellingPriceCents !== null ? " (new)" : ""}
+        {t(line.newSellingPriceCents !== null ? "stockLine.metaNew" : "stockLine.meta", {
+          stock: `${product.stock_quantity} ${unitLabel(product.unit, product.stock_quantity, t)}`,
+          price: formatMAD(effectiveSellingPrice),
+        })}
       </Text>
 
       <View style={styles.inputs}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Quantity</Text>
+          <Text style={styles.label}>{t("stockLine.quantity")}</Text>
           <TextInput
             style={styles.input}
             value={line.quantity}
@@ -91,7 +94,7 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Buying price</Text>
+          <Text style={styles.label}>{t("stockLine.buyingPrice")}</Text>
           <TextInput
             style={styles.input}
             value={line.unitCost}
@@ -103,12 +106,12 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Expiry date (optional)</Text>
+        <Text style={styles.label}>{t("stockLine.expiry")}</Text>
         <TextInput
           style={[styles.input, expiryInvalid && styles.inputInvalid]}
           value={line.expiryDate}
           onChangeText={(value) => onChange({ ...line, expiryDate: value })}
-          placeholder="YYYY-MM-DD"
+          placeholder={t("stockLine.expiryPlaceholder")}
           autoCapitalize="none"
         />
         {expiryInvalid && <Text style={styles.invalid}>{t("stockIn.expiryInvalid")}</Text>}
@@ -117,7 +120,7 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
       <Text style={styles.lastPrice}>
         {lastCostCents === null
           ? t("stockIn.firstTimeBuying")
-          : `Last paid ${formatMAD(lastCostCents)}`}
+          : t("stockLine.lastPaid", { price: formatMAD(lastCostCents) })}
         {lineTotal !== null ? ` · line total ${formatMAD(lineTotal)}` : ""}
       </Text>
 
@@ -154,7 +157,7 @@ export function StockInLine({ line, onChange, onRemove }: Props) {
                     style={styles.undoButton}
                     onPress={() => onChange({ ...line, newSellingPriceCents: null })}
                   >
-                    <Text style={styles.undoButtonText}>Undo</Text>
+                    <Text style={styles.undoButtonText}>{t("stockLine.undo")}</Text>
                   </Pressable>
                 )}
               </View>

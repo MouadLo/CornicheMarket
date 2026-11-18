@@ -246,7 +246,7 @@ describe("Popover", () => {
     const modal = r.root.findByType(Modal);
     act(() => modal.props.onRequestClose());
     const backdrop = r.root.findAll(
-      (n) => n.props.accessibilityLabel === "close" && n.props.onPress
+      (n) => n.props.accessibilityLabel === "common.close" && n.props.onPress
     )[0];
     act(() => backdrop.props.onPress());
     expect(onClose).toHaveBeenCalledTimes(2);

@@ -1,4 +1,5 @@
 import { StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { centsToDisplay } from "@/src/lib/money";
 import type { PricePoint } from "@/src/lib/stock/queries";
@@ -16,8 +17,9 @@ type Props = {
 // Drawn with plain Views rather than a charting library: a bar per delivery
 // is all this needs, and it keeps the mobile bundle free of an SVG dependency.
 export function PriceHistoryChart({ points, averageCostCents }: Props) {
+  const { t } = useTranslation();
   if (points.length === 0) {
-    return <Text style={styles.empty}>No deliveries recorded for this product yet.</Text>;
+    return <Text style={styles.empty}>{t("priceChart.empty")}</Text>;
   }
 
   const costs = points.map((point) => point.unit_cost_cents);
@@ -27,11 +29,13 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
   return (
     <View style={styles.wrapper}>
       <View style={styles.scaleRow}>
-        <Text style={styles.scaleText}>high {centsToDisplay(max)}</Text>
+        <Text style={styles.scaleText}>{t("priceChart.high", { price: centsToDisplay(max) })}</Text>
         {averageCostCents !== null && (
-          <Text style={styles.scaleText}>avg {centsToDisplay(averageCostCents)}</Text>
+          <Text style={styles.scaleText}>
+            {t("priceChart.avg", { price: centsToDisplay(averageCostCents) })}
+          </Text>
         )}
-        <Text style={styles.scaleText}>low {centsToDisplay(min)}</Text>
+        <Text style={styles.scaleText}>{t("priceChart.low", { price: centsToDisplay(min) })}</Text>
       </View>
 
       <View style={styles.chart}>

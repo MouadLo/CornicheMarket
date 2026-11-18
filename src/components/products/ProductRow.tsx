@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
 import { colors } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
@@ -17,7 +18,7 @@ type Props = {
 };
 
 function ProductRowComponent({ product, showCost, onPress }: Props) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   // A product name must not flip its own row based on its script -- see
   // src/lib/text/bidi.ts.
   const dir = appDirection(i18n.language);
@@ -43,9 +44,10 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
           {isolateBidi(product.name)}
         </Text>
         <Text style={[styles.meta, { textAlign }]} numberOfLines={1}>
-          {product.barcode ?? "no barcode"} · {product.stock_quantity} {product.unit}
-          {product.is_low_stock ? " · LOW" : ""}
-          {product.active ? "" : " · inactive"}
+          {product.barcode ?? t("productRow.noBarcode")} · {product.stock_quantity}{" "}
+          {unitLabel(product.unit, product.stock_quantity, t)}
+          {product.is_low_stock ? ` · ${t("productRow.low")}` : ""}
+          {product.active ? "" : ` · ${t("productRow.inactive")}`}
         </Text>
       </View>
 
@@ -55,14 +57,14 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
         {showCost &&
           (hasCost ? (
             <>
-              <Text style={styles.cost}>buy {formatMAD(cost)}</Text>
+              <Text style={styles.cost}>{t("productRow.buy", { price: formatMAD(cost) })}</Text>
               <Text style={[styles.profit, belowCost && styles.profitNegative]}>
                 {(unitProfit as number) >= 0 ? "+" : ""}
                 {formatMAD(unitProfit as number)} · {formatMargin(margin)}
               </Text>
             </>
           ) : (
-            <Text style={styles.cost}>no cost yet</Text>
+            <Text style={styles.cost}>{t("productRow.noCost")}</Text>
           ))}
       </View>
     </Pressable>

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { pickTextFile } from "@/src/lib/files";
-import { centsToDisplay } from "@/src/lib/money";
+import { centsToDisplay, formatMAD } from "@/src/lib/money";
 import {
   guessMapping,
   IMPORT_FIELDS,
@@ -21,6 +21,7 @@ import {
   type ImportResult,
 } from "@/src/lib/products/import";
 import { fetchCategories, type Category } from "@/src/lib/products/queries";
+import { unitLabel } from "@/src/lib/products/unitLabel";
 
 type Step = "pick" | "map" | "preview" | "done";
 
@@ -125,16 +126,16 @@ export default function ImportProducts() {
         <>
           <Text style={styles.title}>{t("products.importMapTitle")}</Text>
           <Text style={styles.body}>
-            {fileName} · {rawRows.length} rows
+            {fileName} · {t("importCsv.rows", { count: rawRows.length })}
           </Text>
 
           {IMPORT_FIELDS.map((field) => (
             <View key={field.key} style={styles.field}>
               <Text style={styles.label}>
-                {field.label}
+                {t(`importCsv.fields.${field.key}`)}
                 {field.required ? " *" : ""}
               </Text>
-              {field.hint && <Text style={styles.hint}>{field.hint}</Text>}
+              {field.hint && <Text style={styles.hint}>{t(`importCsv.hints.${field.key}`)}</Text>}
               <View style={styles.chips}>
                 <Chip
                   label={t("products.importIgnore")}
@@ -177,9 +178,13 @@ export default function ImportProducts() {
               <Text style={styles.previewName}>{row.product.name}</Text>
               <Text style={styles.previewMeta}>
                 {centsToDisplay(row.product.selling_price_cents)} DH ·{" "}
-                {row.product.barcode ?? t("products.importNoBarcode")} · {row.product.unit}
+                {row.product.barcode ?? t("products.importNoBarcode")} ·{" "}
+                {unitLabel(row.product.unit, 1, t)}
                 {row.opening
-                  ? ` · opening ${row.opening.quantity} @ ${centsToDisplay(row.opening.unit_cost_cents)} DH`
+                  ? ` · ${t("importCsv.opening", {
+                      quantity: row.opening.quantity,
+                      cost: formatMAD(row.opening.unit_cost_cents),
+                    })}`
                   : ""}
               </Text>
             </View>

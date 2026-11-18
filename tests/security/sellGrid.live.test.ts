@@ -108,15 +108,13 @@ suite("sell grid tables (live)", () => {
     });
 
     it("the owner can add and remove a tile", async () => {
-      const add = await owner
-        .from("sell_grid_tiles")
-        .insert({
-          tab_id: favoritesId,
-          product_id: productId,
-          position: 50,
-          color: "red",
-          short_label: "Test",
-        });
+      const add = await owner.from("sell_grid_tiles").insert({
+        tab_id: favoritesId,
+        product_id: productId,
+        position: 50,
+        color: "red",
+        short_label: "Test",
+      });
       expect(add.error).toBeNull();
       const del = await owner.from("sell_grid_tiles").delete().eq("product_id", productId);
       expect(del.error).toBeNull();
