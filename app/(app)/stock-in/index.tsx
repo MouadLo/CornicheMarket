@@ -1,64 +1,65 @@
-import { router } from "expo-router";
-import * as Crypto from "expo-crypto";
-import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useTranslation } from "react-i18next";
-import { isolateBidi } from "@/src/lib/text/bidi";
-import { colors } from "@/src/theme/tokens";
 
-import { BigButton } from "@/src/components/BigButton";
-import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
-import { StockInLine, type LineState } from "@/src/components/stock/StockInLine";
+import { Badge } from "@/src/components/ui/Badge";
+import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
-import { fetchNegativeStockProducts } from "@/src/lib/inventory/queries";
-import { centsToDisplay, formatMAD, lineTotalCents } from "@/src/lib/money";
-import type { Product } from "@/src/lib/products/queries";
 import {
-  ReceiveDeliveryError,
-  createSupplier,
-  fetchLastPurchasePrice,
-  fetchSuppliers,
-  receiveDelivery,
-  type Supplier,
-} from "@/src/lib/stock/queries";
-import { buildReceivePayload } from "@/src/lib/stock/receive";
+  fetchExpiringBatches,
+  fetchLowStockProducts,
+  fetchNegativeStockProducts,
+} from "@/src/lib/inventory/queries";
+import {
+  EXPIRING_DEFAULT_DAYS,
+  UNKNOWN_BADGE,
+  badgeFromSettled,
+  gridColumns,
+  type CountBadge,
+} from "@/src/lib/inventory/stockHome";
 import { sampleInvoiceEnabled, sampleInvoiceId } from "@/src/lib/stock/sampleInvoice";
+import { Text } from "@/src/theme/Text";
+import { colors, radius, spacing, touch } from "@/src/theme/tokens";
+import type { Tone } from "@/src/theme/tones";
 
-export default function StockInScreen() {
+type Counts = { lowStock: CountBadge; expiring: CountBadge; negativeStock: CountBadge };
+
+export default function StockHomeScreen() {
   const { profile } = useAuth();
   const { t } = useTranslation();
   const isOwner = profile?.role === "owner";
+  const [width, setWidth] = useState(0);
+  const [counts, setCounts] = useState<Counts>({
+    lowStock: UNKNOWN_BADGE,
+    expiring: UNKNOWN_BADGE,
+    negativeStock: UNKNOWN_BADGE,
+  });
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [supplierId, setSupplierId] = useState<string | null>(null);
-  const [addingSupplier, setAddingSupplier] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState("");
-  const [newSupplierPhone, setNewSupplierPhone] = useState("");
-
-  const [lines, setLines] = useState<LineState[]>([]);
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const [negativeStockCount, setNegativeStockCount] = useState(0);
-  // One id per delivery, kept across failed or unanswered saves so the
-  // server recognises a retry instead of receiving the stock again. Cleared
-  // only once the delivery is confirmed or the draft is emptied.
-  const operationId = useRef<string | null>(null);
-  const savingNow = useRef(false);
-
-  useEffect(() => {
-    fetchSuppliers()
-      .then(setSuppliers)
-      .catch(() => setSuppliers([]));
-  }, []);
-
-  useEffect(() => {
-    if (!isOwner) return;
-    fetchNegativeStockProducts()
-      .then((rows) => setNegativeStockCount(rows.length))
-      .catch(() => setNegativeStockCount(0));
-  }, [isOwner]);
+  // Reloaded whenever the screen regains focus, so a count never goes stale
+  // after the owner fixed something on a tool screen. Each count stands alone:
+  // one failing shows no badge on its card and leaves the others untouched.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isOwner) return;
+      let active = true;
+      Promise.allSettled([
+        fetchLowStockProducts(true).then((rows) => rows.length),
+        fetchExpiringBatches(EXPIRING_DEFAULT_DAYS).then((rows) => rows.length),
+        fetchNegativeStockProducts().then((rows) => rows.length),
+      ]).then(([lowStock, expiring, negativeStock]) => {
+        if (!active) return;
+        setCounts({
+          lowStock: badgeFromSettled(lowStock),
+          expiring: badgeFromSettled(expiring),
+          negativeStock: badgeFromSettled(negativeStock),
+        });
+      });
+      return () => {
+        active = false;
+      };
+    }, [isOwner])
+  );
 
   if (profile && !isOwner) {
     return (
@@ -68,311 +69,199 @@ export default function StockInScreen() {
     );
   }
 
-  const addProduct = async (product: Product) => {
-    const lastCost = await fetchLastPurchasePrice(product.id).catch(() => null);
-    setLines((current) => [
-      ...current,
-      {
-        product,
-        quantity: "",
-        unitCost: centsToDisplay(lastCost ?? product.current_cost_cents ?? 0),
-        lastCostCents: lastCost,
-        newSellingPriceCents: null,
-        expiryDate: "",
-      },
-    ]);
-  };
+  const columns = gridColumns(width);
+  const cardWidth = columns === 1 ? undefined : Math.floor((width - GAP * (columns - 1)) / columns);
+  const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
 
-  const handleAddSupplier = async () => {
-    if (!newSupplierName.trim()) return;
-    try {
-      const supplier = await createSupplier(
-        newSupplierName.trim(),
-        newSupplierPhone.trim() || null
-      );
-      setSuppliers((current) => [...current, supplier]);
-      setSupplierId(supplier.id);
-      setAddingSupplier(false);
-      setNewSupplierName("");
-      setNewSupplierPhone("");
-    } catch (supplierError) {
-      setError(supplierError instanceof Error ? supplierError.message : t("common.error"));
-    }
-  };
+  const main: CardProps[] = [
+    {
+      icon: "truck",
+      title: t("stockIn.home.receive"),
+      hint: t("stockIn.home.receiveHint"),
+      href: "/(app)/stock-in/receive",
+    },
+    {
+      icon: "scan",
+      title: t("invoices.scan"),
+      hint: t("stockIn.home.scanHint"),
+      href: "/(app)/stock-in/invoice/capture",
+    },
+    {
+      icon: "receipt",
+      title: t("invoices.drafts"),
+      hint: t("stockIn.home.draftsHint"),
+      href: "/(app)/stock-in/invoice",
+    },
+    {
+      icon: "clipboard",
+      title: t("stockIn.home.count"),
+      hint: t("stockIn.home.countHint"),
+      href: "/(app)/stock-in/count",
+    },
+    {
+      icon: "sliders",
+      title: t("stockIn.home.adjust"),
+      hint: t("stockIn.home.adjustHint"),
+      href: "/(app)/stock-in/adjust",
+    },
+    {
+      icon: "clock",
+      title: t("stockIn.home.history"),
+      hint: t("stockIn.home.historyHint"),
+      href: "/(app)/stock-in/history",
+    },
+  ];
+  if (sampleInvoiceEnabled) {
+    main.push({
+      icon: "book",
+      title: t("invoices.title"),
+      hint: t("stockIn.home.draftsHint"),
+      href: `/(app)/stock-in/invoice/${sampleInvoiceId}`,
+    });
+  }
 
-  const { lines: validLines, priceUpdates, invalid } = buildReceivePayload(lines);
-
-  const total = validLines.reduce(
-    (sum, line) => sum + lineTotalCents(line.quantity, line.unit_cost_cents),
-    0
-  );
-  // A delivery is saved whole or not at all: goods that arrived must never be
-  // left out of stock silently (UX O3).
-  const incomplete = invalid.length > 0;
-
-  const handleSave = async () => {
-    if (!profile || validLines.length === 0 || incomplete || savingNow.current) return;
-
-    savingNow.current = true;
-    operationId.current ??= Crypto.randomUUID();
-    setSaving(true);
-    setError(null);
-    try {
-      await receiveDelivery(operationId.current, {
-        supplierId,
-        notes: notes.trim() || null,
-        lines: validLines,
-        priceUpdates,
-      });
-
-      operationId.current = null;
-      setDone(t("stockIn.recordDelivery", { count: validLines.length }) + ` · ${formatMAD(total)}`);
-      setLines([]);
-      setNotes("");
-    } catch (saveError) {
-      setError(
-        saveError instanceof ReceiveDeliveryError && saveError.kind === "already_saved"
-          ? t("stockIn.alreadySaved")
-          : saveError instanceof Error
-            ? saveError.message
-            : t("common.error")
-      );
-    } finally {
-      savingNow.current = false;
-      setSaving(false);
-    }
-  };
+  const attention: CardProps[] = [
+    {
+      icon: "package",
+      title: t("stockIn.home.lowStock"),
+      hint: t("stockIn.home.lowStockHint"),
+      href: "/(app)/stock-in/low-stock",
+      badge: counts.lowStock,
+      tone: "warn",
+    },
+    {
+      icon: "calendar",
+      title: t("stockIn.home.expiring"),
+      hint: t("stockIn.home.expiringHint", { days: EXPIRING_DEFAULT_DAYS }),
+      href: "/(app)/stock-in/expiring",
+      badge: counts.expiring,
+      tone: "warn",
+    },
+    {
+      icon: "trendingDown",
+      title: t("stockIn.home.negativeStock"),
+      hint: t("stockIn.home.negativeStockHint"),
+      href: "/(app)/stock-in/negative-stock",
+      badge: counts.negativeStock,
+      tone: "bad",
+    },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t("stockIn.title")}</Text>
 
-      <View style={styles.toolRow}>
-        <ToolLink label={t("stockIn.toolLowStock")} href="/(app)/stock-in/low-stock" />
-        <ToolLink label={t("stockIn.toolCount")} href="/(app)/stock-in/count" />
-        <ToolLink label={t("stockIn.toolAdjust")} href="/(app)/stock-in/adjust" />
-        <ToolLink label={t("stockIn.toolExpiring")} href="/(app)/stock-in/expiring" />
-        <ToolLink label={t("stockIn.toolHistory")} href="/(app)/stock-in/history" />
-        {isOwner && (
-          <>
-            <ToolLink label={t("invoices.scan")} href="/(app)/stock-in/invoice/capture" />
-            <ToolLink label={t("invoices.drafts")} href="/(app)/stock-in/invoice" />
-          </>
-        )}
-        {isOwner && sampleInvoiceEnabled && (
-          <ToolLink
-            label={t("invoices.title")}
-            href={`/(app)/stock-in/invoice/${sampleInvoiceId}`}
-          />
-        )}
-        {isOwner && negativeStockCount > 0 && (
-          <Pressable
-            style={styles.negativeStockTool}
-            onPress={() => router.push("/(app)/stock-in/negative-stock" as never)}
-          >
-            <Text style={styles.negativeStockToolText}>
-              {t("stockIn.toolNegativeStock", { count: negativeStockCount })}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
-      {done && <Text style={styles.success}>{done}</Text>}
-
-      <Text style={styles.sectionLabel}>{t("stockIn.supplier")}</Text>
-      <View style={styles.chips}>
-        <Chip
-          label={t("stockIn.noSupplier")}
-          selected={supplierId === null}
-          onPress={() => setSupplierId(null)}
-        />
-        {suppliers.map((supplier) => (
-          <Chip
-            key={supplier.id}
-            label={supplier.name}
-            selected={supplierId === supplier.id}
-            onPress={() => setSupplierId(supplier.id)}
-          />
+      <Text style={styles.sectionLabel}>{t("stockIn.home.mainTitle")}</Text>
+      <View style={styles.grid} onLayout={onLayout}>
+        {main.map((card) => (
+          <ActionCard key={card.href} {...card} width={cardWidth} />
         ))}
-        <Chip
-          label={t("stockIn.addSupplier")}
-          selected={false}
-          onPress={() => setAddingSupplier(true)}
-        />
       </View>
 
-      {addingSupplier && (
-        <View style={styles.supplierForm}>
-          <TextInput
-            style={styles.input}
-            placeholder={t("stockIn.supplierName")}
-            value={newSupplierName}
-            onChangeText={setNewSupplierName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder={t("stockIn.supplierPhone")}
-            value={newSupplierPhone}
-            onChangeText={setNewSupplierPhone}
-            keyboardType="phone-pad"
-          />
-          <View style={styles.supplierButtons}>
-            <BigButton label={t("stockIn.saveSupplier")} onPress={handleAddSupplier} />
-            <BigButton
-              label={t("common.cancel")}
-              variant="secondary"
-              onPress={() => setAddingSupplier(false)}
-            />
-          </View>
-        </View>
-      )}
-
-      <Text style={styles.sectionLabel}>{t("stockIn.productsReceived")}</Text>
-      <ProductSearchPicker onPick={addProduct} excludeIds={lines.map((line) => line.product.id)} />
-
-      {lines.map((line, index) => (
-        <StockInLine
-          key={line.product.id}
-          line={line}
-          onChange={(next) =>
-            setLines((current) => current.map((item, i) => (i === index ? next : item)))
-          }
-          onRemove={() => {
-            const next = lines.filter((_, i) => i !== index);
-            // An emptied draft is abandoned: the next one is a new delivery.
-            if (next.length === 0) operationId.current = null;
-            setLines(next);
-          }}
-        />
-      ))}
-
-      {lines.length > 0 && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder={t("stockIn.notesPlaceholder")}
-            value={notes}
-            onChangeText={setNotes}
-          />
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t("stockIn.deliveryTotal")}</Text>
-            <Text style={styles.totalValue}>{formatMAD(total)}</Text>
-          </View>
-
-          {incomplete && (
-            <View style={styles.incompleteBox} accessibilityRole="alert">
-              <Text style={styles.warning}>
-                {t("stockIn.incomplete", { count: invalid.length })}
-              </Text>
-              {invalid.map((line) => (
-                <Text key={line.productId} style={styles.incompleteLine}>
-                  {`• ${isolateBidi(line.name)}: ${line.problems
-                    .map((problem) => t(`stockIn.problem.${problem}`))
-                    .join(", ")}`}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {error && <Text style={styles.error}>{error}</Text>}
-
-          <BigButton
-            label={
-              saving
-                ? t("stockIn.saving")
-                : t("stockIn.recordDelivery", { count: validLines.length })
-            }
-            onPress={handleSave}
-            disabled={saving || validLines.length === 0 || incomplete}
-          />
-          <Text style={styles.note}>{t("stockIn.stockNote")}</Text>
-        </>
-      )}
+      <Text style={styles.sectionLabel}>{t("stockIn.home.attentionTitle")}</Text>
+      <View style={styles.grid}>
+        {attention.map((card) => (
+          <ActionCard key={card.href} {...card} width={cardWidth} />
+        ))}
+      </View>
     </ScrollView>
   );
 }
 
-function ToolLink({ label, href }: { label: string; href: string }) {
-  return (
-    <Pressable style={styles.tool} onPress={() => router.push(href as never)}>
-      <Text style={styles.toolText}>{label}</Text>
-    </Pressable>
-  );
-}
+const GAP = spacing.s3;
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
+type CardProps = {
+  icon: IconName;
+  title: string;
+  hint: string;
+  href: string;
+  badge?: CountBadge;
+  tone?: Tone;
+};
+
+function ActionCard({
+  icon,
+  title,
+  hint,
+  href,
+  badge,
+  tone = "warn",
+  width,
+}: CardProps & { width?: number }) {
+  const attention = badge?.kind === "some";
+  const accent = attention
+    ? tone === "bad"
+      ? colors.danger600
+      : colors.warning700
+    : colors.brand700;
+  const label =
+    badge?.kind === "some"
+      ? `${title}, ${badge.count}`
+      : badge?.kind === "zero"
+        ? `${title}, 0`
+        : title;
   return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => router.push(href as never)}
+      style={({ pressed }) => [
+        styles.card,
+        width !== undefined ? { width } : styles.cardFull,
+        attention && { borderColor: accent },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.iconWrap}>
+        <Icon name={icon} size={24} color={accent} />
+      </View>
+      <View style={styles.cardText}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardHint}>{hint}</Text>
+      </View>
+      {badge?.kind === "some" && <Badge value={badge.count} tone={tone} />}
+      {badge?.kind === "zero" && <Badge value={0} tone="ok" />}
+      <Icon name="chevron" size={20} color={colors.ink400} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, gap: 14, paddingBottom: 60 },
-  title: { fontSize: 24, fontWeight: "700" },
-  toolRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tool: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: "#eef3ef",
+  container: { padding: spacing.s5, gap: spacing.s3, paddingBottom: 60 },
+  title: { fontSize: 24, fontWeight: "700", color: colors.ink900 },
+  sectionLabel: {
+    marginTop: spacing.s2,
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.ink600,
+    textTransform: "uppercase",
   },
-  toolText: { color: "#1d7a46", fontWeight: "700", fontSize: 14 },
-  negativeStockTool: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: "#fdeaea",
-  },
-  negativeStockToolText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase" },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
-  chipSelected: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextSelected: { color: "#fff", fontWeight: "600" },
-  supplierForm: { gap: 10, padding: 14, backgroundColor: "#f6f6f6", borderRadius: 12 },
-  supplierButtons: { gap: 8 },
-  input: {
-    minHeight: 52,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  totalRow: {
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
+  card: {
+    minHeight: touch.key,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e4e4e4",
+    gap: spacing.s3,
+    paddingVertical: spacing.s3,
+    paddingHorizontal: spacing.s4,
+    borderRadius: radius.panel,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.divider,
   },
-  totalLabel: { fontSize: 16, fontWeight: "600" },
-  totalValue: { fontSize: 22, fontWeight: "800" },
-  note: { fontSize: 13, color: "#666", fontStyle: "italic" },
-  warning: { color: "#b36b00", fontSize: 14 },
-  incompleteBox: {
-    gap: 4,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: colors.warning100,
+  cardFull: { width: "100%" },
+  pressed: { opacity: 0.85 },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.control,
+    backgroundColor: colors.brand50,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  incompleteLine: { fontSize: 14, color: colors.ink900 },
-  error: { color: "#b3261e", fontSize: 14 },
-  success: { color: "#1d7a46", fontSize: 15, fontWeight: "600" },
+  cardText: { flex: 1, gap: 2 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: colors.ink900 },
+  cardHint: { fontSize: 13, color: colors.ink600, lineHeight: 18 },
   blocked: { flex: 1, justifyContent: "center", padding: 32 },
-  blockedText: { fontSize: 16, textAlign: "center", color: "#555", lineHeight: 23 },
+  blockedText: { fontSize: 16, textAlign: "center", color: colors.ink600, lineHeight: 23 },
 });

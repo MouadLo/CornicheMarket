@@ -8,7 +8,7 @@ import React from "react";
 import { Text } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-import StockInScreen from "../../app/(app)/stock-in/index";
+import ReceiveScreen from "../../app/(app)/stock-in/receive";
 import { BigButton } from "../../src/components/BigButton";
 import { ProductSearchPicker } from "../../src/components/stock/ProductSearchPicker";
 import { StockInLine } from "../../src/components/stock/StockInLine";
@@ -18,13 +18,15 @@ const mockReceiveDelivery = jest.fn();
 const mockBatchUpdateSellingPrices = jest.fn();
 
 jest.mock("expo-crypto", () => ({ randomUUID: () => `op-${++mockUuidCounter}` }));
-jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+const mockAddListener = jest.fn((..._args: unknown[]) => () => {});
+jest.mock("expo-router", () => ({
+  router: { push: jest.fn() },
+  useNavigation: () => ({ addListener: mockAddListener, dispatch: jest.fn() }),
+}));
+jest.mock("../../src/lib/dialog/store", () => ({ confirm: jest.fn(async () => false) }));
 jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "owner-1", role: "owner" } }),
-}));
-jest.mock("../../src/lib/inventory/queries", () => ({
-  fetchNegativeStockProducts: async () => [],
 }));
 jest.mock("../../src/lib/products/queries", () => ({
   batchUpdateSellingPrices: (...args: unknown[]) => mockBatchUpdateSellingPrices(...args),
@@ -69,11 +71,12 @@ const bread = { ...milk, id: "bread", name: "Bread", barcode: "6110000000001" };
 let tree: ReactTestRenderer;
 
 beforeEach(async () => {
+  mockAddListener.mockClear();
   mockUuidCounter = 0;
   mockReceiveDelivery.mockReset();
   mockBatchUpdateSellingPrices.mockReset();
   await act(async () => {
-    tree = create(<StockInScreen />);
+    tree = create(<ReceiveScreen />);
   });
 });
 afterEach(() => act(() => tree.unmount()));
@@ -115,6 +118,35 @@ async function pressSave() {
 }
 
 const texts = () => tree.root.findAllByType(Text).map((node) => node.props.children);
+
+describe("Receive: unsaved delivery guard", () => {
+  // The guard listens for beforeRemove; the listener reads the dirty flag.
+  const leave = () => {
+    const listener = mockAddListener.mock.calls.find((c) => c[0] === "beforeRemove")![1] as (e: {
+      preventDefault: () => void;
+      data: { action: unknown };
+    }) => void;
+    const preventDefault = jest.fn();
+    listener({ preventDefault, data: { action: {} } });
+    return preventDefault;
+  };
+
+  it("lets you leave an empty form without asking", async () => {
+    expect(leave()).not.toHaveBeenCalled();
+  });
+
+  it("asks before leaving with typed lines", async () => {
+    await addLine({ quantity: "10", unitCost: "6" });
+    expect(leave()).toHaveBeenCalled();
+  });
+
+  it("does not ask after a confirmed save", async () => {
+    mockReceiveDelivery.mockResolvedValue("purchase-1");
+    await addLine({ quantity: "10", unitCost: "6" });
+    await pressSave();
+    expect(leave()).not.toHaveBeenCalled();
+  });
+});
 
 describe("Stock In save", () => {
   it("sends the whole delivery, price changes included, in one receiveDelivery call", async () => {

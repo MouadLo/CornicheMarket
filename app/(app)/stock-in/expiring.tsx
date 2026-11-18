@@ -3,12 +3,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useTranslation } from "react-i18next";
 
 import { fetchExpiringBatches, type ExpiringBatch } from "@/src/lib/inventory/queries";
+import { EXPIRING_DEFAULT_DAYS } from "@/src/lib/inventory/stockHome";
 
 const RANGES = [7, 30, 90];
 
 export default function ExpiringScreen() {
   const { t } = useTranslation();
-  const [withinDays, setWithinDays] = useState(30);
+  const [withinDays, setWithinDays] = useState<number>(EXPIRING_DEFAULT_DAYS);
   const [batches, setBatches] = useState<ExpiringBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
