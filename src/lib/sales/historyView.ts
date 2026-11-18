@@ -82,6 +82,38 @@ export function parseVoidReason(reason: string | null): ParsedVoidReason | null 
   };
 }
 
+// What the owner's own void stores: the same shape an approved request leaves,
+// minus the "(requested by ...)" suffix. A note is trimmed and folded onto one
+// line so it cannot be mistaken for a second part of the format.
+export function composeVoidReason(code: VoidReasonCode, note: string): string {
+  const clean = note.replace(/\s+/g, " ").trim();
+  return clean ? `${code} - ${clean}` : code;
+}
+
+// The text shown for a stored reason. A reason in the request format is
+// translated (code, note, and who asked); anything else is shown as stored.
+// `t` and `isolate` are passed in so this stays pure and testable.
+const REASON_LABEL_KEYS: Record<VoidReasonCode, string> = {
+  wrong_item: "sell.voidReasonWrongItem",
+  wrong_quantity: "sell.voidReasonWrongQuantity",
+  customer_changed_mind: "sell.voidReasonChangedMind",
+  other: "sell.voidReasonOther",
+};
+
+export function voidReasonDisplay(
+  reason: string | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+  isolate: (text: string) => string
+): string {
+  const parsed = parseVoidReason(reason);
+  if (!parsed) return reason ?? "";
+  const name = t(REASON_LABEL_KEYS[parsed.code]);
+  const label = parsed.note ? `${name}: ${isolate(parsed.note)}` : name;
+  return parsed.requestedBy
+    ? `${label} · ${t("sell.historyRequestedBy", { name: isolate(parsed.requestedBy) })}`
+    : label;
+}
+
 export function itemsPreview(names: string[], max = 2): { shown: string[]; more: number } {
   const distinct = [...new Set(names)];
   return { shown: distinct.slice(0, max), more: Math.max(0, distinct.length - max) };
