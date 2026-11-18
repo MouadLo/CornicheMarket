@@ -15,9 +15,12 @@ const sale = (id: string, at: string, total: number, voided = false) => ({
 
 describe("storeDayKey", () => {
   it("uses the store's time zone for the day boundary", () => {
-    // 23:30 UTC is already the next day in Casablanca (UTC+1) but not in UTC.
+    // 23:30 UTC is already the next day in Tokyo (UTC+9, no daylight saving)
+    // but not in UTC. A fixed-offset zone keeps this independent of the
+    // machine's tz database (Morocco's offset changes around Ramadan, and CI's
+    // data differs from a laptop's).
     expect(storeDayKey("2026-11-16T23:30:00Z", "UTC")).toBe("2026-11-16");
-    expect(storeDayKey("2026-11-16T23:30:00Z", "Africa/Casablanca")).toBe("2026-11-17");
+    expect(storeDayKey("2026-11-16T23:30:00Z", "Asia/Tokyo")).toBe("2026-11-17");
   });
 });
 
