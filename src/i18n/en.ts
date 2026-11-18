@@ -116,6 +116,10 @@ const en: Translations = {
   settings: {
     title: "Settings",
     account: "Account",
+    timezoneConfirmTitle: "Change the time zone?",
+    timezoneConfirmMessage:
+      "The time zone moves the day boundaries of every report and of day close. Switch to {{tz}}?",
+    timezoneConfirmAction: "Change",
     signedInAs: "Signed in as",
     signOut: "Sign out",
     inviteCashier: "Invite a cashier",
@@ -371,6 +375,19 @@ const en: Translations = {
     formSellingPrice: "Selling price (DH)",
     formLowStockThreshold: "Low stock threshold",
     formActive: "Active",
+    formActiveHint: "When off, the product is hidden from Sell but stays in history.",
+    formSavedToast: "Product saved",
+    formZeroPriceTitle: "Selling price is 0",
+    formZeroPriceMessage:
+      "The selling price is {{price}}. The product would be given away. Save anyway?",
+    formBelowCostTitle: "Price below cost",
+    formBelowCostMessage:
+      "The selling price ({{price}}) is below the cost ({{cost}}). Every sale will lose money. Save anyway?",
+    formSaveAnyway: "Save anyway",
+    formUnsavedTitle: "Leave without saving?",
+    formUnsavedMessage: "Your changes to this product will be lost.",
+    formUnsavedLeave: "Leave",
+    formUnsavedStay: "Stay",
     formSaving: "Saving...",
     formCreate: "Create product",
     formSave: "Save changes",

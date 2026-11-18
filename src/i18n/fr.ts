@@ -115,6 +115,10 @@ const fr = {
   settings: {
     title: "Paramètres",
     account: "Compte",
+    timezoneConfirmTitle: "Changer le fuseau horaire ?",
+    timezoneConfirmMessage:
+      "Le fuseau horaire décale les limites de jour de tous les rapports et de la clôture de journée. Passer à {{tz}} ?",
+    timezoneConfirmAction: "Changer",
     signedInAs: "Connecté en tant que",
     signOut: "Se déconnecter",
     inviteCashier: "Inviter un caissier",
@@ -371,6 +375,19 @@ const fr = {
     formSellingPrice: "Prix de vente (DH)",
     formLowStockThreshold: "Seuil stock bas",
     formActive: "Actif",
+    formActiveHint: "Désactivé : le produit disparaît de la vente mais reste dans l'historique.",
+    formSavedToast: "Produit enregistré",
+    formZeroPriceTitle: "Prix de vente à 0",
+    formZeroPriceMessage:
+      "Le prix de vente est de {{price}}. Le produit serait vendu gratuitement. Enregistrer quand même ?",
+    formBelowCostTitle: "Prix inférieur au coût",
+    formBelowCostMessage:
+      "Le prix de vente ({{price}}) est inférieur au coût ({{cost}}). Chaque vente fera perdre de l'argent. Enregistrer quand même ?",
+    formSaveAnyway: "Enregistrer quand même",
+    formUnsavedTitle: "Quitter sans enregistrer ?",
+    formUnsavedMessage: "Les modifications de ce produit seront perdues.",
+    formUnsavedLeave: "Quitter",
+    formUnsavedStay: "Rester",
     formSaving: "Enregistrement...",
     formCreate: "Créer le produit",
     formSave: "Enregistrer les modifications",

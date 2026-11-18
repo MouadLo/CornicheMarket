@@ -36,6 +36,8 @@ import {
   type ProductInput,
   type ProductUnit,
 } from "@/src/lib/products/queries";
+import { confirm, showToast } from "@/src/lib/dialog/store";
+import { priceWarning } from "@/src/lib/products/pricing";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -46,6 +48,9 @@ type Props = {
   initial?: Product | null;
   submitLabel: string;
   onSubmit: (input: ProductInput) => Promise<void>;
+  // Tells the screen whether there are unsaved changes (it guards leaving).
+  // Called with false just before onSubmit, since a saved screen navigates away.
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 export function ProductForm({
@@ -53,6 +58,7 @@ export function ProductForm({
   initial,
   submitLabel,
   onSubmit,
+  onDirtyChange,
 }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n?.language;
@@ -83,6 +89,12 @@ export function ProductForm({
   const [duplicate, setDuplicate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const snapshot = JSON.stringify([name, barcode, categoryId, unit, price, threshold, active]);
+  const [initialSnapshot] = useState(snapshot);
+  useEffect(() => {
+    onDirtyChange?.(snapshot !== initialSnapshot);
+  }, [snapshot, initialSnapshot, onDirtyChange]);
 
   useEffect(() => {
     const trimmed = barcode.trim();
@@ -175,8 +187,32 @@ export function ProductForm({
 
     const thresholdValue = parseQuantity(threshold) ?? 0;
 
+    // Zero or below-cost prices are allowed, but never by accident. The cost
+    // is only known to the owner (null for cashiers).
+    const warning = priceWarning(priceCents, initial?.current_cost_cents ?? null);
+    if (warning) {
+      const ok = await confirm({
+        tone: "danger",
+        title:
+          warning.kind === "zero"
+            ? t("products.formZeroPriceTitle")
+            : t("products.formBelowCostTitle"),
+        message:
+          warning.kind === "zero"
+            ? t("products.formZeroPriceMessage", { price: formatMAD(priceCents) })
+            : t("products.formBelowCostMessage", {
+                price: formatMAD(warning.priceCents),
+                cost: formatMAD(warning.costCents),
+              }),
+        confirmLabel: t("products.formSaveAnyway"),
+        cancelLabel: t("common.cancel"),
+      });
+      if (!ok) return;
+    }
+
     setSubmitting(true);
     try {
+      onDirtyChange?.(false);
       await onSubmit({
         name: name.trim(),
         barcode: barcode.trim() || null,
@@ -186,7 +222,9 @@ export function ProductForm({
         low_stock_threshold: thresholdValue,
         active,
       });
+      showToast({ text: t("products.formSavedToast"), tone: "success" });
     } catch (submitError) {
+      onDirtyChange?.(true);
       setError(submitError instanceof Error ? submitError.message : t("products.formSaveError"));
     } finally {
       setSubmitting(false);
@@ -358,6 +396,7 @@ export function ProductForm({
         <Text style={styles.label}>{t("products.formActive")}</Text>
         <Switch value={active} onValueChange={setActive} />
       </View>
+      <Text style={styles.note}>{t("products.formActiveHint")}</Text>
 
       {initial && <CostSummary product={initial} price={price} />}
 
@@ -489,7 +528,7 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: colors.brand700 },
   chipText: { fontSize: 15, color: colors.ink700 },
   chipTextSelected: { color: colors.white, fontWeight: "600" },
-  switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   note: { fontSize: 13, color: colors.ink600, fontStyle: "italic" },
   summary: { backgroundColor: colors.brand50, borderRadius: radius.control, padding: 14, gap: 6 },
   summaryLine: { fontSize: 15, color: colors.ink700 },
