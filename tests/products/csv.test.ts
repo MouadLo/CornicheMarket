@@ -102,8 +102,8 @@ describe("validateRows", () => {
     );
 
     expect(rows).toHaveLength(0);
-    expect(errors[0].messages).toContain("Name is required");
-    expect(errors[0].messages).toContain("Selling price is required");
+    expect(errors[0].issues.map((i) => i.key)).toContain("products.importIssue.nameRequired");
+    expect(errors[0].issues.map((i) => i.key)).toContain("products.importIssue.priceRequired");
   });
 
   it("rejects an unparseable price", () => {
@@ -112,7 +112,7 @@ describe("validateRows", () => {
       { name: "name", selling_price: "price" },
       emptyContext
     );
-    expect(errors[0].messages[0]).toMatch(/not a valid amount/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.priceInvalid");
   });
 
   it("flags a barcode that already exists in the database", () => {
@@ -121,7 +121,7 @@ describe("validateRows", () => {
       { name: "name", barcode: "barcode", selling_price: "price" },
       { categories, existingBarcodes: new Set(["611100001"]) }
     );
-    expect(errors[0].messages[0]).toMatch(/already exists/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.barcodeExists");
   });
 
   it("flags a barcode duplicated within the file", () => {
@@ -137,7 +137,7 @@ describe("validateRows", () => {
     expect(rows).toHaveLength(1);
     expect(errors).toHaveLength(1);
     expect(errors[0].rowNumber).toBe(3);
-    expect(errors[0].messages[0]).toMatch(/more than once/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.barcodeInFile");
   });
 
   it("rejects an unknown category rather than silently creating one", () => {
@@ -146,7 +146,7 @@ describe("validateRows", () => {
       { name: "name", category: "category", selling_price: "price" },
       emptyContext
     );
-    expect(errors[0].messages[0]).toMatch(/Unknown category/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.categoryUnknown");
   });
 
   it("rejects an invalid unit", () => {
@@ -155,7 +155,7 @@ describe("validateRows", () => {
       { name: "name", unit: "unit", selling_price: "price" },
       emptyContext
     );
-    expect(errors[0].messages[0]).toMatch(/must be piece, kg or pack/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.unitInvalid");
   });
 
   it("builds an opening delivery when cost and quantity are both present", () => {
@@ -176,7 +176,7 @@ describe("validateRows", () => {
     );
 
     expect(rows).toHaveLength(0);
-    expect(errors[0].messages[0]).toMatch(/needs a buying price/);
+    expect(errors[0].issues[0].key).toBe("products.importIssue.openingNeedsCost");
   });
 
   it("ignores a cost with no quantity, since cost only moves via a purchase", () => {
@@ -246,5 +246,52 @@ describe("toCsv", () => {
     const { rows } = parseCsv(csv);
     expect(rows[0].name).toBe("Coca-Cola 33cl");
     expect(rows[0].selling_price).toBe("7.00");
+  });
+});
+
+describe("row issues carry what the person needs to fix the file", () => {
+  it("keeps the offending value so the translated message can name it", () => {
+    const { errors } = validateRows(
+      [{ name: "Coca", barcode: "611100001", price: "gratuit", unit: "caisse", cat: "Nope" }],
+      { name: "name", barcode: "barcode", selling_price: "price", unit: "unit", category: "cat" },
+      { categories, existingBarcodes: new Set(["611100001"]) }
+    );
+    expect(errors[0].rowNumber).toBe(2);
+    expect(errors[0].issues).toEqual(
+      expect.arrayContaining([
+        { key: "products.importIssue.priceInvalid", params: { value: "gratuit" } },
+        { key: "products.importIssue.barcodeExists", params: { value: "611100001" } },
+        { key: "products.importIssue.unitInvalid", params: { value: "caisse" } },
+        { key: "products.importIssue.categoryUnknown", params: { value: "Nope" } },
+      ])
+    );
+  });
+
+  it("every issue key exists in all three languages", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dicts = [
+      require("../../src/i18n/fr"),
+      require("../../src/i18n/en"),
+      require("../../src/i18n/ar"),
+    ].map((m) => m.default as Record<string, unknown>);
+    const keys = [
+      "nameRequired",
+      "priceRequired",
+      "priceInvalid",
+      "barcodeExists",
+      "barcodeInFile",
+      "unitInvalid",
+      "categoryUnknown",
+      "thresholdInvalid",
+      "costInvalid",
+      "quantityInvalid",
+      "openingNeedsCost",
+      "openingFailedAll",
+      "openingFailedChunk",
+    ];
+    for (const dict of dicts) {
+      const issues = (dict.products as { importIssue: Record<string, string> }).importIssue;
+      for (const key of keys) expect(typeof issues[key]).toBe("string");
+    }
   });
 });

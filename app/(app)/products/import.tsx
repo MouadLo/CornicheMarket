@@ -4,6 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { InlineError } from "@/src/components/ui/InlineError";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { pickTextFile } from "@/src/lib/files";
 import { centsToDisplay, formatMAD } from "@/src/lib/money";
@@ -13,6 +15,7 @@ import {
   parseCsv,
   validateRows,
   type ColumnMapping,
+  type RowError,
   type ValidationResult,
 } from "@/src/lib/products/csv";
 import {
@@ -39,7 +42,10 @@ export default function ImportProducts() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
+  // A translation key (see errorKeyOr): the server's own text never shows.
   const [error, setError] = useState<string | null>(null);
+  const issueText = (rowError: RowError) =>
+    rowError.issues.map((issue) => t(issue.key, issue.params)).join("; ");
 
   useEffect(() => {
     fetchCategories()
@@ -59,7 +65,7 @@ export default function ImportProducts() {
 
       const { headers: parsedHeaders, rows } = parseCsv(file.text);
       if (parsedHeaders.length === 0 || rows.length === 0) {
-        setError(t("products.importNoRows"));
+        setError("products.importNoRows");
         return;
       }
 
@@ -68,8 +74,8 @@ export default function ImportProducts() {
       setRawRows(rows);
       setMapping(guessMapping(parsedHeaders));
       setStep("map");
-    } catch (pickError) {
-      setError(pickError instanceof Error ? pickError.message : t("products.importReadError"));
+    } catch {
+      setError("products.importReadError");
     }
   };
 
@@ -81,11 +87,7 @@ export default function ImportProducts() {
       setValidation(validateRows(rawRows, mapping, { categories, existingBarcodes }));
       setStep("preview");
     } catch (validateError) {
-      setError(
-        validateError instanceof Error
-          ? validateError.message
-          : t("products.importValidationFailed")
-      );
+      setError(errorKeyOr(validateError, "products.importValidationFailed"));
     } finally {
       setBusy(false);
     }
@@ -100,7 +102,7 @@ export default function ImportProducts() {
       setResult(await importProducts(validation.rows, profile.id));
       setStep("done");
     } catch (importError) {
-      setError(importError instanceof Error ? importError.message : t("products.importFailed"));
+      setError(errorKeyOr(importError, "products.importFailed"));
     } finally {
       setBusy(false);
     }
@@ -112,12 +114,11 @@ export default function ImportProducts() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
-
       {step === "pick" && (
         <>
           <Text style={styles.title}>{t("products.importTitle")}</Text>
           <Text style={styles.body}>{t("products.importPickBody")}</Text>
+          {error ? <InlineError reasonKey={error} /> : null}
           <BigButton label={t("products.importChooseFile")} onPress={handlePick} />
         </>
       )}
@@ -154,6 +155,7 @@ export default function ImportProducts() {
             </View>
           ))}
 
+          {error ? <InlineError reasonKey={error} /> : null}
           <BigButton
             label={busy ? t("products.importChecking") : t("products.importPreview")}
             onPress={handleValidate}
@@ -202,7 +204,7 @@ export default function ImportProducts() {
                 <Text key={rowError.rowNumber} style={styles.errorLine}>
                   {t("products.importRowError", {
                     row: rowError.rowNumber,
-                    messages: rowError.messages.join("; "),
+                    messages: issueText(rowError),
                   })}
                 </Text>
               ))}
@@ -214,6 +216,7 @@ export default function ImportProducts() {
             </View>
           )}
 
+          {error ? <InlineError reasonKey={error} /> : null}
           <BigButton
             label={
               busy
@@ -251,9 +254,9 @@ export default function ImportProducts() {
                   {rowError.rowNumber > 0
                     ? t("products.importRowError", {
                         row: rowError.rowNumber,
-                        messages: rowError.messages.join("; "),
+                        messages: issueText(rowError),
                       })
-                    : rowError.messages.join("; ")}
+                    : issueText(rowError)}
                 </Text>
               ))}
             </View>
@@ -304,5 +307,4 @@ const styles = StyleSheet.create({
   errorBox: { backgroundColor: "#fdecea", borderRadius: 10, padding: 12, gap: 4 },
   errorTitle: { fontWeight: "700", color: "#b3261e" },
   errorLine: { fontSize: 13, color: "#8c1d18" },
-  error: { color: "#b3261e", fontSize: 15 },
 });
