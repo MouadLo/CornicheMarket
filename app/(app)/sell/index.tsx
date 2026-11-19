@@ -166,6 +166,7 @@ export default function SellScreen() {
               stock_quantity: p.stock_quantity ?? 0,
               low_stock_threshold: p.low_stock_threshold ?? 0,
               active: p.active,
+              discountable: p.discountable,
             })),
           })
         : [],

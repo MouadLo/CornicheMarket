@@ -1,6 +1,8 @@
 import { productsSource } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
+import { DEFAULT_DISCOUNT_LIMITS, type DiscountLimits } from "@/src/lib/sales/discountLimit";
+import { parseDiscountLimits, saveCachedDiscountLimits } from "@/src/lib/sales/discountLimitCache";
 import type { PendingSale } from "@/src/lib/sales/offlineQueue";
 
 export type PaymentMethod = "cash" | "card" | "credit";
@@ -314,4 +316,37 @@ export async function fetchCustomerPayments(
     .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
   return (data ?? []) as CustomerPayment[];
+}
+
+// --- cashier discount limit (store_settings) ------------------------------
+// Readable by every signed-in user (a cashier's device needs it to enforce the
+// limit), updated by the owner only (row-level security).
+
+export async function fetchDiscountLimits(): Promise<DiscountLimits> {
+  const { data, error } = await supabase
+    .from("store_settings")
+    .select("cashier_discount_percent, cashier_discount_max_cents")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as {
+    cashier_discount_percent: number | string | null;
+    cashier_discount_max_cents: number | string | null;
+  } | null;
+  return (
+    parseDiscountLimits(row?.cashier_discount_percent, row?.cashier_discount_max_cents) ??
+    DEFAULT_DISCOUNT_LIMITS
+  );
+}
+
+export async function updateDiscountLimits(limits: DiscountLimits): Promise<void> {
+  const { error } = await supabase
+    .from("store_settings")
+    .update({
+      cashier_discount_percent: limits.percent,
+      cashier_discount_max_cents: limits.maxCents,
+    })
+    .eq("singleton", true);
+  if (error) throw new Error(error.message);
+  await saveCachedDiscountLimits(limits);
 }

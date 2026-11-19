@@ -11,7 +11,7 @@ const LEGACY_CACHE_KEY = "corniche.productCache.v1";
 const PAGE_SIZE = 200;
 // Never a cost column: this cache is read on cashier devices too.
 const CACHE_COLUMNS =
-  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold";
+  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold, discountable";
 
 export type CachedProduct = {
   id: string;
@@ -24,6 +24,8 @@ export type CachedProduct = {
   category_id?: string | null;
   stock_quantity?: number;
   low_stock_threshold?: number;
+  // Added with the cashier discount limit. Missing on older entries (read as allowed).
+  discountable?: boolean;
 };
 
 type ProductCache = {
