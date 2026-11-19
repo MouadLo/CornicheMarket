@@ -4,17 +4,22 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { InlineError } from "@/src/components/ui/InlineError";
+import { ListRow } from "@/src/components/ui/ListRow";
 import { LoadError } from "@/src/components/ui/LoadError";
+import { Panel } from "@/src/components/ui/Panel";
 import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { BulkPriceModal } from "@/src/components/products/BulkPriceModal";
 import { PRODUCT_ROW_HEIGHT, ProductRow } from "@/src/components/products/ProductRow";
@@ -33,12 +38,14 @@ import {
 } from "@/src/lib/products/queries";
 import { categoryLabel } from "@/src/lib/products/categoryCatalog";
 import { familyIds, mainCategories, subCategoriesOf } from "@/src/lib/products/categories";
+import { activeFilterCount, isCompactProductsList } from "@/src/lib/products/listFilters";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 
 export default function ProductsScreen() {
   const { profile } = useAuth();
   const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
+  const compact = isCompactProductsList(useWindowDimensions().width);
 
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -57,6 +64,8 @@ export default function ProductsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
 
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -139,9 +148,119 @@ export default function ProductsScreen() {
     }
   };
 
+  const filterCount = activeFilterCount({ categoryId, lowStockOnly, status });
+  const clearFilters = () => {
+    setCategoryId(null);
+    setSubCategoryId(null);
+    setLowStockOnly(false);
+    setStatus("active");
+  };
+  // Names what is narrowing the list, so a short list is never a mystery.
+  const selectedCategory = categories.find((c) => c.id === (subCategoryId ?? categoryId));
+  const filterSummary = [
+    selectedCategory ? categoryLabel(selectedCategory, i18n?.language) : null,
+    lowStockOnly ? t("products.lowStock") : null,
+    status === "inactive" ? t("products.statusInactive") : null,
+    status === "all" ? t("products.statusAll") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const categoryChips = (
+    <>
+      <View style={styles.filterRow}>
+        <FilterChip
+          label={t("products.allCategories")}
+          large={compact}
+          selected={categoryId === null}
+          onPress={() => {
+            setCategoryId(null);
+            setSubCategoryId(null);
+          }}
+        />
+        {mainCategories(categories).map((category) => (
+          <FilterChip
+            key={category.id}
+            label={categoryLabel(category, i18n?.language)}
+            large={compact}
+            selected={categoryId === category.id}
+            onPress={() => {
+              setCategoryId(category.id === categoryId ? null : category.id);
+              setSubCategoryId(null);
+            }}
+          />
+        ))}
+      </View>
+
+      {categoryId && subCategoriesOf(categories, categoryId).length > 0 && (
+        <View style={styles.filterRow}>
+          <FilterChip
+            label={t("products.catAllSubs")}
+            large={compact}
+            selected={subCategoryId === null}
+            onPress={() => setSubCategoryId(null)}
+          />
+          {subCategoriesOf(categories, categoryId).map((sub) => (
+            <FilterChip
+              key={sub.id}
+              label={categoryLabel(sub, i18n?.language)}
+              large={compact}
+              selected={subCategoryId === sub.id}
+              onPress={() => setSubCategoryId(sub.id === subCategoryId ? null : sub.id)}
+            />
+          ))}
+        </View>
+      )}
+    </>
+  );
+
+  const statusChips = (
+    <View style={styles.filterRow}>
+      <FilterChip
+        label={t("products.lowStock")}
+        large={compact}
+        selected={lowStockOnly}
+        onPress={() => setLowStockOnly((value) => !value)}
+      />
+      <FilterChip
+        label={t("products.statusActive")}
+        large={compact}
+        selected={status === "active"}
+        onPress={() => setStatus("active")}
+      />
+      <FilterChip
+        label={t("products.statusInactive")}
+        large={compact}
+        selected={status === "inactive"}
+        onPress={() => setStatus("inactive")}
+      />
+      <FilterChip
+        label={t("products.statusAll")}
+        large={compact}
+        selected={status === "all"}
+        onPress={() => setStatus("all")}
+      />
+    </View>
+  );
+
+  const secondaryActions: { icon: IconName; label: string; onPress: () => void }[] = [
+    {
+      icon: "upload",
+      label: t("products.importCsv"),
+      onPress: () => router.push("/(app)/products/import"),
+    },
+    { icon: "download", label: t("products.exportCsv"), onPress: () => void handleExport() },
+    { icon: "tag", label: t("products.bulkPrice"), onPress: () => setBulkOpen(true) },
+    {
+      icon: "clipboard",
+      label: t("products.manageCategories"),
+      onPress: () => router.push("/(app)/products/categories"),
+    },
+  ];
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
         <TextInput
           style={styles.search}
           placeholder={t("products.searchPlaceholder")}
@@ -152,90 +271,72 @@ export default function ProductsScreen() {
           autoCorrect={false}
         />
 
-        <View style={styles.filterRow}>
-          <FilterChip
-            label={t("products.allCategories")}
-            selected={categoryId === null}
-            onPress={() => {
-              setCategoryId(null);
-              setSubCategoryId(null);
-            }}
-          />
-          {mainCategories(categories).map((category) => (
-            <FilterChip
-              key={category.id}
-              label={categoryLabel(category, i18n?.language)}
-              selected={categoryId === category.id}
-              onPress={() => {
-                setCategoryId(category.id === categoryId ? null : category.id);
-                setSubCategoryId(null);
-              }}
-            />
-          ))}
-        </View>
-
-        {categoryId && subCategoriesOf(categories, categoryId).length > 0 && (
-          <View style={styles.filterRow}>
-            <FilterChip
-              label={t("products.catAllSubs")}
-              selected={subCategoryId === null}
-              onPress={() => setSubCategoryId(null)}
-            />
-            {subCategoriesOf(categories, categoryId).map((sub) => (
-              <FilterChip
-                key={sub.id}
-                label={categoryLabel(sub, i18n?.language)}
-                selected={subCategoryId === sub.id}
-                onPress={() => setSubCategoryId(sub.id === subCategoryId ? null : sub.id)}
-              />
-            ))}
-          </View>
-        )}
-
-        <View style={styles.filterRow}>
-          <FilterChip
-            label={t("products.lowStock")}
-            selected={lowStockOnly}
-            onPress={() => setLowStockOnly((value) => !value)}
-          />
-          <FilterChip
-            label={t("products.statusActive")}
-            selected={status === "active"}
-            onPress={() => setStatus("active")}
-          />
-          <FilterChip
-            label={t("products.statusInactive")}
-            selected={status === "inactive"}
-            onPress={() => setStatus("inactive")}
-          />
-          <FilterChip
-            label={t("products.statusAll")}
-            selected={status === "all"}
-            onPress={() => setStatus("all")}
-          />
-        </View>
-
-        {isOwner && (
+        {compact ? (
           <>
-            <View style={styles.actionRow}>
-              <ActionButton
-                label={t("products.addNew")}
-                onPress={() => router.push("/(app)/products/new")}
+            <View style={styles.toolbar}>
+              <ToolbarButton
+                icon="sliders"
+                label={
+                  filterCount > 0
+                    ? t("products.filtersCount", { count: filterCount })
+                    : t("products.filters")
+                }
+                active={filterCount > 0}
+                onPress={() => setFiltersOpen(true)}
               />
-              <ActionButton
-                label={t("products.importCsv")}
-                onPress={() => router.push("/(app)/products/import")}
-              />
-              <ActionButton label={t("products.exportCsv")} onPress={handleExport} />
-              <ActionButton label={t("products.bulkPrice")} onPress={() => setBulkOpen(true)} />
-              <ActionButton
-                label={t("products.manageCategories")}
-                onPress={() => router.push("/(app)/products/categories")}
-              />
+              {isOwner && (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.action, styles.toolbarAction]}
+                    onPress={() => router.push("/(app)/products/new")}
+                  >
+                    <Text style={styles.actionText} numberOfLines={1}>
+                      {t("products.addNew")}
+                    </Text>
+                  </Pressable>
+                  <ToolbarButton
+                    icon="more"
+                    label={t("products.moreActions")}
+                    onPress={() => setActionsOpen(true)}
+                  />
+                </>
+              )}
             </View>
-            {exportError ? <InlineError reasonKey={exportError} /> : null}
+            {filterCount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryText} numberOfLines={1}>
+                  {filterSummary}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("products.clearFilters")}
+                  style={styles.summaryClear}
+                  onPress={clearFilters}
+                >
+                  <Text style={styles.summaryClearText}>{t("products.clearShort")}</Text>
+                </Pressable>
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {categoryChips}
+            {statusChips}
+            {isOwner && (
+              <View style={styles.actionRow}>
+                <ActionButton
+                  label={t("products.addNew")}
+                  onPress={() => router.push("/(app)/products/new")}
+                />
+                {secondaryActions.map((action) => (
+                  <ActionButton key={action.icon} label={action.label} onPress={action.onPress} />
+                ))}
+              </View>
+            )}
           </>
         )}
+        {isOwner && exportError ? <InlineError reasonKey={exportError} /> : null}
       </View>
 
       {busyMessage && <Text style={styles.busy}>{busyMessage}</Text>}
@@ -287,6 +388,53 @@ export default function ProductsScreen() {
         />
       )}
 
+      <Panel
+        visible={compact && filtersOpen}
+        title={t("products.filters")}
+        onClose={() => setFiltersOpen(false)}
+        footer={
+          <>
+            {filterCount > 0 && (
+              <View style={styles.flex}>
+                <BigButton
+                  label={t("products.clearFilters")}
+                  variant="secondary"
+                  onPress={clearFilters}
+                />
+              </View>
+            )}
+            <View style={styles.flex}>
+              <BigButton label={t("products.showResults")} onPress={() => setFiltersOpen(false)} />
+            </View>
+          </>
+        }
+      >
+        <ScrollView contentContainerStyle={styles.panelBody}>
+          <Text style={styles.panelHeading}>{t("products.filterCategory")}</Text>
+          {categoryChips}
+          <Text style={styles.panelHeading}>{t("products.filterStatus")}</Text>
+          {statusChips}
+        </ScrollView>
+      </Panel>
+
+      <Panel
+        visible={compact && actionsOpen}
+        title={t("products.moreActions")}
+        onClose={() => setActionsOpen(false)}
+      >
+        {secondaryActions.map((action) => (
+          <ListRow
+            key={action.icon}
+            title={action.label}
+            leading={<Icon name={action.icon} />}
+            onPress={() => {
+              setActionsOpen(false);
+              action.onPress();
+            }}
+          />
+        ))}
+      </Panel>
+
       <BulkPriceModal
         visible={bulkOpen}
         categories={categories}
@@ -303,20 +451,47 @@ export default function ProductsScreen() {
 function FilterChip({
   label,
   selected,
+  large,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  large?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
+      style={[styles.chip, large && styles.chipLarge, selected && styles.chipSelected]}
       onPress={onPress}
     >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ToolbarButton({
+  icon,
+  label,
+  active,
+  onPress,
+}: {
+  icon: IconName;
+  label: string;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={[styles.toolbarButton, active && styles.toolbarButtonActive]}
+      onPress={onPress}
+    >
+      <Icon name={icon} size={20} color="#1d7a46" />
+      <Text style={styles.toolbarButtonText} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -332,6 +507,40 @@ function ActionButton({ label, onPress }: { label: string; onPress: () => void }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   header: { padding: 16, gap: 12, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  headerCompact: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  flex: { flex: 1 },
+  toolbar: { flexDirection: "row", gap: 8 },
+  toolbarButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#1d7a46",
+    backgroundColor: "#fff",
+  },
+  toolbarButtonActive: { backgroundColor: "#eaf6ee" },
+  toolbarButtonText: { flexShrink: 1, color: "#1d7a46", fontWeight: "600", fontSize: 15 },
+  toolbarAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingVertical: 0,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryText: { flex: 1, fontSize: 14, color: "#555" },
+  summaryClear: { minHeight: 44, minWidth: 48, alignItems: "center", justifyContent: "center" },
+  summaryClearText: { color: "#1d7a46", fontWeight: "700", fontSize: 15 },
+  panelBody: { gap: 12 },
+  panelHeading: { fontSize: 15, fontWeight: "700", color: "#333", marginTop: 4 },
   search: {
     minHeight: 52,
     borderRadius: 10,
@@ -343,6 +552,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 18, backgroundColor: "#eee" },
+  chipLarge: { minHeight: 48, justifyContent: "center" },
   chipSelected: { backgroundColor: "#1d7a46" },
   chipText: { fontSize: 14, color: "#333" },
   chipTextSelected: { color: "#fff", fontWeight: "600" },

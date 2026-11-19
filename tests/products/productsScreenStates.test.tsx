@@ -104,3 +104,49 @@ it("a cashier is never offered the owner's action", async () => {
   expect(texts()).not.toContain("products.emptyAddFirst");
   expect(texts()).not.toContain("products.addNew");
 });
+
+describe("on a phone", () => {
+  it("keeps secondary actions and filters closed until asked for", async () => {
+    mockFetchProducts.mockResolvedValue([]);
+    await render();
+    expect(texts()).toContain("products.addNew");
+    expect(texts()).not.toContain("products.importCsv");
+    expect(texts()).not.toContain("products.allCategories");
+
+    await act(async () => {
+      pressableByText(tree.root, "products.moreActions").props.onPress();
+    });
+    expect(texts()).toContain("products.importCsv");
+    expect(texts()).toContain("products.manageCategories");
+  });
+
+  it("names an active filter on the list and clears it", async () => {
+    mockFetchProducts.mockResolvedValue([]);
+    await render();
+    await act(async () => {
+      pressableByText(tree.root, "products.filters").props.onPress();
+    });
+    await act(async () => {
+      pressableByText(tree.root, "products.lowStock").props.onPress();
+    });
+    await act(async () => {
+      pressableByText(tree.root, "products.showResults").props.onPress();
+    });
+    expect(texts()).toContain("products.lowStock");
+    expect(mockFetchProducts.mock.calls.at(-1)?.[0]).toMatchObject({ lowStockOnly: true });
+
+    await act(async () => {
+      pressableByText(tree.root, "products.clearShort").props.onPress();
+    });
+    expect(texts()).not.toContain("products.lowStock");
+    expect(mockFetchProducts.mock.calls.at(-1)?.[0]).toMatchObject({ lowStockOnly: false });
+  });
+
+  it("gives a cashier the filters but no owner actions", async () => {
+    mockRole = "cashier";
+    mockFetchProducts.mockResolvedValue([]);
+    await render();
+    expect(texts()).toContain("products.filters");
+    expect(texts()).not.toContain("products.moreActions");
+  });
+});
