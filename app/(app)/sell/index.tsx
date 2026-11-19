@@ -742,7 +742,7 @@ export default function SellScreen() {
             </Pressable>
           ) : isOwner && storeIsEmpty ? (
             <EmptyStorePrompt />
-          ) : (
+          ) : gridNode && gridTabs.length > 0 ? null : (
             <Text style={styles.empty}>{t("sell.empty")}</Text>
           )}
         </>

@@ -381,6 +381,16 @@ describe("Sell with the grid", () => {
     expect(pain()).toBeDefined();
   });
 
+  it("on a phone the tiles get the room: tabs never shrink and the empty hint is gone", async () => {
+    mockWidth = 390;
+    await render();
+    const tabs = tree.root.findAll(
+      (n) => n.props.accessibilityLabel === "sell.grid.tabs" && n.props.horizontal === true
+    )[0];
+    expect(StyleSheet.flatten(tabs.props.style).flexShrink).toBe(0);
+    expect(allTexts(tree.root)).not.toContain("sell.empty");
+  });
+
   it("centres the empty-basket hint across the full pane width", async () => {
     mockWidth = 1366;
     await render();
