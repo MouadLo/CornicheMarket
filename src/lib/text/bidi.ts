@@ -29,6 +29,16 @@ export function isolateLtr(text: string): string {
   return `\u2066${text}\u2069`;
 }
 
+// A number, amount or signed quantity with no Arabic in it ("-2", "21.00 DH",
+// "+0.80 DH · 53.3%"). In an Arabic line it must still read left to right, or
+// the sign and currency jump to the wrong end ("2-", "DH 21.00"). Text that
+// holds Arabic words, or starts with a word, is left to the normal rules.
+const ARABIC_LETTERS = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+export function keepNumberLtr(text: string): string {
+  return /^[+\-\u2212]?\d/.test(text) && !ARABIC_LETTERS.test(text) ? isolateLtr(text) : text;
+}
+
 // The app's current layout direction, derived from the i18n language --
 // never from the content being displayed. Use this for any row/container
 // whose layout order must follow the UI language, not whatever happens to
