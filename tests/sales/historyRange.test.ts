@@ -95,8 +95,10 @@ describe("fetchRecentSales range", () => {
 
 describe("dayRange", () => {
   it("is the store day, half-open, in the store's zone", () => {
-    const range = dayRange("2026-11-18", "Africa/Casablanca");
-    expect(range?.from.toISOString()).toBe("2026-11-17T23:00:00.000Z"); // UTC+1
+    // Lagos is UTC+1 all year. Casablanca's rules differ between time-zone
+    // database versions, so its offset would make this test machine-dependent.
+    const range = dayRange("2026-11-18", "Africa/Lagos");
+    expect(range?.from.toISOString()).toBe("2026-11-17T23:00:00.000Z");
     expect(range?.to.toISOString()).toBe("2026-11-18T23:00:00.000Z");
     const tokyo = dayRange("2026-11-18", "Asia/Tokyo");
     expect(tokyo?.from.toISOString()).toBe("2026-11-17T15:00:00.000Z");
