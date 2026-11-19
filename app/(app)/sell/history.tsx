@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   dayTitle: { flex: 1, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
-  dayTotal: { fontSize: 15, fontWeight: "700", color: colors.success600 },
+  dayTotal: { fontSize: 15, fontWeight: "700", color: colors.success700 },
   rowTap: { minHeight: 48, justifyContent: "center" },
   preview: { fontSize: 15, color: colors.ink700 },
   lines: { gap: 8, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 10 },
