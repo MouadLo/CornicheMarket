@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import { tabularNumbers } from "@/src/theme/type";
 
 export function formatClock(date: Date): string {
@@ -41,6 +42,6 @@ export function Clock({ showDate = true }: { showDate?: boolean }) {
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "flex-end", paddingHorizontal: 6 },
-  time: { fontSize: 20, fontWeight: "600", color: "#ffffff", lineHeight: 22 },
-  date: { fontSize: 13, color: "#b9d3db" },
+  time: { fontSize: 20, fontWeight: "600", color: colors.white, lineHeight: 22 },
+  date: { fontSize: 13, color: colors.onBrandMuted },
 });

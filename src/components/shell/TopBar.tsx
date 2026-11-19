@@ -58,7 +58,7 @@ export function TopBar({
 
       {scannerReady ? (
         <View style={styles.scanner} accessibilityLabel={t("shell.scannerReady")}>
-          <Icon name="scan" size={18} color="#d6e8ee" />
+          <Icon name="scan" size={18} color={colors.onBrandSoft} />
           <Text style={styles.scannerText}>{t("shell.scannerReady")}</Text>
         </View>
       ) : null}
@@ -84,7 +84,7 @@ export function TopBar({
           onPress={onAlerts}
           style={[styles.iconButton, compact && styles.iconButtonCompact]}
         >
-          <Icon name="bell" size={22} color="#ffffff" />
+          <Icon name="bell" size={22} color={colors.white} />
           {alertCount > 0 ? (
             <View style={styles.bellBadge}>
               <Badge value={alertCount > 99 ? "99+" : alertCount} tone="bad" />
@@ -112,7 +112,7 @@ export function TopBar({
             </Text>
           </View>
         )}
-        {compact ? null : <Icon name="down" size={16} color="#ffffff" />}
+        {compact ? null : <Icon name="down" size={16} color={colors.white} />}
       </Pressable>
 
       <Clock showDate={!compact} />
@@ -149,9 +149,9 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.onBrandFill,
   },
-  scannerText: { fontSize: 15, fontWeight: "600", color: "#d6e8ee" },
+  scannerText: { fontSize: 15, fontWeight: "600", color: colors.onBrandSoft },
   pill: {
     minHeight: 36,
     minWidth: 36,
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.onBrandFill,
   },
   avatar: {
     width: 34,
@@ -191,5 +191,5 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 16, fontWeight: "700", color: colors.ink900 },
   userName: { fontSize: 15, fontWeight: "600", color: colors.white, maxWidth: 120 },
-  userRole: { fontSize: 13, color: "#b9d3db" },
+  userRole: { fontSize: 13, color: colors.onBrandMuted },
 });

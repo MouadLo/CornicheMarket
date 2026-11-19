@@ -240,7 +240,7 @@ export function PaymentSheet({
                         label={
                           owed > 0
                             ? `${isolateBidi(customer.name)} · ${t("sell.owes", { amount: formatMAD(owed) })}`
-                            : isolateBidi(customer.name)
+                            : customer.name
                         }
                         selected={selected}
                         onPress={() => setCustomerId(customer.id)}

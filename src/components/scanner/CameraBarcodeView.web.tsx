@@ -113,7 +113,7 @@ export function CameraBarcodeView({ onBarcode, onClose, children }: CameraBarcod
         playsInline: true,
         muted: true,
         autoPlay: true,
-        style: { width: "100%", height: "100%", objectFit: "cover", backgroundColor: "#000" },
+        style: { width: "100%", height: "100%", objectFit: "cover", backgroundColor: colors.black },
       })}
       {error ? (
         <View style={styles.errorPanel}>

@@ -25,6 +25,14 @@ export const colors = {
   white: "#ffffff",
   black: "#000000",
 
+  // On the dark brand bar (TopBar, Clock) and on dark overlays (dialogs, toasts).
+  onBrandSoft: "#d6e8ee", // scanner hint text and icon
+  onBrandMuted: "#b9d3db", // clock date, user role
+  onBrandFill: "rgba(255,255,255,0.08)", // faint white fill behind bar buttons
+  scrim: "rgba(7,47,60,0.48)", // dialog backdrop, a translucent brand800
+  toastSuccessIcon: "#8ee0ae", // on the dark toast
+  toastAction: "#a9dcea", // action text on the dark toast
+
   // Semantic. Money in = success, money out / loss / destructive = danger.
   success700: "#16653a",
   success600: "#1d7a46", // the "money in" button
