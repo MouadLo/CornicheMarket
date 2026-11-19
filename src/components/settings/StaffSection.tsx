@@ -1,3 +1,4 @@
+import { formatLocaleDateTime } from "@/src/lib/text/dates";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -125,7 +126,7 @@ export function StaffSection({ refreshKey = 0 }: { refreshKey?: number }) {
                   {" · "}
                   {member.lastSignInAt
                     ? t("settings.lastSignIn", {
-                        when: new Date(member.lastSignInAt).toLocaleString(i18n.language),
+                        when: formatLocaleDateTime(new Date(member.lastSignInAt), i18n.language),
                       })
                     : t("settings.neverSignedIn")}
                 </Text>

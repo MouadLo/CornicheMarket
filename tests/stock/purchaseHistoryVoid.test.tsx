@@ -11,7 +11,9 @@ import { textOf } from "../sales/sellTestUtils";
 const mockPush = jest.fn();
 const mockT = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}:${JSON.stringify(options)}` : key;
-jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT }) }));
+jest.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: mockT, i18n: { language: "fr" } }),
+}));
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { id: "o", role: "owner" } }),
 }));

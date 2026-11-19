@@ -11,6 +11,7 @@ import { isScannerBurst, keyFromKeyboardEvent, type WeightKey } from "@/src/lib/
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { colors, radius, touch } from "@/src/theme/tokens";
+import { Chip } from "@/src/components/ui/Chip";
 import { Text } from "@/src/theme/Text";
 
 type Props = {
@@ -234,22 +235,13 @@ export function PaymentSheet({
                     const owed = customer.balance_cents ?? 0;
                     const selected = customerId === customer.id;
                     return (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: selected }}
+                      <Chip
                         key={customer.id}
-                        style={[styles.chip, selected && styles.chipActive]}
+                        label={customer.name}
+                        alert={owed > 0 ? t("sell.owes", { amount: formatMAD(owed) }) : undefined}
+                        selected={selected}
                         onPress={() => setCustomerId(customer.id)}
-                      >
-                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
-                          {customer.name}
-                        </Text>
-                        {owed > 0 && (
-                          <Text style={[styles.chipOwes, selected && styles.chipTextActive]}>
-                            {t("sell.owes", { amount: formatMAD(owed) })}
-                          </Text>
-                        )}
-                      </Pressable>
+                      />
                     );
                   })}
                   {shown.length === 0 && (
@@ -398,18 +390,6 @@ const styles = StyleSheet.create({
   changeValue: { fontSize: 26, fontWeight: "800", color: colors.success700 },
   short: { color: colors.danger600, fontSize: 16, fontWeight: "600" },
   customers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    minHeight: touch.min,
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-    backgroundColor: colors.divider,
-  },
-  chipActive: { backgroundColor: colors.brand700 },
-  chipText: { fontSize: 15, color: colors.ink700 },
-  chipOwes: { fontSize: 15, color: colors.danger600 },
-  chipTextActive: { color: colors.white, fontWeight: "600" },
   newCustomerRow: { flexDirection: "row", gap: 8 },
   addCustomer: {
     paddingHorizontal: 20,

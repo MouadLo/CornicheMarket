@@ -25,7 +25,12 @@ export function pressableByText(root: ReactTestInstance, label: string): ReactTe
 }
 
 export function sizeOf(node: ReactTestInstance): { minHeight: number; minWidth: number } {
-  const style = StyleSheet.flatten(node.props.style) ?? {};
+  // Pressable styles can be a function of the pressed state, and a wrapper
+  // component (the shared Chip) carries no style: read its first styled child.
+  const holder =
+    node.props.style !== undefined ? node : node.find((n) => n.props.style !== undefined);
+  const raw = holder.props.style;
+  const style = StyleSheet.flatten(typeof raw === "function" ? raw({ pressed: false }) : raw) ?? {};
   return {
     minHeight: (style.minHeight as number) ?? (style.height as number) ?? 0,
     minWidth: (style.minWidth as number) ?? (style.width as number) ?? 0,

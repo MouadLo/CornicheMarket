@@ -1,3 +1,4 @@
+import { formatLocaleDateTime } from "@/src/lib/text/dates";
 import { useCallback, useEffect, useState } from "react";
 import { Share, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -28,7 +29,7 @@ export function OthersSalesList({
   userId: string | null;
   onChanged: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [sales, setSales] = useState<PendingSale[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -99,7 +100,9 @@ export function OthersSalesList({
             </Text>
             <Money cents={sale.total_cents} size="subtitle" />
           </View>
-          <Text style={styles.date}>{new Date(sale.created_at).toLocaleString()}</Text>
+          <Text style={styles.date}>
+            {formatLocaleDateTime(new Date(sale.created_at), i18n.language)}
+          </Text>
           <BigButton
             label={t("shell.recoverButton")}
             variant="secondary"

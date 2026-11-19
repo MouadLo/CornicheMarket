@@ -1,3 +1,4 @@
+import { formatLocaleDate } from "@/src/lib/text/dates";
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -17,7 +18,7 @@ import { priceChangePercent } from "@/src/lib/stock/pricing";
 export default function ProductPriceHistory() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -96,7 +97,9 @@ export default function ProductPriceHistory() {
           <Text style={styles.sectionLabel}>{t("products.priceHistoryDeliveries")}</Text>
           {[...points].reverse().map((point) => (
             <View key={point.id} style={styles.row}>
-              <Text style={styles.rowDate}>{new Date(point.created_at).toLocaleDateString()}</Text>
+              <Text style={styles.rowDate}>
+                {formatLocaleDate(new Date(point.created_at), i18n.language)}
+              </Text>
               <Text style={styles.rowQty}>
                 {point.quantity} {product.unit}
               </Text>

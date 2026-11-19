@@ -20,22 +20,60 @@ export function resolveLocale(language: string): string {
   return LOCALE_BY_LANGUAGE[language] ?? "fr-FR";
 }
 
-export function formatLocaleDate(date: Date, language: string): string {
+export function formatLocaleDate(date: Date, language: string, timeZone?: string): string {
   return date.toLocaleDateString(resolveLocale(language), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone,
   });
 }
 
-export function formatLocaleDateTime(date: Date, language: string): string {
+// Date and time, no seconds. Pass the store's time zone where the screen has one.
+export function formatLocaleDateTime(date: Date, language: string, timeZone?: string): string {
   return date.toLocaleString(resolveLocale(language), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
   });
+}
+
+// Day and month only ("05/01"), for tight chart labels.
+export function formatLocaleDayMonth(date: Date, language: string, timeZone?: string): string {
+  return date.toLocaleDateString(resolveLocale(language), {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+  });
+}
+
+// "janvier 2026". A month bucket comes from the database already cut at the
+// start of the month, so it is read in UTC unless a zone is given.
+export function formatLocaleMonthYear(
+  date: Date,
+  language: string,
+  timeZone: string = "UTC"
+): string {
+  return date.toLocaleDateString(resolveLocale(language), {
+    month: "long",
+    year: "numeric",
+    timeZone,
+  });
+}
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A value from the API that is either a plain calendar date ("2026-01-05", no
+// time) or a full timestamp. A plain date names a day, not an instant, so it is
+// read in UTC and never moves to the neighbouring day whatever the device zone.
+export function formatIsoDate(value: string, language: string, timeZone?: string): string {
+  if (DATE_ONLY.test(value))
+    return formatLocaleDate(new Date(`${value}T00:00:00Z`), language, "UTC");
+  return formatLocaleDate(new Date(value), language, timeZone);
 }
 
 // Sales history: times and day headings are read in the STORE's time zone

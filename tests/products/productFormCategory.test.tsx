@@ -50,10 +50,7 @@ const chip = (label: string) =>
   tree.root.findAllByType(Pressable).find((node) => textIn(node) === label);
 const press = (label: string) => act(() => chip(label)!.props.onPress());
 const selected = (label: string) => {
-  const style = ([] as unknown[]).concat(chip(label)!.props.style).flat(Infinity);
-  return style.some(
-    (entry) => (entry as { backgroundColor?: string })?.backgroundColor === "#0b5266"
-  );
+  return chip(label)!.props.accessibilityState?.selected === true;
 };
 const categoryInput = () =>
   tree.root

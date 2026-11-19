@@ -106,7 +106,11 @@ export function ToastView({ toast }: { toast: ToastState }) {
   return (
     <View style={styles.toastZone} pointerEvents="box-none">
       <View style={styles.toast} accessibilityRole="alert" accessibilityLiveRegion="polite">
-        <Icon name={toast.tone === "info" ? "info" : "check"} size={22} color="#8ee0ae" />
+        <Icon
+          name={toast.tone === "info" ? "info" : "check"}
+          size={22}
+          color={colors.toastSuccessIcon}
+        />
         <Text style={styles.toastText}>{toast.text}</Text>
         {toast.action ? (
           <Pressable
@@ -128,7 +132,7 @@ export function ToastView({ toast }: { toast: ToastState }) {
 const styles = StyleSheet.create({
   scrim: {
     flex: 1,
-    backgroundColor: "rgba(7, 47, 60, 0.48)",
+    backgroundColor: colors.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.s5,
@@ -200,5 +204,5 @@ const styles = StyleSheet.create({
   },
   toastText: { flexShrink: 1, fontSize: 17, color: colors.white },
   toastAction: { minHeight: 48, paddingHorizontal: spacing.s3, justifyContent: "center" },
-  toastActionText: { fontSize: 17, fontWeight: "600", color: "#a9dcea" },
+  toastActionText: { fontSize: 17, fontWeight: "600", color: colors.toastAction },
 });
