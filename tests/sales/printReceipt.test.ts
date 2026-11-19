@@ -1,6 +1,11 @@
 import { Platform } from "react-native";
 
-import { canShareReceipt, printReceipt, shareReceipt } from "../../src/lib/sales/printReceipt";
+import {
+  canPrintReceipt,
+  canShareReceipt,
+  printReceipt,
+  shareReceipt,
+} from "../../src/lib/sales/printReceipt";
 
 const mockPrintAsync = jest.fn();
 const mockPrintToFile = jest.fn();
@@ -105,5 +110,33 @@ describe("web", () => {
     expect(await shareReceipt(input)).toBe("cancelled");
     share.mockRejectedValueOnce(new Error("nope"));
     await expect(shareReceipt(input)).rejects.toThrow("nope");
+  });
+});
+
+describe("canPrintReceipt", () => {
+  const browser = (userAgent: string, maxTouchPoints = 0) => {
+    setOS("web");
+    Object.defineProperty(globalThis, "navigator", {
+      value: { userAgent, maxTouchPoints },
+      configurable: true,
+    });
+  };
+
+  it("offers printing on native apps and desktop or Android browsers", () => {
+    setOS("android");
+    expect(canPrintReceipt()).toBe(true);
+    browser("Mozilla/5.0 (Windows NT 10.0) Chrome/130");
+    expect(canPrintReceipt()).toBe(true);
+    browser("Mozilla/5.0 (Linux; Android 14) Chrome/130", 5);
+    expect(canPrintReceipt()).toBe(true);
+    browser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605");
+    expect(canPrintReceipt()).toBe(true);
+  });
+
+  it("leaves iPhone and iPad browsers to Share", () => {
+    browser("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604");
+    expect(canPrintReceipt()).toBe(false);
+    browser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605", 5);
+    expect(canPrintReceipt()).toBe(false);
   });
 });

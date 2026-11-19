@@ -6,7 +6,12 @@ import { BigButton } from "@/src/components/BigButton";
 import { Banner } from "@/src/components/ui/Banner";
 import { formatMAD } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
-import { canShareReceipt, printReceipt, shareReceipt } from "@/src/lib/sales/printReceipt";
+import {
+  canPrintReceipt,
+  canShareReceipt,
+  printReceipt,
+  shareReceipt,
+} from "@/src/lib/sales/printReceipt";
 import {
   formatReceiptQuantity,
   receiptDateText,
@@ -15,7 +20,7 @@ import {
   type ReceiptLabels,
   type ReceiptModel,
 } from "@/src/lib/sales/receipt";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, spacing } from "@/src/theme/tokens";
 
@@ -129,12 +134,13 @@ export function ReceiptPanel({
               <View style={styles.lineMain}>
                 <Text style={styles.lineName}>{isolateBidi(line.name)}</Text>
                 <Text style={styles.sub}>
-                  {`${formatReceiptQuantity(line.quantity)} ${line.unit ? labels.unit(line.unit, line.quantity) : ""}`.trim() +
-                    ` × ${formatMAD(line.unitPriceCents)}`}
+                  {`${isolateLtr(
+                    `${formatReceiptQuantity(line.quantity)} ${line.unit ? labels.unit(line.unit, line.quantity) : ""}`.trim()
+                  )} × ${isolateLtr(formatMAD(line.unitPriceCents))}`}
                 </Text>
                 {line.discountCents > 0 ? (
                   <Text style={styles.sub}>
-                    {labels.lineDiscount(formatMAD(line.discountCents))}
+                    {labels.lineDiscount(isolateLtr(formatMAD(line.discountCents)))}
                   </Text>
                 ) : null}
               </View>
@@ -160,16 +166,18 @@ export function ReceiptPanel({
         </ScrollView>
         {error ? <Banner tone="bad" text={error} /> : null}
         <View style={styles.actions}>
-          <BigButton
-            label={t("receipt.print")}
-            disabled={busy}
-            onPress={() =>
-              run(
-                () => printReceipt(receiptToHtml(receipt, labels, options)),
-                t("receipt.printFailed")
-              )
-            }
-          />
+          {canPrintReceipt() ? (
+            <BigButton
+              label={t("receipt.print")}
+              disabled={busy}
+              onPress={() =>
+                run(
+                  () => printReceipt(receiptToHtml(receipt, labels, options)),
+                  t("receipt.printFailed")
+                )
+              }
+            />
+          ) : null}
           {canShare ? (
             <BigButton
               label={t("receipt.share")}

@@ -15,8 +15,7 @@ function printInIframe(html: string): Promise<void> {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
     frame.setAttribute("tabindex", "-1");
-    frame.style.cssText =
-      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
     let removed = false;
     const remove = () => {
       if (removed) return;
@@ -50,6 +49,17 @@ function printInIframe(html: string): Promise<void> {
     frame.srcdoc = html;
     document.body.appendChild(frame);
   });
+}
+
+// iPhone and iPad browsers print the whole page instead of the hidden frame, so
+// they offer Share only. iPadOS reports itself as a Mac with a touch screen.
+export function canPrintReceipt(): boolean {
+  if (Platform.OS !== "web") return true;
+  if (typeof navigator === "undefined") return false;
+  const ios =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  return !ios;
 }
 
 export async function printReceipt(html: string): Promise<void> {
