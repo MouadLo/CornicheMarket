@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
@@ -14,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Chip } from "@/src/components/ui/Chip";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { InlineError } from "@/src/components/ui/InlineError";
@@ -40,6 +40,8 @@ import { categoryLabel } from "@/src/lib/products/categoryCatalog";
 import { familyIds, mainCategories, subCategoriesOf } from "@/src/lib/products/categories";
 import { activeFilterCount, isCompactProductsList } from "@/src/lib/products/listFilters";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 export default function ProductsScreen() {
   const { profile } = useAuth();
@@ -169,9 +171,8 @@ export default function ProductsScreen() {
   const categoryChips = (
     <>
       <View style={styles.filterRow}>
-        <FilterChip
+        <Chip
           label={t("products.allCategories")}
-          large={compact}
           selected={categoryId === null}
           onPress={() => {
             setCategoryId(null);
@@ -179,10 +180,9 @@ export default function ProductsScreen() {
           }}
         />
         {mainCategories(categories).map((category) => (
-          <FilterChip
+          <Chip
             key={category.id}
             label={categoryLabel(category, i18n?.language)}
-            large={compact}
             selected={categoryId === category.id}
             onPress={() => {
               setCategoryId(category.id === categoryId ? null : category.id);
@@ -194,17 +194,15 @@ export default function ProductsScreen() {
 
       {categoryId && subCategoriesOf(categories, categoryId).length > 0 && (
         <View style={styles.filterRow}>
-          <FilterChip
+          <Chip
             label={t("products.catAllSubs")}
-            large={compact}
             selected={subCategoryId === null}
             onPress={() => setSubCategoryId(null)}
           />
           {subCategoriesOf(categories, categoryId).map((sub) => (
-            <FilterChip
+            <Chip
               key={sub.id}
               label={categoryLabel(sub, i18n?.language)}
-              large={compact}
               selected={subCategoryId === sub.id}
               onPress={() => setSubCategoryId(sub.id === subCategoryId ? null : sub.id)}
             />
@@ -216,27 +214,23 @@ export default function ProductsScreen() {
 
   const statusChips = (
     <View style={styles.filterRow}>
-      <FilterChip
+      <Chip
         label={t("products.lowStock")}
-        large={compact}
         selected={lowStockOnly}
         onPress={() => setLowStockOnly((value) => !value)}
       />
-      <FilterChip
+      <Chip
         label={t("products.statusActive")}
-        large={compact}
         selected={status === "active"}
         onPress={() => setStatus("active")}
       />
-      <FilterChip
+      <Chip
         label={t("products.statusInactive")}
-        large={compact}
         selected={status === "inactive"}
         onPress={() => setStatus("inactive")}
       />
-      <FilterChip
+      <Chip
         label={t("products.statusAll")}
-        large={compact}
         selected={status === "all"}
         onPress={() => setStatus("all")}
       />
@@ -448,29 +442,6 @@ export default function ProductsScreen() {
   );
 }
 
-function FilterChip({
-  label,
-  selected,
-  large,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  large?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: selected }}
-      style={[styles.chip, large && styles.chipLarge, selected && styles.chipSelected]}
-      onPress={onPress}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function ToolbarButton({
   icon,
   label,
@@ -488,7 +459,7 @@ function ToolbarButton({
       style={[styles.toolbarButton, active && styles.toolbarButtonActive]}
       onPress={onPress}
     >
-      <Icon name={icon} size={20} color="#1d7a46" />
+      <Icon name={icon} size={20} color={colors.brand700} />
       <Text style={styles.toolbarButtonText} numberOfLines={1}>
         {label}
       </Text>
@@ -505,8 +476,8 @@ function ActionButton({ label, onPress }: { label: string; onPress: () => void }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  header: { padding: 16, gap: 12, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  container: { flex: 1, backgroundColor: colors.surface },
+  header: { padding: 16, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
   headerCompact: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   flex: { flex: 1 },
   toolbar: { flexDirection: "row", gap: 8 },
@@ -521,11 +492,11 @@ const styles = StyleSheet.create({
     gap: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#1d7a46",
-    backgroundColor: "#fff",
+    borderColor: colors.brand700,
+    backgroundColor: colors.surface,
   },
-  toolbarButtonActive: { backgroundColor: "#eaf6ee" },
-  toolbarButtonText: { flexShrink: 1, color: "#1d7a46", fontWeight: "600", fontSize: 15 },
+  toolbarButtonActive: { backgroundColor: colors.brand100 },
+  toolbarButtonText: { flexShrink: 1, color: colors.brand700, fontWeight: "600", fontSize: 15 },
   toolbarAction: {
     flex: 1,
     minWidth: 0,
@@ -536,33 +507,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   summaryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  summaryText: { flex: 1, fontSize: 14, color: "#555" },
+  summaryText: { flex: 1, fontSize: 14, color: colors.ink600 },
   summaryClear: { minHeight: 44, minWidth: 48, alignItems: "center", justifyContent: "center" },
-  summaryClearText: { color: "#1d7a46", fontWeight: "700", fontSize: 15 },
+  summaryClearText: { color: colors.brand700, fontWeight: "700", fontSize: 15 },
   panelBody: { gap: 12 },
-  panelHeading: { fontSize: 15, fontWeight: "700", color: "#333", marginTop: 4 },
+  panelHeading: { fontSize: 15, fontWeight: "700", color: colors.ink700, marginTop: 4 },
   search: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
   },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 18, backgroundColor: "#eee" },
-  chipLarge: { minHeight: 48, justifyContent: "center" },
-  chipSelected: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextSelected: { color: "#fff", fontWeight: "600" },
   action: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: "#1d7a46",
+    backgroundColor: colors.brand700,
   },
-  actionText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  actionText: { color: colors.white, fontWeight: "600", fontSize: 15 },
   loader: { marginVertical: 24 },
-  busy: { textAlign: "center", padding: 12, color: "#1d7a46" },
+  busy: { textAlign: "center", padding: 12, color: colors.brand700 },
 });

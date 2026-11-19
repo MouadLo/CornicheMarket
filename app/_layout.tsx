@@ -4,7 +4,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -13,6 +13,7 @@ import { useOrientationLock } from "@/src/lib/device/orientation";
 import { DeactivatedScreen } from "@/src/components/auth/DeactivatedScreen";
 import { DialogHost } from "@/src/components/ui/DialogHost";
 import { bundledFonts } from "@/src/theme/fonts";
+import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
 import i18n, { changeLanguage, loadSavedLanguage } from "@/src/i18n";
 
@@ -97,15 +98,15 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 const guardStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32, gap: 16 },
   title: { fontSize: 20, fontWeight: "700", textAlign: "center" },
-  message: { fontSize: 15, color: "#555", textAlign: "center" },
+  message: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   retryButton: {
     paddingVertical: 14,
     paddingHorizontal: 32,
     backgroundColor: colors.brand700,
     borderRadius: 10,
   },
-  retryText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  signOutText: { color: "#b3261e", fontSize: 15 },
+  retryText: { color: colors.white, fontWeight: "600", fontSize: 16 },
+  signOutText: { color: colors.danger600, fontSize: 15 },
 });
 
 export default function RootLayout() {

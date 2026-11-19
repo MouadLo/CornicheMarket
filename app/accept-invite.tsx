@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { supabase } from "@/src/lib/supabase/client";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 // Reached via the link in the invite email. On web, Supabase sets a
 // session from the URL before this screen mounts (see detectSessionInUrl
@@ -89,16 +91,16 @@ export default function AcceptInvite() {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
   title: { fontSize: 22, fontWeight: "700", textAlign: "center" },
-  subtitle: { fontSize: 14, textAlign: "center", color: "#555", marginBottom: 12 },
+  subtitle: { fontSize: 14, textAlign: "center", color: colors.ink600, marginBottom: 12 },
   message: { fontSize: 16, textAlign: "center" },
   input: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  error: { color: "#b3261e", textAlign: "center" },
+  error: { color: colors.danger600, textAlign: "center" },
   buttonWrap: { marginTop: 12 },
 });
