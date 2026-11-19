@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -15,6 +15,8 @@ import { COVER_DAYS, daysOfStockLeft, suggestedReorder } from "@/src/lib/invento
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { neutralizeFormula } from "@/src/lib/reports/export";
 import type { Product } from "@/src/lib/products/queries";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 type Row = {
   product: Product;
@@ -135,28 +137,28 @@ export default function LowStockScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
-  intro: { fontSize: 13, color: "#666", lineHeight: 19 },
+  intro: { fontSize: 13, color: colors.ink600, lineHeight: 19 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
   rowMain: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#666" },
+  meta: { fontSize: 13, color: colors.ink600 },
   suggestBox: {
     alignItems: "center",
-    backgroundColor: "#eef3ef",
+    backgroundColor: colors.brand100,
     borderRadius: 10,
     padding: 10,
     minWidth: 72,
   },
-  suggestLabel: { fontSize: 13, color: "#1d7a46", textTransform: "uppercase" },
-  suggestValue: { fontSize: 20, fontWeight: "800", color: "#1d7a46" },
-  empty: { textAlign: "center", color: "#666", marginTop: 32 },
-  error: { color: "#b3261e" },
+  suggestLabel: { fontSize: 13, color: colors.brand700, textTransform: "uppercase" },
+  suggestValue: { fontSize: 20, fontWeight: "800", color: colors.brand700 },
+  empty: { textAlign: "center", color: colors.ink600, marginTop: 32 },
+  error: { color: colors.danger600 },
 });

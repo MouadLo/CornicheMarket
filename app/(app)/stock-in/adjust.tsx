@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -20,6 +20,9 @@ import {
 import { reasonLabel } from "@/src/lib/inventory/reasonLabel";
 import { adjustmentPreviewMessage, lossValueCents } from "@/src/lib/inventory/reorder";
 import type { Product } from "@/src/lib/products/queries";
+import { Chip } from "@/src/components/ui/Chip";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 export default function AdjustScreen() {
   const { profile } = useAuth();
@@ -115,17 +118,12 @@ export default function AdjustScreen() {
           <Text style={styles.label}>{t("stockIn.adjustReason")}</Text>
           <View style={styles.chips}>
             {ADJUSTMENT_REASONS.map((option) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: reason === option }}
+              <Chip
                 key={option}
-                style={[styles.chip, reason === option && styles.chipActive]}
+                label={reasonLabel(option, t)}
+                selected={reason === option}
                 onPress={() => setReason(option)}
-              >
-                <Text style={[styles.chipText, reason === option && styles.chipTextActive]}>
-                  {reasonLabel(option, t)}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
 
@@ -205,7 +203,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#555",
+    color: colors.ink600,
     textTransform: "uppercase",
     marginTop: 8,
   },
@@ -213,45 +211,41 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f4f6f5",
+    backgroundColor: colors.sunken,
     borderRadius: 10,
     padding: 14,
     gap: 12,
   },
   selectedMain: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "700" },
-  meta: { fontSize: 13, color: "#666" },
+  meta: { fontSize: 13, color: colors.ink600 },
   touchTarget: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
-  change: { color: "#1d7a46", fontWeight: "600" },
-  label: { fontSize: 14, fontWeight: "600", color: "#444" },
+  change: { color: colors.ink700, fontWeight: "600" },
+  label: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
-  chipActive: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
   input: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  preview: { fontSize: 15, color: "#333", fontWeight: "600" },
+  preview: { fontSize: 15, color: colors.ink700, fontWeight: "600" },
   historyRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
   rowMain: { flex: 1, gap: 3 },
   historyName: { fontSize: 15, fontWeight: "600" },
   historyRight: { alignItems: "flex-end" },
-  delta: { fontSize: 16, fontWeight: "700", color: "#1d7a46" },
-  deltaNegative: { color: "#b3261e" },
-  lossValue: { fontSize: 13, color: "#666" },
-  empty: { color: "#666", textAlign: "center", marginVertical: 16 },
-  error: { color: "#b3261e" },
+  delta: { fontSize: 16, fontWeight: "700", color: colors.ink700 },
+  deltaNegative: { color: colors.danger600 },
+  lossValue: { fontSize: 13, color: colors.ink600 },
+  empty: { color: colors.ink600, textAlign: "center", marginVertical: 16 },
+  error: { color: colors.danger600 },
 });

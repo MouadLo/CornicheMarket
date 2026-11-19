@@ -6,6 +6,7 @@ import { isolateBidi } from "@/src/lib/text/bidi";
 import { Icon } from "@/src/components/ui/Icon";
 import { colors, radius, touch } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
+import { Chip } from "@/src/components/ui/Chip";
 
 import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
@@ -299,27 +300,6 @@ export default function ReceiveDeliveryScreen() {
   );
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
-      onPress={onPress}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 14, paddingBottom: 60 },
   addSupplier: {
@@ -335,22 +315,23 @@ const styles = StyleSheet.create({
     borderColor: colors.brand700,
   },
   addSupplierText: { color: colors.brand700, fontWeight: "700", fontSize: 15 },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase" },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.ink600,
+    textTransform: "uppercase",
+  },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
-  chipSelected: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextSelected: { color: "#fff", fontWeight: "600" },
-  supplierForm: { gap: 10, padding: 14, backgroundColor: "#f6f6f6", borderRadius: 12 },
+  supplierForm: { gap: 10, padding: 14, backgroundColor: colors.sunken, borderRadius: 12 },
   supplierButtons: { gap: 8 },
   input: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   totalRow: {
     flexDirection: "row",
@@ -358,12 +339,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#e4e4e4",
+    borderTopColor: colors.divider,
   },
   totalLabel: { fontSize: 16, fontWeight: "600" },
   totalValue: { fontSize: 22, fontWeight: "800" },
-  note: { fontSize: 13, color: "#666", fontStyle: "italic" },
-  warning: { color: "#b36b00", fontSize: 14 },
+  note: { fontSize: 13, color: colors.ink600, fontStyle: "italic" },
+  warning: { color: colors.warning700, fontSize: 14 },
   incompleteBox: {
     gap: 4,
     padding: 12,
@@ -371,8 +352,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warning100,
   },
   incompleteLine: { fontSize: 14, color: colors.ink900 },
-  error: { color: "#b3261e", fontSize: 14 },
-  success: { color: "#1d7a46", fontSize: 15, fontWeight: "600" },
+  error: { color: colors.danger600, fontSize: 14 },
+  success: { color: colors.success700, fontSize: 15, fontWeight: "600" },
   blocked: { flex: 1, justifyContent: "center", padding: 32 },
-  blockedText: { fontSize: 16, textAlign: "center", color: "#555", lineHeight: 23 },
+  blockedText: { fontSize: 16, textAlign: "center", color: colors.ink600, lineHeight: 23 },
 });

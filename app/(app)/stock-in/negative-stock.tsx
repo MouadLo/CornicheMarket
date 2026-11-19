@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -9,6 +9,8 @@ import { errorKey } from "@/src/lib/errors/userMessage";
 import { fetchNegativeStockProducts, type NegativeStockProduct } from "@/src/lib/inventory/queries";
 import { daysNegative } from "@/src/lib/inventory/reorder";
 import { formatMAD } from "@/src/lib/money";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 export default function NegativeStockScreen() {
   const { t } = useTranslation();
@@ -74,20 +76,20 @@ export default function NegativeStockScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
-  intro: { fontSize: 13, color: "#666", lineHeight: 19 },
+  intro: { fontSize: 13, color: colors.ink600, lineHeight: 19 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
   rowMain: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "600" },
-  meta: { fontSize: 13, color: "#b3261e" },
-  value: { fontSize: 16, fontWeight: "700", color: "#b3261e" },
-  empty: { textAlign: "center", color: "#666", marginTop: 32 },
-  error: { color: "#b3261e" },
+  meta: { fontSize: 13, color: colors.danger600 },
+  value: { fontSize: 16, fontWeight: "700", color: colors.danger600 },
+  empty: { textAlign: "center", color: colors.ink600, marginTop: 32 },
+  error: { color: colors.danger600 },
 });
