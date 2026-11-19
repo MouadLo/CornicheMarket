@@ -46,6 +46,11 @@ export function describeReviewLine(line: ReviewLine, t: T): string {
         amount: m(line.amountCents),
         percent: isolateLtr(String(line.percent)),
       });
+    case "cashierLimit":
+      return t("shell.cashierLimitLine", {
+        discount: m(line.discountCents),
+        limit: m(line.limitCents),
+      });
   }
 }
 

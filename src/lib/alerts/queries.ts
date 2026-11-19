@@ -10,9 +10,12 @@ const FLAG_COLUMN: Record<ReviewKind, "needs_price_review" | "needs_discount_rev
   price: "needs_price_review",
   discount: "needs_discount_review",
 };
-const LOG_ACTION: Record<ReviewKind, string> = {
-  price: "price_mismatch",
-  discount: "discount_over_threshold",
+// A flagged discount sale carries either log row (or both): a discount above
+// the owner's threshold, or one above what a cashier may give.
+const CASHIER_LIMIT_ACTION = "discount_over_cashier_limit";
+const LOG_ACTIONS: Record<ReviewKind, string[]> = {
+  price: ["price_mismatch"],
+  discount: ["discount_over_threshold", CASHIER_LIMIT_ACTION],
 };
 const DISMISS_RPC: Record<ReviewKind, string> = {
   price: "dismiss_price_review",
@@ -72,7 +75,10 @@ export async function fetchAlertCounts(): Promise<AlertCounts> {
 export type ReviewLine =
   | { type: "price"; name: string; deviceCents: number; expectedCents: number; stale: boolean }
   | { type: "discount"; name: string; amountCents: number; discountCents: number; percent: number }
-  | { type: "saleDiscount"; amountCents: number; discountCents: number; percent: number };
+  | { type: "saleDiscount"; amountCents: number; discountCents: number; percent: number }
+  // A cashier gave more discount than the limit allows (which the device
+  // enforces, so this is a device that was not up to date or was tampered with).
+  | { type: "cashierLimit"; discountCents: number; limitCents: number };
 
 export type ReviewItem = {
   saleId: string;
@@ -85,15 +91,28 @@ export type ReviewItem = {
 type LogDetails = {
   lines?: Record<string, unknown>[];
   sale_discount?: { discount_cents: number; basket_cents: number; percent: number } | null;
+  // discount_over_cashier_limit rows
+  limit_cents?: number;
+  total_discount_cents?: number;
 };
 
 // Turns one activity-log row into the lines the owner reads. Pure, so the two
 // log shapes are tested without a database.
 export function reviewLinesFrom(
   kind: ReviewKind,
-  details: LogDetails | null | undefined
+  details: LogDetails | null | undefined,
+  action?: string
 ): ReviewLine[] {
   if (!details) return [];
+  if (action === CASHIER_LIMIT_ACTION) {
+    return [
+      {
+        type: "cashierLimit",
+        discountCents: Number(details.total_discount_cents),
+        limitCents: Number(details.limit_cents),
+      },
+    ];
+  }
   const lines: ReviewLine[] = [];
   for (const line of details.lines ?? []) {
     const name = String(line.product_name ?? "");
@@ -144,11 +163,13 @@ export async function fetchReviewSales(kind: ReviewKind, limit = 50): Promise<Re
 
   const ids = rows.map((r) => r.id);
   const [logs, people] = await Promise.all([
-    supabase
-      .from("activity_log")
-      .select("entity_id, details")
-      .eq("action", LOG_ACTION[kind])
-      .in("entity_id", ids),
+    (() => {
+      const actions = LOG_ACTIONS[kind];
+      const query = supabase.from("activity_log").select("entity_id, action, details");
+      return (
+        actions.length === 1 ? query.eq("action", actions[0]) : query.in("action", actions)
+      ).in("entity_id", ids);
+    })(),
     supabase
       .from("profiles")
       .select("id, full_name")
@@ -156,9 +177,14 @@ export async function fetchReviewSales(kind: ReviewKind, limit = 50): Promise<Re
   ]);
   if (logs.error) throw new Error(logs.error.message);
 
-  const detailsBySale = new Map<string, LogDetails>();
-  for (const row of (logs.data ?? []) as { entity_id: string; details: LogDetails }[]) {
-    detailsBySale.set(row.entity_id, row.details);
+  const linesBySale = new Map<string, ReviewLine[]>();
+  for (const row of (logs.data ?? []) as {
+    entity_id: string;
+    action?: string;
+    details: LogDetails;
+  }[]) {
+    const found = reviewLinesFrom(kind, row.details, row.action);
+    linesBySale.set(row.entity_id, [...(linesBySale.get(row.entity_id) ?? []), ...found]);
   }
   const nameById = new Map<string, string>();
   for (const p of (people.data ?? []) as { id: string; full_name: string | null }[]) {
@@ -170,7 +196,7 @@ export async function fetchReviewSales(kind: ReviewKind, limit = 50): Promise<Re
     occurredAt: r.occurred_at,
     totalCents: Number(r.total_cents),
     cashierName: nameById.get(r.cashier_id) ?? null,
-    lines: reviewLinesFrom(kind, detailsBySale.get(r.id)),
+    lines: linesBySale.get(r.id) ?? [],
   }));
 }
 
