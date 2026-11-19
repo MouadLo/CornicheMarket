@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
+import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
 import { Banner } from "@/src/components/ui/Banner";
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -476,7 +477,7 @@ const styles = StyleSheet.create({
   rangeBox: { gap: 8 },
   backToReport: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
   backToReportText: { fontSize: 15, fontWeight: "700", color: colors.brand700 },
-  rangeTotal: { fontSize: 15, fontWeight: "700", color: "#444" },
+  rangeTotal: { fontSize: 15, fontWeight: "700", color: colors.ink700 },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -485,33 +486,33 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   dayTitle: { flex: 1, fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
-  dayTotal: { fontSize: 15, fontWeight: "700", color: "#1d7a46" },
+  dayTotal: { fontSize: 15, fontWeight: "700", color: colors.success600 },
   rowTap: { minHeight: 48, justifyContent: "center" },
-  preview: { fontSize: 15, color: "#444" },
-  lines: { gap: 8, borderTopWidth: 1, borderTopColor: "#eee", paddingTop: 10 },
+  preview: { fontSize: 15, color: colors.ink700 },
+  lines: { gap: 8, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 10 },
   line: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   lineName: { fontSize: 14, fontWeight: "600" },
   lineTotal: { fontSize: 14, fontWeight: "600" },
-  row: { borderWidth: 1, borderColor: "#eee", borderRadius: 12, padding: 14, gap: 10 },
-  rowVoided: { backgroundColor: "#fafafa", borderColor: "#e8e8e8" },
+  row: { borderWidth: 1, borderColor: colors.divider, borderRadius: 12, padding: 14, gap: 10 },
+  rowVoided: { backgroundColor: colors.sunken, borderColor: colors.divider },
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   rowMain: { flex: 1, gap: 3 },
   time: { fontSize: 15, fontWeight: "600" },
-  meta: { fontSize: 15, color: "#666" },
+  meta: { fontSize: 15, color: colors.ink600 },
   total: { fontSize: 17, fontWeight: "700" },
-  totalVoided: { textDecorationLine: "line-through", color: "#999" },
+  totalVoided: { textDecorationLine: "line-through", color: colors.ink600 },
   voidButton: {
     minHeight: 48,
     justifyContent: "center",
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: "#fdecea",
+    backgroundColor: colors.danger100,
     alignItems: "center",
   },
-  voidButtonText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
+  voidButtonText: { color: colors.danger600, fontWeight: "700", fontSize: 14 },
   voidBox: { gap: 10 },
-  voidTitle: { fontSize: 15, fontWeight: "700", color: "#333" },
-  empty: { textAlign: "center", color: "#666", marginTop: 32 },
-  refusal: { fontSize: 15, color: "#666" },
-  error: { color: "#b3261e" },
+  voidTitle: { fontSize: 15, fontWeight: "700", color: colors.ink700 },
+  empty: { textAlign: "center", color: colors.ink600, marginTop: 32 },
+  refusal: { fontSize: 15, color: colors.ink600 },
+  error: { color: colors.danger600 },
 });

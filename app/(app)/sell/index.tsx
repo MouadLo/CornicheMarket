@@ -5,7 +5,6 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
@@ -66,6 +65,7 @@ import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
+import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
 
 export default function SellScreen() {
@@ -471,7 +471,7 @@ export default function SellScreen() {
             style={styles.headerLink}
             onPress={() => router.push("/(app)/sell/history")}
           >
-            <Icon name="receipt" size={20} color="#1d7a46" />
+            <Icon name="receipt" size={20} color={colors.brand700} />
             <Text style={styles.link}>{t("sell.history")}</Text>
           </Pressable>
           <Pressable
@@ -479,7 +479,7 @@ export default function SellScreen() {
             style={styles.headerLink}
             onPress={() => router.push("/(app)/sell/day")}
           >
-            <Icon name="calendar" size={20} color="#1d7a46" />
+            <Icon name="calendar" size={20} color={colors.brand700} />
             <Text style={styles.link}>{t("day.link")}</Text>
           </Pressable>
         </View>
@@ -790,17 +790,17 @@ export default function SellScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.surface },
   // Tablet and laptop (>= 900 dp): grid and cart side by side, cart always visible.
   split: { flex: 1, flexDirection: "row" },
   gridPane: { flex: 1, minWidth: 0 },
-  cartPane: { width: 420, borderStartWidth: 1, borderStartColor: "#e7ebee" },
+  cartPane: { width: 420, borderStartWidth: 1, borderStartColor: colors.divider },
   backBar: {
     minHeight: 52,
     justifyContent: "center",
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: colors.divider,
   },
   basketBar: {
     flexDirection: "row",
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
   basketCount: { color: colors.white, fontSize: 14, fontWeight: "600" },
   basketTotal: { color: colors.white, fontSize: 22, fontWeight: "800" },
   basketAction: { color: colors.white, fontSize: 16, fontWeight: "700" },
-  header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.divider },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 8 },
   headerLink: {
@@ -827,17 +827,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#1d7a46",
-    backgroundColor: "#eaf6ee",
+    borderColor: colors.brand700,
+    backgroundColor: colors.brand100,
   },
-  link: { color: "#1d7a46", fontWeight: "600", fontSize: 15 },
+  link: { color: colors.brand700, fontWeight: "600", fontSize: 15 },
   searchRow: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
   search: {
     minHeight: 56,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     paddingHorizontal: 16,
     fontSize: 17,
   },
@@ -845,11 +845,11 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: 22,
     borderRadius: 10,
-    backgroundColor: "#1d7a46",
+    backgroundColor: colors.brand700,
     alignItems: "center",
     justifyContent: "center",
   },
-  scanButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  scanButtonText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   flashRow: { minHeight: 22, justifyContent: "center" },
   flash: { color: colors.success700, fontSize: 15, fontWeight: "600" },
   flashError: { color: colors.danger700 },
@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 14,
     borderRadius: 10,
-    backgroundColor: "#f4f4f4",
+    backgroundColor: colors.sunken,
   },
   resultName: { fontSize: 15, fontWeight: "600", flex: 1 },
   resultPrice: { fontSize: 15, fontWeight: "700" },
@@ -891,29 +891,29 @@ const styles = StyleSheet.create({
     width: "100%",
     textAlign: "center",
     marginTop: 48,
-    color: "#666",
+    color: colors.ink600,
     fontSize: 15,
   },
-  footer: { padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: "#eee" },
+  footer: { padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: colors.divider },
   discountRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  footerLabel: { fontSize: 15, color: "#555" },
+  footerLabel: { fontSize: 15, color: colors.ink700 },
   discountInput: {
     minHeight: 48,
     minWidth: 110,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     paddingHorizontal: 14,
     fontSize: 16,
     textAlign: "right",
   },
-  discountInputInvalid: { borderColor: "#b3261e" },
-  discountError: { color: "#b3261e", fontSize: 13 },
+  discountInputInvalid: { borderColor: colors.danger600 },
+  discountError: { color: colors.danger600, fontSize: 13 },
   basketHeader: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 14 },
   emptyLink: { minHeight: 48, justifyContent: "center" },
-  emptyLinkText: { fontSize: 14, color: "#9a1f18", fontWeight: "600" },
+  emptyLinkText: { fontSize: 14, color: colors.danger700, fontWeight: "600" },
   discountLink: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
-  discountLinkText: { fontSize: 15, color: "#1a5fb4", fontWeight: "600" },
+  discountLinkText: { fontSize: 15, color: colors.brand700, fontWeight: "600" },
   totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   totalValue: { fontSize: 30, fontWeight: "800" },
 });
