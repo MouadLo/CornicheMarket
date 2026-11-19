@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { centsToDisplay, formatMAD, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { isLineDiscountValid, lineTotal, type CartLine } from "@/src/lib/sales/totals";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -52,8 +52,10 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
             {isolateBidi(line.name)}
           </Text>
           <Text style={styles.unitPrice} numberOfLines={1}>
-            {formatMAD(line.unit_price_cents)} / {unitLabel(line.unit, 1, t)}
-            {line.discount_cents > 0 ? ` · −${formatMAD(line.discount_cents)}` : ""}
+            {isolateLtr(formatMAD(line.unit_price_cents))} / {unitLabel(line.unit, 1, t)}
+            {line.discount_cents > 0
+              ? ` · ${isolateLtr(`−${formatMAD(line.discount_cents)}`)}`
+              : ""}
           </Text>
         </Pressable>
 

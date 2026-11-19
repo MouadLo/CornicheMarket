@@ -67,9 +67,9 @@ describe("no hard-coded text", () => {
         />
       );
     });
-    expect(hardcodedTexts(tree.root, [isolateBidi("Coca-Cola 33cl"), "+2.00 DH · 28.6%"])).toEqual(
-      []
-    );
+    expect(
+      hardcodedTexts(tree.root, [isolateBidi("Coca-Cola 33cl"), "⁦+2.00 DH · 28.6%⁩"])
+    ).toEqual([]);
   });
 
   it("BulkPriceModal", () => {

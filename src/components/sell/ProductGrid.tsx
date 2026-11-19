@@ -19,7 +19,7 @@ import {
   type ResolvedTab,
   type ResolvedTile,
 } from "@/src/lib/sellGrid/layout";
-import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
+import { appDirection, isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, spacing, tilePalette } from "@/src/theme/tokens";
 import { tabularNumbers } from "@/src/theme/type";
@@ -176,7 +176,9 @@ function Tile({
         </View>
       ) : null}
       <View style={styles.tileBottom}>
-        <View style={styles.priceLine}>
+        <View
+          style={[styles.priceLine, appDirection(language ?? "") === "rtl" && styles.priceLineRtl]}
+        >
           <Text
             style={[
               styles.price,
@@ -284,6 +286,9 @@ const styles = StyleSheet.create({
   qtyText: { fontSize: 13, fontWeight: "700", color: colors.white },
   tileBottom: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   priceLine: { flexShrink: 1, flexDirection: "row", alignItems: "flex-end" },
+  // "9.00" then "/kg" are two elements; in Arabic a plain row lays them out
+  // right to left ("/kg9.00"). An amount always reads left to right.
+  priceLineRtl: { flexDirection: "row-reverse", justifyContent: "flex-end" },
   price: { flexShrink: 1, fontSize: 20, fontWeight: "700", color: colors.ink900 },
   unit: { flexShrink: 0, fontSize: 13, fontWeight: "600", color: colors.ink600 },
   stock: {

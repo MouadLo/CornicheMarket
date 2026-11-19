@@ -41,7 +41,7 @@ import {
 import { historyRangeParams } from "@/src/lib/sales/historyRange";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
-import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { appDirection, isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { storeDayKey } from "@/src/lib/sales/historyView";
 import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
 import { unitLabel } from "@/src/lib/products/unitLabel";
@@ -380,7 +380,7 @@ export default function ReportsScreen() {
               {inventory.oversold_value_cents < 0 && (
                 <Text style={styles.oversoldWarning}>
                   {t("reports.oversoldWarning", {
-                    amount: formatMAD(-inventory.oversold_value_cents),
+                    amount: isolateLtr(formatMAD(-inventory.oversold_value_cents)),
                   })}
                 </Text>
               )}
@@ -419,8 +419,8 @@ export default function ReportsScreen() {
               <>
                 <Text style={styles.deadStockTotal}>
                   {t("reports.deadStockTotal", {
-                    amount: formatMAD(
-                      deadStock.reduce((sum, row) => sum + row.stock_value_cents, 0)
+                    amount: isolateLtr(
+                      formatMAD(deadStock.reduce((sum, row) => sum + row.stock_value_cents, 0))
                     ),
                   })}
                 </Text>
@@ -644,7 +644,7 @@ function ProductTable({
           key={row.product_id}
           index={index}
           name={row.product_name}
-          subtitle={`${row.quantity} ${unitLabel(row.unit, row.quantity, t)} · ${formatMAD(row.revenue_cents)}`}
+          subtitle={`${row.quantity} ${unitLabel(row.unit, row.quantity, t)} · ${isolateLtr(formatMAD(row.revenue_cents))}`}
           value={renderValue(row)}
           valueNegative={warnBelowZero && (row.margin_percent ?? 0) < 0}
         />

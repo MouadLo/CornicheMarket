@@ -23,6 +23,7 @@ import {
 } from "@/src/lib/products/queries";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
+import { isolateLtr } from "@/src/lib/text/bidi";
 
 type Props = {
   visible: boolean;
@@ -142,8 +143,8 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
           {valid ? (
             <Text style={styles.preview}>
               {t("products.bulkExample", {
-                before: formatMAD(1000),
-                after: formatMAD(applyPercent(1000, percentValue)),
+                before: isolateLtr(formatMAD(1000)),
+                after: isolateLtr(formatMAD(applyPercent(1000, percentValue))),
               })}
             </Text>
           ) : percent.trim() !== "" ? (

@@ -61,7 +61,7 @@ import {
   type InvoiceReviewLine,
   type ProductChoice,
 } from "@/src/lib/stock/invoices";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, touch } from "@/src/theme/tokens";
 
@@ -514,9 +514,9 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                     {amounts && (
                       <Text>
                         {t("invoices.lineAmounts", {
-                          gross: isolateBidi(formatMAD(amounts.gross)),
-                          discount: isolateBidi(formatMAD(amounts.discount)),
-                          net: isolateBidi(formatMAD(amounts.net)),
+                          gross: isolateLtr(formatMAD(amounts.gross)),
+                          discount: isolateLtr(formatMAD(amounts.discount)),
+                          net: isolateLtr(formatMAD(amounts.net)),
                         })}
                       </Text>
                     )}
@@ -530,15 +530,15 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                     {agrees === true && printedTotal !== null && (
                       <Text style={styles.ok}>
                         {t("invoices.lineTotalMatches", {
-                          printed: isolateBidi(formatMAD(printedTotal)),
+                          printed: isolateLtr(formatMAD(printedTotal)),
                         })}
                       </Text>
                     )}
                     {agrees === false && printedTotal !== null && amounts && (
                       <Text style={styles.warning}>
                         {t("invoices.lineTotalDiffers", {
-                          printed: isolateBidi(formatMAD(printedTotal)),
-                          net: isolateBidi(formatMAD(amounts.net)),
+                          printed: isolateLtr(formatMAD(printedTotal)),
+                          net: isolateLtr(formatMAD(amounts.net)),
                         })}
                       </Text>
                     )}
@@ -711,7 +711,7 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
                     {t("invoices.delta", {
                       quantity: new Intl.NumberFormat(i18n.language).format(result.quantity),
                       unit: unitLabel(result.unit, result.quantity, t),
-                      total: isolateBidi(
+                      total: isolateLtr(
                         formatMAD(lineTotalCents(result.quantity, result.unit_cost_cents))
                       ),
                     })}
@@ -726,7 +726,7 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
           {ready ? (
             <>
               <Text style={styles.heading}>
-                {t("invoices.total", { total: isolateBidi(formatMAD(total)) })}
+                {t("invoices.total", { total: isolateLtr(formatMAD(total)) })}
               </Text>
               <Pressable
                 accessibilityRole="checkbox"
@@ -795,7 +795,7 @@ function TotalsCard({
   onChange: (changes: Partial<TotalsInput>) => void;
 }) {
   const { t } = useTranslation();
-  const money = (cents: number) => isolateBidi(formatMAD(cents));
+  const money = (cents: number) => isolateLtr(formatMAD(cents));
   const basisLabel = (basis: "ht" | "ttc") =>
     t(basis === "ht" ? "invoices.basisHT" : "invoices.basisTTC");
   const { check } = summary;

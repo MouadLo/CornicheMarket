@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/stock/pricing";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
+import { isolateLtr } from "@/src/lib/text/bidi";
 
 export type LineState = {
   product: Product;
@@ -80,7 +81,7 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
       <Text style={styles.meta}>
         {t(line.newSellingPriceCents !== null ? "stockLine.metaNew" : "stockLine.meta", {
           stock: `${product.stock_quantity} ${unitLabel(product.unit, product.stock_quantity, t)}`,
-          price: formatMAD(effectiveSellingPrice),
+          price: isolateLtr(formatMAD(effectiveSellingPrice)),
         })}
       </Text>
 
@@ -125,8 +126,8 @@ export function StockInLine({ line, onChange, onRemove, today }: Props) {
       <Text style={styles.lastPrice}>
         {lastCostCents === null
           ? t("stockIn.firstTimeBuying")
-          : t("stockLine.lastPaid", { price: formatMAD(lastCostCents) })}
-        {lineTotal !== null ? ` · line total ${formatMAD(lineTotal)}` : ""}
+          : t("stockLine.lastPaid", { price: isolateLtr(formatMAD(lastCostCents)) })}
+        {lineTotal !== null ? ` · line total ${isolateLtr(formatMAD(lineTotal))}` : ""}
       </Text>
 
       {flagged && change !== null && (
