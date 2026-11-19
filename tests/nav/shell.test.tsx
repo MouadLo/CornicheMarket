@@ -261,13 +261,17 @@ describe("the route guard in the layout", () => {
     mockPathname = "/stock-in/invoice/abc";
     const r = await render(<AppLayout />);
     expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
-    expect(r.root.findAllByType("Slot" as never)).toHaveLength(0);
+    // The page stays mounted (hidden under the spinner): on web a layout
+    // without a Slot makes the router drop the reloaded URL.
+    expect(r.root.findAllByType("Slot" as never)).toHaveLength(1);
+    expect(r.root.findAll((n) => n.props.testID === "app-auth-loading").length).toBeGreaterThan(0);
 
     mockLoading = false;
     mockProfile = owner;
     await act(async () => r.update(<AppLayout />));
     expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
     expect(r.root.findAllByType("Slot" as never)).toHaveLength(1);
+    expect(r.root.findAll((n) => n.props.testID === "app-auth-loading")).toHaveLength(0);
   });
 
   it("sends a loaded cashier away from an owner URL", async () => {
