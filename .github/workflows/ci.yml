@@ -80,6 +80,14 @@ jobs:
         with:
           version: 2.122.0
 
+      # The local stack listens on 54320-54329 (supabase/config.toml). Those
+      # sit inside Linux's ephemeral port range, so an outgoing connection on
+      # the runner (image pulls, etc.) sometimes grabs 54322 first and
+      # `supabase start` fails with "address already in use". Reserving the
+      # range keeps the kernel from handing those ports out.
+      - name: Reserve the Supabase ports
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=54320-54329
+
       - name: Apply every migration + seed.sql from scratch
         run: supabase start
 
