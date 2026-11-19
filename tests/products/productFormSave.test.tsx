@@ -19,6 +19,9 @@ jest.mock("react-i18next", () => ({
     i18n: { language: "fr" },
   }),
 }));
+jest.mock("../../src/lib/sales/queries", () => ({
+  fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
+}));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("../../src/components/products/BarcodeScannerModal", () => ({
   BarcodeScannerModal: () => null,

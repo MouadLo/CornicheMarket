@@ -21,6 +21,8 @@ import {
   exportSales,
   getLastBackupTime,
 } from "@/src/lib/backup/export";
+import { centsToDisplay, parseMoneyToCents } from "@/src/lib/money";
+import { fetchDiscountLimits, updateDiscountLimits } from "@/src/lib/sales/queries";
 import { fetchStoreTimezone, updateStoreTimezone } from "@/src/lib/reports/queries";
 
 const LANGUAGES: { code: SupportedLang; labelKey: "languageFr" | "languageEn" | "languageAr" }[] = [
@@ -108,6 +110,14 @@ export default function Settings() {
           <Text style={styles.sectionLabel}>{t("settings.storeTimezone")}</Text>
           <Text style={styles.hint}>{t("settings.storeTimezoneHint")}</Text>
           <StoreTimezonePicker />
+        </View>
+      )}
+
+      {isOwner && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("settings.discountTitle")}</Text>
+          <Text style={styles.hint}>{t("settings.discountHint")}</Text>
+          <DiscountLimitsForm />
         </View>
       )}
 
@@ -201,6 +211,95 @@ function StoreTimezonePicker() {
         ))}
       </View>
       {error ? <InlineError reasonKey={error} /> : null}
+    </View>
+  );
+}
+
+// The most a cashier may discount: a percent of the sale (on items that allow
+// a discount) and a ceiling in DH. Devices read it when they are online.
+function DiscountLimitsForm() {
+  const { t } = useTranslation();
+  const [percent, setPercent] = useState("");
+  const [max, setMax] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoadFailed(false);
+    Promise.resolve()
+      .then(fetchDiscountLimits)
+      .then((limits) => {
+        setPercent(String(limits.percent));
+        setMax(centsToDisplay(limits.maxCents));
+        setLoaded(true);
+      })
+      .catch(() => setLoadFailed(true));
+  }, []);
+  useEffect(load, [load]);
+
+  const save = async () => {
+    setMessage(null);
+    const maxCents = parseMoneyToCents(max);
+    const percentValue = Number(percent.trim().replace(",", "."));
+    if (
+      maxCents === null ||
+      percent.trim() === "" ||
+      !Number.isFinite(percentValue) ||
+      percentValue < 0 ||
+      percentValue > 100
+    ) {
+      setError("settings.discountInvalid");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await updateDiscountLimits({ percent: percentValue, maxCents });
+      setMessage(t("settings.discountSaved"));
+    } catch (e) {
+      setError(errorKeyOr(e, "errors.generic"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loadFailed) {
+    return (
+      <Banner
+        tone="warn"
+        text={t("settings.discountLoadError")}
+        action={{ label: t("common.retry"), onPress: load }}
+      />
+    );
+  }
+  if (!loaded) return <Text style={styles.hint}>{t("common.loading")}</Text>;
+
+  return (
+    <View style={styles.inviteForm}>
+      <Text style={styles.hint}>{t("settings.discountPercent")}</Text>
+      <TextInput
+        style={styles.input}
+        value={percent}
+        onChangeText={setPercent}
+        keyboardType="decimal-pad"
+        placeholder="5"
+        accessibilityLabel={t("settings.discountPercent")}
+      />
+      <Text style={styles.hint}>{t("settings.discountMax")}</Text>
+      <TextInput
+        style={styles.input}
+        value={max}
+        onChangeText={setMax}
+        keyboardType="decimal-pad"
+        placeholder="20.00"
+        accessibilityLabel={t("settings.discountMax")}
+      />
+      {error ? <InlineError reasonKey={error} /> : null}
+      {message ? <Text style={styles.success}>{message}</Text> : null}
+      <BigButton label={t("settings.discountSave")} onPress={save} disabled={saving} />
     </View>
   );
 }

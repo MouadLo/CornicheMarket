@@ -44,6 +44,10 @@ jest.mock("../src/lib/reports/queries", () => ({
   fetchStoreTimezone: jest.fn(async () => "UTC"),
   updateStoreTimezone: jest.fn(),
 }));
+jest.mock("../src/lib/sales/queries", () => ({
+  fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
+  updateDiscountLimits: jest.fn(),
+}));
 jest.mock("../src/lib/auth/inviteCashier", () => ({
   inviteCashier: (...a: unknown[]) => mockInvite(...a),
 }));
@@ -236,10 +240,11 @@ describe("staff actions", () => {
   it("reloads the list after an invite", async () => {
     await render();
     const { TextInput } = jest.requireActual("react-native");
-    const inputs = tree.root.findAllByType(TextInput);
+    const input = (label: string) =>
+      tree.root.findAllByType(TextInput).find((n) => n.props.accessibilityLabel === label)!;
     await act(async () => {
-      inputs[0].props.onChangeText("New Person");
-      inputs[1].props.onChangeText("new@x.ma");
+      input("settings.fullName").props.onChangeText("New Person");
+      input("settings.email").props.onChangeText("new@x.ma");
     });
     await act(async () => {
       await tree.root
