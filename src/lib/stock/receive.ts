@@ -34,6 +34,15 @@ export function normalizeExpiryDate(input: string): ExpiryResult {
   return { ok: true, value: `${year}-${pad(month)}-${pad(day)}` };
 }
 
+// What the invoice date calendar starts from: a date typed or extracted as
+// YYYY-MM-DD or DD/MM/YYYY becomes YYYY-MM-DD; anything else is kept as is so
+// the owner sees it (the field marks it invalid) instead of it vanishing.
+export function invoiceDateFieldValue(raw: string | null | undefined): string {
+  const text = (raw ?? "").trim();
+  const result = normalizeExpiryDate(text);
+  return result.ok && result.value ? result.value : text;
+}
+
 export type DraftLineInput = {
   product: { id: string; name?: string };
   quantity: string;

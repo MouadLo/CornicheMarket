@@ -31,11 +31,22 @@ type Props = {
   max?: string;
   clearable?: boolean;
   invalid?: boolean;
+  disabled?: boolean;
 };
 
 const CELL = 44;
 
-export function DateField({ value, onChange, label, today, min, max, clearable, invalid }: Props) {
+export function DateField({
+  value,
+  onChange,
+  label,
+  today,
+  min,
+  max,
+  clearable,
+  invalid,
+  disabled,
+}: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n?.language ?? "fr";
   const [open, setOpen] = useState(false);
@@ -100,8 +111,10 @@ export function DateField({ value, onChange, label, today, min, max, clearable, 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${chosen ? formatLongDate(value, language) : t("dateField.choose")}`}
+        accessibilityState={{ disabled: !!disabled }}
+        disabled={disabled}
         onPress={openCalendar}
-        style={[styles.field, invalid && styles.fieldInvalid]}
+        style={[styles.field, invalid && styles.fieldInvalid, disabled && styles.fieldDisabled]}
         testID="date-field"
       >
         <Text style={[styles.fieldText, !shown && styles.placeholder]} numberOfLines={1}>
@@ -237,6 +250,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     backgroundColor: colors.surface,
   },
+  fieldDisabled: { opacity: 0.5 },
   fieldInvalid: { borderColor: colors.danger600 },
   fieldText: { flexShrink: 1, fontSize: 16, color: colors.ink900 },
   placeholder: { color: colors.ink600 },
