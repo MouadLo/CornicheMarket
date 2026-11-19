@@ -358,6 +358,11 @@ const ar: Translations = {
     historyEmptyRangeHint: "لم تُسجَّل أي عملية بيع بين هذين التاريخين.",
     historyVoidError: "تعذر إلغاء البيع.",
     completeSale: "إتمام البيع",
+    cardInstruction: "اقبض {{amount}} على جهاز البطاقة، ثم أخبرنا بما حدث.",
+    cardAccepted: "تم قبول البطاقة",
+    cardDeclined: "تم رفض البطاقة",
+    cardDeclinedMessage:
+      "تم رفض البطاقة: لم يتم تسجيل أي بيع. حاول مرة أخرى أو اختر طريقة دفع أخرى.",
     payLater: "الدفع لاحقاً",
     cashReceived: "المبلغ المستلم",
     shortBy: "ناقص {{amount}}",

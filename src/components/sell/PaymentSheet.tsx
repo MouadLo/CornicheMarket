@@ -9,8 +9,9 @@ import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { changeDue, isShortPayment } from "@/src/lib/sales/totals";
 import { isScannerBurst, keyFromKeyboardEvent, type WeightKey } from "@/src/lib/sales/weightEntry";
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { colors, radius, touch } from "@/src/theme/tokens";
+import { Banner } from "@/src/components/ui/Banner";
 import { Chip } from "@/src/components/ui/Chip";
 import { Text } from "@/src/theme/Text";
 
@@ -54,6 +55,7 @@ export function PaymentSheet({
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [newCustomer, setNewCustomer] = useState("");
   const [search, setSearch] = useState("");
+  const [cardDeclined, setCardDeclined] = useState(false);
 
   // The sheet stays mounted between sales, so its state would otherwise carry
   // over: after a credit sale the next customer's sheet opened on "Pay later"
@@ -70,6 +72,7 @@ export function PaymentSheet({
       setCustomerId(null);
       setNewCustomer("");
       setSearch("");
+      setCardDeclined(false);
     }
   }
 
@@ -144,7 +147,10 @@ export function PaymentSheet({
                   accessibilityState={{ selected: method === value }}
                   key={value}
                   style={[styles.method, method === value && styles.methodActive]}
-                  onPress={() => setMethod(value)}
+                  onPress={() => {
+                    setMethod(value);
+                    setCardDeclined(false);
+                  }}
                 >
                   <Text style={[styles.methodText, method === value && styles.methodTextActive]}>
                     {value === "credit" ? t("sell.payLater") : t(paymentMethodKey(value))}
@@ -218,6 +224,14 @@ export function PaymentSheet({
               </View>
             )}
 
+            {method === "card" && (
+              <View style={styles.block}>
+                <Text style={styles.cardInstruction}>
+                  {t("sell.cardInstruction", { amount: isolateLtr(formatMAD(totalCents)) })}
+                </Text>
+              </View>
+            )}
+
             {method === "credit" && (
               <View style={styles.block}>
                 <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
@@ -274,13 +288,36 @@ export function PaymentSheet({
           {/* Pinned: Complete sale is always in the same place, whatever the method. */}
           <View style={styles.footer}>
             {needsCustomer && <Text style={styles.hint}>{t("sell.chooseCustomer")}</Text>}
-            <BigButton
-              label={confirmLabel}
-              variant="pay"
-              tall
-              onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
-              disabled={saving || needsCustomer || short}
-            />
+            {method === "card" ? (
+              <>
+                <View accessibilityLiveRegion="polite">
+                  {cardDeclined && <Banner tone="bad" text={t("sell.cardDeclinedMessage")} />}
+                </View>
+                <BigButton
+                  label={saving ? t("common.saving") : t("sell.cardAccepted")}
+                  variant="pay"
+                  tall
+                  onPress={() => onConfirm("card", customerId, 0)}
+                  disabled={saving}
+                />
+                <View style={styles.declineGap}>
+                  <BigButton
+                    label={t("sell.cardDeclined")}
+                    variant="secondary"
+                    onPress={() => setCardDeclined(true)}
+                    disabled={saving}
+                  />
+                </View>
+              </>
+            ) : (
+              <BigButton
+                label={confirmLabel}
+                variant="pay"
+                tall
+                onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
+                disabled={saving || needsCustomer || short}
+              />
+            )}
             <Pressable style={styles.back} onPress={onClose} accessibilityRole="button">
               <Text style={styles.backText}>{t("common.back")}</Text>
             </Pressable>
@@ -407,6 +444,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
+  cardInstruction: { fontSize: 17, fontWeight: "600", color: colors.ink900, textAlign: "center" },
+  declineGap: { marginTop: 12 },
   hint: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   // Small and apart from Complete sale: a slip must not leave the payment.
   back: { minHeight: touch.min, alignItems: "center", justifyContent: "center", marginTop: 8 },

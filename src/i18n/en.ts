@@ -361,6 +361,11 @@ const en: Translations = {
     historyEmptyRangeHint: "No sale was recorded between these dates.",
     historyVoidError: "Could not void the sale.",
     completeSale: "Complete sale",
+    cardInstruction: "Charge {{amount}} on the card terminal, then say what happened.",
+    cardAccepted: "Card accepted",
+    cardDeclined: "Card declined",
+    cardDeclinedMessage:
+      "Card declined: no sale was recorded. Try again or choose another payment method.",
     payLater: "Pay later",
     cashReceived: "Cash received",
     shortBy: "Short by {{amount}}",

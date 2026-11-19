@@ -231,3 +231,73 @@ describe("Pay Later (C10)", () => {
     press("sell.putOnCredit");
   });
 });
+
+describe("card: was it accepted?", () => {
+  const texts = () => label(tree.root);
+  const pressable = (text: string) =>
+    tree.root.findAllByType(Pressable).find((node) => label(node) === text);
+
+  it("shows the instruction and the two answers, not the normal complete button", () => {
+    press("sell.paymentCard");
+    expect(texts()).toContain("sell.cardInstruction");
+    expect(pressable("sell.cardAccepted")).toBeDefined();
+    expect(pressable("sell.cardDeclined")).toBeDefined();
+    expect(pressable("sell.completeSale")).toBeUndefined();
+    expect(pressable("common.back")).toBeDefined();
+  });
+
+  it("accepted records the card sale once", () => {
+    press("sell.paymentCard");
+    press("sell.cardAccepted");
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith("card", null, 0);
+  });
+
+  it("declined records nothing and says so", () => {
+    press("sell.paymentCard");
+    press("sell.cardDeclined");
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(texts()).toContain("sell.cardDeclinedMessage");
+    expect(pressable("sell.cardAccepted")).toBeDefined();
+  });
+
+  it("the declined message clears on switching method", () => {
+    press("sell.paymentCard");
+    press("sell.cardDeclined");
+    press("sell.payLater");
+    press("sell.paymentCard");
+    expect(texts()).not.toContain("sell.cardDeclinedMessage");
+  });
+
+  it("the declined message does not survive reopening the sheet", () => {
+    press("sell.paymentCard");
+    press("sell.cardDeclined");
+    setVisible(false);
+    setVisible(true);
+    press("sell.paymentCard");
+    expect(texts()).not.toContain("sell.cardDeclinedMessage");
+  });
+
+  it("saving disables both answers", () => {
+    press("sell.paymentCard");
+    setVisible(true, true);
+    expect(pressable("common.saving")!.props.disabled).toBe(true);
+    expect(pressable("sell.cardDeclined")!.props.disabled).toBe(true);
+  });
+
+  it("cash and pay later keep the normal button and no card answers", () => {
+    expect(pressable("sell.completeSale")).toBeDefined();
+    expect(pressable("sell.cardAccepted")).toBeUndefined();
+    press("sell.payLater");
+    expect(pressable("sell.cardAccepted")).toBeUndefined();
+    expect(pressable("sell.cardDeclined")).toBeUndefined();
+  });
+
+  it("card then cash still sends the cash change", () => {
+    press("sell.paymentCard");
+    press("sell.paymentCash");
+    keys("100");
+    press("sell.completeSale");
+    expect(onConfirm.mock.calls.at(-1)).toEqual(["cash", null, 9200]);
+  });
+});
