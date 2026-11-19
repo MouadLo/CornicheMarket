@@ -46,6 +46,7 @@ import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
   createCustomer,
   fetchCustomers,
+  fetchDiscountLimits,
   type Customer,
   type PaymentMethod,
 } from "@/src/lib/sales/queries";
@@ -62,6 +63,12 @@ import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { pendingSaleFrom, useSaleSync } from "@/src/lib/sales/useSaleSync";
 import { ProductGrid } from "@/src/components/sell/ProductGrid";
 import { useBasket } from "@/src/lib/sales/basketStore";
+import {
+  cashierDiscountProblem,
+  remainingSaleDiscountCents,
+  cashierDiscountLimitCents,
+} from "@/src/lib/sales/discountLimit";
+import { useDiscountLimits } from "@/src/lib/sales/discountLimitCache";
 import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
 import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
@@ -178,7 +185,13 @@ export default function SellScreen() {
   const total = useMemo(() => saleTotal(lines, discountCents), [lines, discountCents]);
   const discountError = validateSaleDiscounts(lines, discountCents);
   const saleDiscountTooHigh = discountError === "sale";
-  const discountInvalid = discountError !== null;
+  // The cashier's limit (the owner has none). The last known limits are used
+  // offline; the limit is checked here and again in handleConfirm.
+  const limits = useDiscountLimits(!isOwner, sync.online, fetchDiscountLimits);
+  const cashierProblem = isOwner ? null : cashierDiscountProblem(lines, discountCents, limits);
+  const allowanceCents = isOwner ? 0 : cashierDiscountLimitCents(lines, limits);
+  const remainingCents = isOwner ? 0 : remainingSaleDiscountCents(lines, limits);
+  const discountInvalid = discountError !== null || cashierProblem !== null;
   const quantityInvalid = hasInvalidQuantity(lines);
 
   useEffect(() => {
@@ -353,6 +366,21 @@ export default function SellScreen() {
     }
     if (discountCheck === "sale") {
       setError(t("sell.saleDiscountTooHigh"));
+      return;
+    }
+
+    // The cashier's limit, checked on the device (it works offline) before
+    // anything is queued. The server never refuses a sale for it; it only
+    // flags one that got past a device.
+    const limitProblem = isOwner ? null : cashierDiscountProblem(lines, discountCents, limits);
+    if (limitProblem?.kind === "blocked") {
+      setError(t("sell.lineDiscountNotAllowed"));
+      return;
+    }
+    if (limitProblem?.kind === "over") {
+      setError(
+        t("sell.saleDiscountOverLimit", { amount: isolateLtr(formatMAD(limitProblem.limitCents)) })
+      );
       return;
     }
 
@@ -670,6 +698,7 @@ export default function SellScreen() {
               setLines((current) => current.map((line, i) => (i === index ? next : line)))
             }
             onRemove={() => removeLine(index)}
+            restrictDiscount={!isOwner}
           />
         )}
         ListEmptyComponent={
@@ -683,11 +712,16 @@ export default function SellScreen() {
 
       {lines.length > 0 && (
         <View style={styles.footer}>
-          {saleDiscount.trim() !== "" || discountOpen || saleDiscountTooHigh ? (
+          {!isOwner && allowanceCents === 0 && saleDiscount.trim() === "" ? (
+            <Text style={styles.discountHint}>{t("sell.saleDiscountNotAllowed")}</Text>
+          ) : saleDiscount.trim() !== "" || discountOpen || saleDiscountTooHigh ? (
             <View style={styles.discountRow}>
               <Text style={styles.footerLabel}>{t("sell.saleDiscount")}</Text>
               <TextInput
-                style={[styles.discountInput, saleDiscountTooHigh && styles.discountInputInvalid]}
+                style={[
+                  styles.discountInput,
+                  (saleDiscountTooHigh || cashierProblem !== null) && styles.discountInputInvalid,
+                ]}
                 value={saleDiscount}
                 onChangeText={setSaleDiscount}
                 keyboardType="decimal-pad"
@@ -706,8 +740,24 @@ export default function SellScreen() {
             </Pressable>
           )}
 
+          {!isOwner && allowanceCents > 0 && (
+            <Text style={styles.discountHint}>
+              {t("sell.saleDiscountMax", { amount: isolateLtr(formatMAD(remainingCents)) })}
+            </Text>
+          )}
+
           {saleDiscountTooHigh && (
             <Text style={styles.discountError}>{t("sell.saleDiscountTooHigh")}</Text>
+          )}
+          {!saleDiscountTooHigh && cashierProblem?.kind === "over" && (
+            <Text style={styles.discountError}>
+              {t("sell.saleDiscountOverLimit", {
+                amount: isolateLtr(formatMAD(cashierProblem.limitCents)),
+              })}
+            </Text>
+          )}
+          {cashierProblem?.kind === "blocked" && (
+            <Text style={styles.discountError}>{t("sell.lineDiscountNotAllowed")}</Text>
           )}
 
           <View style={styles.totalRow}>
@@ -1008,6 +1058,7 @@ const styles = StyleSheet.create({
   },
   discountInputInvalid: { borderColor: colors.danger600 },
   discountError: { color: colors.danger600, fontSize: 13 },
+  discountHint: { color: colors.ink600, fontSize: 13 },
   basketHeader: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 14 },
   emptyLink: { minHeight: 48, justifyContent: "center" },
   emptyLinkText: { fontSize: 14, color: colors.danger700, fontWeight: "600" },
