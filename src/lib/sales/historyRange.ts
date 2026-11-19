@@ -2,6 +2,10 @@
 // travels as two route params holding the SAME instants the report used
 // (half-open [from, to), see resolveRange in src/lib/reports/ranges.ts).
 
+import { isSingleStoreDay } from "@/src/lib/reports/ranges";
+import { addDaysInTimeZone, startOfDayInTimeZone } from "@/src/lib/reports/timezone";
+import { parseISODate } from "@/src/lib/text/calendar";
+
 export type HistoryRange = { from: Date; to: Date };
 
 type Param = string | string[] | undefined;
@@ -51,4 +55,30 @@ export function nonVoidedTotalCents(sales: { total_cents: number; voided_at: str
 // The last instant inside the half-open range, to name its last day.
 export function lastInstantOf(range: HistoryRange): Date {
   return new Date(range.to.getTime() - 1);
+}
+
+// One store day (YYYY-MM-DD, the calendar's value) as a half-open range, with
+// the boundaries computed in the store's time zone like the reports do. Noon
+// UTC anchors the date so no zone shifts it to a neighbouring day.
+export function dayRange(day: string, timeZone: string): HistoryRange | null {
+  if (!parseISODate(day)) return null;
+  const from = startOfDayInTimeZone(new Date(`${day}T12:00:00.000Z`), timeZone);
+  return { from, to: addDaysInTimeZone(from, 1, timeZone) };
+}
+
+// Route params for "sales of this store day"; null if the day is not a date.
+export function dayRangeParams(day: string, timeZone: string): Record<string, string> | null {
+  const range = dayRange(day, timeZone);
+  return range ? historyRangeParams(range) : null;
+}
+
+// The day a one-day range stands for, "" for no range or a longer one.
+export function singleDayOf(
+  range: HistoryRange | null,
+  timeZone: string,
+  dayKey: (iso: string, timeZone: string) => string
+): string {
+  return range && isSingleStoreDay(range, timeZone)
+    ? dayKey(range.from.toISOString(), timeZone)
+    : "";
 }

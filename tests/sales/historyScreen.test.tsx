@@ -150,6 +150,43 @@ describe("sales history", () => {
     ).toBeGreaterThan(0);
   });
 
+  describe("go to a day", () => {
+    const pickDay = async (day: string) => {
+      const field = tree.root.find((n) => n.props.testID === "date-field");
+      await act(async () => field.props.onPress());
+      const cell = tree.root.find(
+        (n) => n.props.testID === `day-${day}` && typeof n.props.onPress === "function"
+      );
+      await act(async () => cell.props.onPress());
+    };
+
+    it("offers the picker with no filter and replaces the route with a one-day range", async () => {
+      await render();
+      expect(allTexts(tree.root).join("|")).toContain("sell.historyGoToDay");
+      // The store's zone is UTC in this test; the view opens on the current month.
+      const now = new Date().toISOString().slice(0, 10);
+      await pickDay(now.slice(0, 8) + "01");
+      const day = now.slice(0, 8) + "01";
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: "/(app)/sell/history",
+        params: {
+          rangeFrom: `${day}T00:00:00.000Z`,
+          rangeTo: `${new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString()}`,
+        },
+      });
+    });
+
+    it("lets a single-day range change its day, but not a longer report range", async () => {
+      mockParams = { rangeFrom: "2026-11-16T00:00:00.000Z", rangeTo: "2026-11-17T00:00:00.000Z" };
+      await render();
+      expect(allTexts(tree.root).join("|")).toContain("sell.historyGoToDay");
+      act(() => tree.unmount());
+      mockParams = { rangeFrom: "2026-11-16T00:00:00.000Z", rangeTo: "2026-11-18T00:00:00.000Z" };
+      await render();
+      expect(allTexts(tree.root).join("|")).not.toContain("sell.historyGoToDay");
+    });
+  });
+
   describe("opened on a report's range", () => {
     const from = "2026-11-16T00:00:00.000Z";
     const to = "2026-11-18T00:00:00.000Z";
