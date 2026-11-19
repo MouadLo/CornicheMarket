@@ -35,6 +35,7 @@ export type GridProduct = {
   stock_quantity: number;
   low_stock_threshold: number;
   active: boolean;
+  discountable?: boolean;
 };
 
 // parent_id: set on a sub-category (migration 036); its products show in the parent's tab.

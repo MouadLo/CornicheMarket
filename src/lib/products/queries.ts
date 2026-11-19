@@ -1,4 +1,5 @@
 import { supabase } from "@/src/lib/supabase/client";
+import type { DiscountOverride } from "@/src/lib/sales/discountLimit";
 
 export type ProductUnit = "piece" | "kg" | "pack";
 
@@ -15,6 +16,11 @@ export type Product = {
   active: boolean;
   // Always null for cashiers: they read a view that has no cost column.
   current_cost_cents: number | null;
+  // Whether a cashier may discount it (a computed column the database gives
+  // both the table and the cashier view). Missing on rows from an older cache.
+  discountable?: boolean;
+  // The owner's choice for this product; only owners read it (null = automatic).
+  discount_override?: DiscountOverride;
 };
 
 // code: the stable identity of a catalogue category (migration 035); null for
@@ -45,12 +51,16 @@ export type ProductInput = {
   selling_price_cents: number;
   low_stock_threshold: number;
   active: boolean;
+  discount_override?: DiscountOverride;
 };
 
 export const PAGE_SIZE = 50;
 
 const LIST_COLUMNS =
-  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active";
+  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active, discountable";
+
+// The owner also reads the buying price and his cashier-discount choice.
+const OWNER_COLUMNS = `${LIST_COLUMNS}, current_cost_cents, discount_override`;
 
 export function productsSource(isOwner: boolean) {
   return isOwner ? "products" : "products_cashier_view";
@@ -67,7 +77,7 @@ export async function fetchProducts(
   page: number,
   isOwner: boolean
 ): Promise<Product[]> {
-  const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
+  const columns = isOwner ? OWNER_COLUMNS : LIST_COLUMNS;
   // The built-in Divers item is not part of the catalogue.
   let query = supabase.from(productsSource(isOwner)).select(columns).eq("kind", "regular");
 
@@ -183,7 +193,7 @@ export async function deleteCategory(id: string): Promise<void> {
 }
 
 export async function fetchProduct(id: string, isOwner: boolean): Promise<Product | null> {
-  const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
+  const columns = isOwner ? OWNER_COLUMNS : LIST_COLUMNS;
   const { data, error } = await supabase
     .from(productsSource(isOwner))
     .select(columns)
@@ -204,7 +214,7 @@ export async function fetchProductByBarcode(
   barcode: string,
   isOwner: boolean
 ): Promise<Product | null> {
-  const columns = isOwner ? `${LIST_COLUMNS}, current_cost_cents` : LIST_COLUMNS;
+  const columns = isOwner ? OWNER_COLUMNS : LIST_COLUMNS;
   const { data, error } = await supabase
     .from(productsSource(isOwner))
     .select(columns)

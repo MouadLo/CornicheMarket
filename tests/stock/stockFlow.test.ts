@@ -85,6 +85,7 @@ describe("stock after a sale", () => {
       unit_price_cents: 500,
       discount_cents: 0,
       unit_cost_cents: 500,
+      discountable: true,
     };
     expect(saleProfit([l], 0)).toBe(0);
   });
@@ -100,6 +101,7 @@ describe("stock after a sale", () => {
       unit_price_cents: 700,
       discount_cents: 0,
       unit_cost_cents: 480,
+      discountable: true,
     };
     expect(saleProfit([l], 100)).toBe(120);
   });

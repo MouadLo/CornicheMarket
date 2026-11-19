@@ -18,6 +18,7 @@ const line = (id: string, quantity = 1): CartLine => ({
   unit_price_cents: 700,
   discount_cents: 0,
   unit_cost_cents: null,
+  discountable: true,
 });
 
 let api: ReturnType<typeof useBasket>;

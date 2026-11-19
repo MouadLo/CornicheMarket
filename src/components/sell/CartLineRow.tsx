@@ -13,9 +13,11 @@ type Props = {
   line: CartLine;
   onChange: (next: CartLine) => void;
   onRemove: () => void;
+  // A cashier cannot discount an item the owner (or its margin) rules out.
+  restrictDiscount?: boolean;
 };
 
-export function CartLineRow({ line, onChange, onRemove }: Props) {
+export function CartLineRow({ line, onChange, onRemove, restrictDiscount = false }: Props) {
   const { t } = useTranslation();
   const weighted = line.unit === "kg";
   const discountTooHigh = !isLineDiscountValid(
@@ -38,6 +40,8 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
   const [expanded, setExpanded] = useState(false);
   const needsAttention = discountTooHigh || (weighted && !(line.quantity > 0));
   const open = expanded || needsAttention;
+  // A discount already on the line stays editable, so it can be cleared.
+  const noDiscount = restrictDiscount && !line.discountable && line.discount_cents === 0;
 
   return (
     <View style={styles.row}>
@@ -85,15 +89,19 @@ export function CartLineRow({ line, onChange, onRemove }: Props) {
 
       {open && (
         <View style={styles.details}>
-          <View style={styles.discountBox}>
-            <Text style={styles.label}>{t("sell.discount")}</Text>
-            <DiscountField
-              cents={line.discount_cents}
-              invalid={discountTooHigh}
-              label={t("sell.discount")}
-              onCents={(discount_cents) => onChange({ ...line, discount_cents })}
-            />
-          </View>
+          {noDiscount ? (
+            <Text style={[styles.label, styles.noDiscount]}>{t("sell.noDiscountOnItem")}</Text>
+          ) : (
+            <View style={styles.discountBox}>
+              <Text style={styles.label}>{t("sell.discount")}</Text>
+              <DiscountField
+                cents={line.discount_cents}
+                invalid={discountTooHigh}
+                label={t("sell.discount")}
+                onCents={(discount_cents) => onChange({ ...line, discount_cents })}
+              />
+            </View>
+          )}
           <Pressable accessibilityRole="button" onPress={onRemove} style={styles.removeButton}>
             <Text style={styles.remove}>{t("sell.remove")}</Text>
           </Pressable>
@@ -223,6 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   label: { fontSize: 15, color: colors.ink600 },
+  noDiscount: { flex: 1, alignSelf: "center" },
   removeButton: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center" },
   remove: { color: colors.danger600, fontWeight: "600", fontSize: 14 },
   unitPrice: { fontSize: 15, color: colors.ink600 },

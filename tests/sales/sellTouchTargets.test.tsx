@@ -71,6 +71,8 @@ describe("touch targets are at least 48dp", () => {
       unit_price_cents: 700,
       discount_cents: 0,
       unit_cost_cents: null,
+
+      discountable: true,
     };
     for (const unit of ["piece", "kg"]) {
       act(() => {

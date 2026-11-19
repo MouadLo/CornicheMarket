@@ -59,6 +59,7 @@ function cartLine(overrides: Partial<CartLine> = {}): CartLine {
     unit_price_cents: 700,
     discount_cents: 0,
     unit_cost_cents: 500,
+    discountable: true,
     ...overrides,
   };
 }

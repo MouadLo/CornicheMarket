@@ -30,7 +30,8 @@ function isLine(value: unknown): value is CartLine {
     Number.isFinite(line.quantity) &&
     Number.isInteger(line.unit_price_cents) &&
     Number.isInteger(line.discount_cents) &&
-    (line.unit_cost_cents === null || Number.isInteger(line.unit_cost_cents))
+    (line.unit_cost_cents === null || Number.isInteger(line.unit_cost_cents)) &&
+    (line.discountable === undefined || typeof line.discountable === "boolean")
   );
 }
 
@@ -43,7 +44,8 @@ export function restoreBasket(raw: string | null, now: number): Basket | null {
     if (!Array.isArray(saved.lines) || !saved.lines.every(isLine)) return null;
     if (saved.lines.length === 0) return null;
     return {
-      lines: saved.lines,
+      // A basket saved before the discount limit has no flag: it is allowed.
+      lines: saved.lines.map((line) => ({ ...line, discountable: line.discountable ?? true })),
       saleDiscount: typeof saved.saleDiscount === "string" ? saved.saleDiscount : "",
     };
   } catch {

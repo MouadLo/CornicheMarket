@@ -42,6 +42,13 @@ import {
   type ProductUnit,
 } from "@/src/lib/products/queries";
 import { confirm, showToast } from "@/src/lib/dialog/store";
+import {
+  autoDiscountable,
+  DEFAULT_DISCOUNT_LIMITS,
+  type DiscountLimits,
+  type DiscountOverride,
+} from "@/src/lib/sales/discountLimit";
+import { fetchDiscountLimits } from "@/src/lib/sales/queries";
 import { priceWarning } from "@/src/lib/products/pricing";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { TileColorPicker, TilePreview } from "@/src/components/products/TileColorPicker";
@@ -104,6 +111,22 @@ export function ProductForm({
   const [active, setActive] = useState(initial?.active ?? true);
   const [favorite, setFavorite] = useState(initialTile?.favorite ?? false);
   const [tileColor, setTileColor] = useState(initialTile?.color ?? null);
+  const [discountOverride, setDiscountOverride] = useState<DiscountOverride>(
+    initial?.discount_override ?? null
+  );
+  const [limits, setLimits] = useState<DiscountLimits>(DEFAULT_DISCOUNT_LIMITS);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve()
+      .then(fetchDiscountLimits)
+      .then((fresh) => {
+        if (!cancelled) setLimits(fresh);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const cameraScan = useCameraScanAvailable();
@@ -124,6 +147,7 @@ export function ProductForm({
     active,
     favorite,
     tileColor,
+    discountOverride,
   ]);
   const [initialSnapshot] = useState(snapshot);
   useEffect(() => {
@@ -212,6 +236,15 @@ export function ProductForm({
     }
   };
 
+  // What "Automatic" would do now, with the live price and the product's cost.
+  const autoDiscountNote = (priceCents: number | null, costCents: number | null): string => {
+    if (costCents === null || costCents <= 0) return t("products.formDiscountNoCost");
+    if (autoDiscountable({ priceCents: priceCents ?? 0, costCents }, limits)) {
+      return t("products.formDiscountAllowed");
+    }
+    return t("products.formDiscountLowMargin", { percent: isolateLtr(String(limits.percent)) });
+  };
+
   const handleSubmit = async () => {
     setError(null);
 
@@ -268,6 +301,7 @@ export function ProductForm({
           selling_price_cents: priceCents,
           low_stock_threshold: thresholdValue,
           active,
+          discount_override: discountOverride,
         },
         tile
       );
@@ -447,6 +481,31 @@ export function ProductForm({
           accessibilityLabel={t("products.formLowStockThreshold")}
           keyboardType="decimal-pad"
         />
+      </Field>
+
+      <Field label={t("products.formDiscount")}>
+        <View style={styles.chips}>
+          <Chip
+            label={t("products.formDiscountAuto")}
+            selected={discountOverride === null}
+            onPress={() => setDiscountOverride(null)}
+          />
+          <Chip
+            label={t("products.formDiscountAllow")}
+            selected={discountOverride === "allow"}
+            onPress={() => setDiscountOverride("allow")}
+          />
+          <Chip
+            label={t("products.formDiscountBlock")}
+            selected={discountOverride === "block"}
+            onPress={() => setDiscountOverride("block")}
+          />
+        </View>
+        {discountOverride === null && (
+          <Text style={styles.note}>
+            {autoDiscountNote(parseMoneyToCents(price), initial?.current_cost_cents ?? null)}
+          </Text>
+        )}
       </Field>
 
       <View style={styles.switchRow}>

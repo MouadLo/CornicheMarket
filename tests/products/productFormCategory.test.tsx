@@ -10,6 +10,9 @@ let mockLanguage = "fr";
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: mockLanguage } }),
 }));
+jest.mock("../../src/lib/sales/queries", () => ({
+  fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
+}));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("../../src/components/products/BarcodeScannerModal", () => ({
   BarcodeScannerModal: () => null,

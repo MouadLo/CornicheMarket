@@ -80,6 +80,7 @@ const sale = (id: string): PendingSale =>
         unit_price_cents: 700,
         discount_cents: 0,
         unit_cost_cents: null,
+        discountable: true,
       },
     ],
     "user-1"
