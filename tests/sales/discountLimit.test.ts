@@ -112,7 +112,7 @@ describe("autoDiscountable", () => {
     expect(autoDiscountable({ priceCents: 10000, costCents: 9300 }, SEVEN_HALF)).toBe(false);
   });
   it("judges Divers by its estimated margin", () => {
-    const divers = { priceCents: 100, costCents: null, kind: "divers" };
+    const divers = { priceCents: 0, costCents: null, kind: "misc" };
     expect(autoDiscountable(divers, L, 20)).toBe(true);
     expect(autoDiscountable(divers, L, 4)).toBe(false);
     expect(autoDiscountable(divers, L)).toBe(false);

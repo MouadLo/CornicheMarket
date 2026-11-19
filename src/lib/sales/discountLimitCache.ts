@@ -60,8 +60,11 @@ export function useDiscountLimits(
   useEffect(() => {
     if (!enabled || !online) return;
     let cancelled = false;
-    fetchLimits()
-      .then(async (fresh) => {
+    Promise.resolve()
+      .then(fetchLimits)
+      .then(async (value) => {
+        const fresh = parseDiscountLimits(value?.percent, value?.maxCents);
+        if (!fresh) return;
         await saveCachedDiscountLimits(fresh);
         if (!cancelled) setLimits(fresh);
       })

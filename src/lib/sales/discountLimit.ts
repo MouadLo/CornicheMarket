@@ -65,10 +65,12 @@ export function autoDiscountable(
   limits: DiscountLimits,
   diversMarginPercent?: number
 ): boolean {
-  if (product.priceCents <= 0) return false;
-  if (product.kind === "divers") {
+  // The free-amount Divers item (products.kind = 'misc') has price 0 in the
+  // catalogue, so it is judged before the price rule.
+  if (product.kind === "misc") {
     return diversMarginPercent !== undefined && diversMarginPercent >= limits.percent;
   }
+  if (product.priceCents <= 0) return false;
   if (product.costCents === null || product.costCents <= 0) return false;
   return (
     (product.priceCents - product.costCents) * 10000 >=
