@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -22,6 +22,8 @@ import { voidDeliveryConfirmMessage } from "@/src/lib/stock/voidConfirm";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { formatLocaleDate, formatLocaleDateTime } from "@/src/lib/text/dates";
 import { isolateBidi } from "@/src/lib/text/bidi";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 export default function DeliveryDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -217,21 +219,21 @@ export default function DeliveryDetail() {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 48 },
   centered: { flex: 1, justifyContent: "center", padding: 32 },
-  muted: { fontSize: 16, textAlign: "center", color: "#555" },
+  muted: { fontSize: 16, textAlign: "center", color: colors.ink600 },
   header: { gap: 4 },
   title: { fontSize: 20, fontWeight: "700" },
-  meta: { fontSize: 13, color: "#666" },
-  struck: { textDecorationLine: "line-through", color: "#777" },
-  banner: { backgroundColor: "#fdecea", borderRadius: 12, padding: 14, gap: 4 },
-  bannerText: { color: "#b3261e", fontWeight: "700", fontSize: 14 },
-  bannerReason: { color: "#333", fontSize: 14 },
+  meta: { fontSize: 13, color: colors.ink600 },
+  struck: { textDecorationLine: "line-through", color: colors.ink600 },
+  banner: { backgroundColor: colors.danger100, borderRadius: 12, padding: 14, gap: 4 },
+  bannerText: { color: colors.danger600, fontWeight: "700", fontSize: 14 },
+  bannerReason: { color: colors.ink700, fontSize: 14 },
   line: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
   },
   lineMain: { flex: 1, gap: 3 },
   lineName: { fontSize: 15, fontWeight: "600" },
@@ -244,10 +246,10 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
-  error: { color: "#b3261e", fontSize: 14 },
+  error: { color: colors.danger600, fontSize: 14 },
 });

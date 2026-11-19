@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -17,6 +17,9 @@ import {
   type PurchaseSummary,
   type SupplierTotal,
 } from "@/src/lib/stock/queries";
+import { Chip } from "@/src/components/ui/Chip";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 
 type Tab = "deliveries" | "months" | "suppliers";
 
@@ -182,39 +185,26 @@ function TabButton({
   active: boolean;
   onPress: () => void;
 }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={[styles.tab, active && styles.tabActive]}
-      onPress={onPress}
-    >
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-    </Pressable>
-  );
+  return <Chip label={label} selected={active} onPress={onPress} />;
 }
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
   tabs: { flexDirection: "row", gap: 8, marginBottom: 6 },
-  tab: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#eee" },
-  tabActive: { backgroundColor: "#1d7a46" },
-  tabText: { fontSize: 14, color: "#333" },
-  tabTextActive: { color: "#fff", fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 12,
   },
   rowVoided: { opacity: 0.85 },
-  voidedText: { textDecorationLine: "line-through", color: "#777" },
-  voidedTag: { fontSize: 13, color: "#b3261e", fontWeight: "700" },
+  voidedText: { textDecorationLine: "line-through", color: colors.ink600 },
+  voidedTag: { fontSize: 13, color: colors.danger600, fontWeight: "700" },
   rowMain: { flex: 1, gap: 3 },
   rowTitle: { fontSize: 16, fontWeight: "600" },
-  rowMeta: { fontSize: 13, color: "#666" },
+  rowMeta: { fontSize: 13, color: colors.ink600 },
   rowValue: { fontSize: 17, fontWeight: "700" },
 });
