@@ -1,3 +1,4 @@
+import { Chip } from "@/src/components/ui/Chip";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
@@ -550,22 +551,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 18, paddingBottom: 48 },
   field: { gap: 8 },
@@ -594,15 +579,6 @@ const styles = StyleSheet.create({
   subRow: { marginTop: 10, gap: 6 },
   newCategory: { gap: 10, marginTop: 4 },
   suggestTitle: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
-  chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: radius.pill,
-    backgroundColor: colors.divider,
-  },
-  chipSelected: { backgroundColor: colors.brand700 },
-  chipText: { fontSize: 15, color: colors.ink700 },
-  chipTextSelected: { color: colors.white, fontWeight: "600" },
   switchRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   note: { fontSize: 13, color: colors.ink600, fontStyle: "italic" },
   summary: { backgroundColor: colors.brand50, borderRadius: radius.control, padding: 14, gap: 6 },

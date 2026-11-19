@@ -1,5 +1,6 @@
+import { Chip } from "@/src/components/ui/Chip";
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Modal, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -165,27 +166,6 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
   );
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
-      onPress={onPress}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -203,15 +183,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "700" },
   label: { fontSize: 14, fontWeight: "600", color: colors.ink700 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-    backgroundColor: colors.divider,
-  },
-  chipSelected: { backgroundColor: colors.brand700 },
-  chipText: { fontSize: 14, color: colors.ink700 },
-  chipTextSelected: { color: colors.white, fontWeight: "600" },
   input: {
     minHeight: 52,
     borderRadius: radius.control,

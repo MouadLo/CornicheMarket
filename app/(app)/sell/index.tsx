@@ -665,7 +665,7 @@ export default function SellScreen() {
           )}
 
           <View style={styles.totalRow}>
-            <Text style={styles.footerLabel}>
+            <Text style={[styles.footerLabel, styles.totalLabel]}>
               {t("sell.subtotal", { amount: formatMAD(cartSubtotal(lines)) })}
             </Text>
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
@@ -914,6 +914,10 @@ const styles = StyleSheet.create({
   emptyLinkText: { fontSize: 14, color: colors.danger700, fontWeight: "600" },
   discountLink: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
   discountLinkText: { fontSize: 15, color: colors.brand700, fontWeight: "600" },
-  totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  totalValue: { fontSize: 30, fontWeight: "800" },
+  // Label above, amount below at the end of the line: at the design total size
+  // (44) a long amount does not fit beside the label in a 360 px phone or the
+  // 420 px laptop pane, and the amount must never shrink or clip.
+  totalRow: { gap: 2, alignItems: "flex-end" },
+  totalLabel: { alignSelf: "stretch" },
+  totalValue: { fontSize: typeScale.total.latin, fontWeight: "800" },
 });
