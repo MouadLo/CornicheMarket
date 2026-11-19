@@ -364,6 +364,11 @@ const fr = {
     historyEmptyRangeHint: "Aucune vente n'a été enregistrée entre ces dates.",
     historyVoidError: "Impossible d'annuler la vente.",
     completeSale: "Encaisser la vente",
+    cardInstruction: "Encaissez {{amount}} sur le terminal, puis dites ce qui s'est passé.",
+    cardAccepted: "Carte acceptée",
+    cardDeclined: "Carte refusée",
+    cardDeclinedMessage:
+      "Carte refusée : aucune vente n'a été enregistrée. Réessayez ou choisissez un autre moyen de paiement.",
     payLater: "Crédit",
     cashReceived: "Espèces reçues",
     shortBy: "Il manque {{amount}}",
