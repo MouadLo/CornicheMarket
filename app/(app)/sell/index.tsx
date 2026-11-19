@@ -740,7 +740,7 @@ export default function SellScreen() {
             </Pressable>
           )}
 
-          {!isOwner && allowanceCents > 0 && (
+          {!isOwner && allowanceCents > 0 && (saleDiscount.trim() !== "" || discountOpen) && (
             <Text style={styles.discountHint}>
               {t("sell.saleDiscountMax", { amount: isolateLtr(formatMAD(remainingCents)) })}
             </Text>

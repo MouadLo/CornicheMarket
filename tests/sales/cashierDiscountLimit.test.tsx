@@ -108,6 +108,9 @@ async function basketWith(...barcodes: string[]) {
 describe("cashier sale discount limit", () => {
   it("shows what is left of the allowance, from the items that allow a discount", async () => {
     await basketWith("cig", "bis");
+    // Only once the cashier opens the discount field, not on every basket.
+    expect(has("sell.saleDiscountMax|")).toBe(false);
+    await act(async () => pressableByText(tree.root, "sell.saleDiscount").props.onPress());
     // 5% of 40 DH only
     expect(has("sell.saleDiscountMax|")).toBe(true);
     expect(has("2.00 DH")).toBe(true);
