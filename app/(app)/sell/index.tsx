@@ -67,6 +67,7 @@ import { isolateBidi } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
+import { typeScale } from "@/src/theme/type";
 
 export default function SellScreen() {
   const { profile } = useAuth();
