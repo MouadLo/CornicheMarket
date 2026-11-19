@@ -88,7 +88,7 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange }: P
         })}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.tiles}>
+      <ScrollView style={styles.tilesScroll} contentContainerStyle={styles.tiles}>
         {tiles.map((tile) => (
           <Tile
             key={tile.key}
@@ -216,7 +216,9 @@ function Tile({
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, minHeight: 0 },
-  tabsScroll: { flexGrow: 0 },
+  // Never shrinks: on web a long tile list would otherwise squeeze the tabs.
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tilesScroll: { flex: 1, minHeight: 0 },
   tabs: { gap: spacing.s2, paddingHorizontal: spacing.s4, paddingVertical: spacing.s3 },
   tab: {
     minHeight: 52,
