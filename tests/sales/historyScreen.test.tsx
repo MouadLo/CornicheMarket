@@ -172,7 +172,27 @@ describe("sales history", () => {
         params: {
           rangeFrom: `${day}T00:00:00.000Z`,
           rangeTo: `${new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString()}`,
+          picked: "1",
         },
+      });
+    });
+
+    it("hides the way back to a report for a day picked here, keeps it after a report", async () => {
+      mockParams = {
+        rangeFrom: "2026-11-16T00:00:00.000Z",
+        rangeTo: "2026-11-17T00:00:00.000Z",
+        picked: "1",
+      };
+      await render();
+      expect(allTexts(tree.root).join("|")).not.toContain("sell.historyBackToReport");
+      act(() => tree.unmount());
+      mockParams = { rangeFrom: "2026-11-16T00:00:00.000Z", rangeTo: "2026-11-17T00:00:00.000Z" };
+      await render();
+      expect(allTexts(tree.root).join("|")).toContain("sell.historyBackToReport");
+      await pickDay("2026-11-10");
+      expect(mockReplace).toHaveBeenLastCalledWith({
+        pathname: "/(app)/sell/history",
+        params: { rangeFrom: "2026-11-10T00:00:00.000Z", rangeTo: "2026-11-11T00:00:00.000Z" },
       });
     });
 

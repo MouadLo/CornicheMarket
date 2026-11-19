@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { DateField } from "@/src/components/ui/DateField";
+import { formatShortDate } from "@/src/lib/text/calendar";
 import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
 import { fetchStoreTimezone } from "@/src/lib/reports/queries";
 import { storeDayKey } from "@/src/lib/sales/historyView";
@@ -357,7 +358,11 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
           </Text>
         ))}
       </View>
-      {!!draft.invoice_date && <Text>{isolateBidi(draft.invoice_date)}</Text>}
+      {!!draft.invoice_date && (
+        <Text>
+          {isolateBidi(formatShortDate(draft.invoice_date, i18n.language) || draft.invoice_date)}
+        </Text>
+      )}
       {draft.flags.map((flag) => (
         <Text key={flag} style={styles.warning}>
           {t("invoices." + flag)}

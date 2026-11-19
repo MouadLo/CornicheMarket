@@ -31,6 +31,7 @@ import {
 import {
   HISTORY_RANGE_FROM,
   HISTORY_RANGE_TO,
+  HISTORY_PICKED,
   dayRangeParams,
   lastInstantOf,
   singleDayOf,
@@ -73,7 +74,12 @@ export default function SalesHistory() {
 
   // Opened from a report: only the sales of that report's range. Bad or
   // partial params mean no filter at all.
-  const params = useLocalSearchParams<{ rangeFrom?: string; rangeTo?: string }>();
+  const params = useLocalSearchParams<{
+    rangeFrom?: string;
+    rangeTo?: string;
+    picked?: string;
+  }>();
+  const pickedHere = params?.[HISTORY_PICKED] === "1";
   const rangeFromParam = params?.[HISTORY_RANGE_FROM];
   const rangeToParam = params?.[HISTORY_RANGE_TO];
   const range = useMemo(
@@ -404,7 +410,13 @@ export default function SalesHistory() {
   const goToDay = (day: string) => {
     if (!day) return clearRange();
     const target = dayRangeParams(day, timeZone);
-    if (target) router.replace({ pathname: "/(app)/sell/history", params: target });
+    if (!target) return;
+    // Opened from a report: changing the day keeps the way back to it.
+    const fromReport = range !== null && !pickedHere;
+    router.replace({
+      pathname: "/(app)/sell/history",
+      params: fromReport ? target : { ...target, [HISTORY_PICKED]: "1" },
+    });
   };
   const clearRange = () => router.replace("/(app)/sell/history");
   const firstDay = range ? formatLocaleDayHeading(range.from, language, timeZone) : "";
@@ -432,13 +444,15 @@ export default function SalesHistory() {
       {range ? (
         <View style={styles.rangeBox}>
           {/* Opened from Reports, another section: the stack has no screen to go back to. */}
-          <Pressable
-            accessibilityRole="button"
-            style={styles.backToReport}
-            onPress={() => router.navigate("/(app)/reports")}
-          >
-            <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
-          </Pressable>
+          {!pickedHere && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.backToReport}
+              onPress={() => router.navigate("/(app)/reports")}
+            >
+              <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
+            </Pressable>
+          )}
           {dayPicker}
           <Banner
             tone="info"

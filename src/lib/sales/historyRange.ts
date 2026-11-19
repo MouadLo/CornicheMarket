@@ -12,6 +12,9 @@ type Param = string | string[] | undefined;
 
 export const HISTORY_RANGE_FROM = "rangeFrom";
 export const HISTORY_RANGE_TO = "rangeTo";
+// Set when the range was picked on the history screen itself, not opened from a
+// report: there is then no report to go back to.
+export const HISTORY_PICKED = "picked";
 
 // Anything older or longer than this is not a report range a person can pick.
 const MIN_TIME = Date.UTC(2000, 0, 1);
