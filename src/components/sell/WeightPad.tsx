@@ -12,7 +12,7 @@ import {
   pressKey,
   type WeightKey,
 } from "@/src/lib/sales/weightEntry";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -83,7 +83,7 @@ export function WeightPad({ productName, unitPriceCents, onConfirm, onCancel }: 
           <Text style={styles.title} numberOfLines={1}>
             {isolateBidi(productName)}
           </Text>
-          <Text style={styles.price}>{`${formatMAD(unitPriceCents)} / kg`}</Text>
+          <Text style={styles.price}>{`${isolateLtr(formatMAD(unitPriceCents))} / kg`}</Text>
 
           <View style={styles.display}>
             <Text style={styles.entry} testID="weight-entry">

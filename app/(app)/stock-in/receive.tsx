@@ -2,7 +2,7 @@ import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { Icon } from "@/src/components/ui/Icon";
 import { colors, radius, touch } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
@@ -152,7 +152,10 @@ export default function ReceiveDeliveryScreen() {
       });
 
       operationId.current = null;
-      setDone(t("stockIn.recordDelivery", { count: validLines.length }) + ` · ${formatMAD(total)}`);
+      setDone(
+        t("stockIn.recordDelivery", { count: validLines.length }) +
+          ` · ${isolateLtr(formatMAD(total))}`
+      );
       setLines([]);
       setNotes("");
     } catch (saveError) {

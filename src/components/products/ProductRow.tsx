@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
-import { appDirection, isolateBidi } from "@/src/lib/text/bidi";
+import { appDirection, isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { colors } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -58,10 +58,13 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
         {showCost &&
           (hasCost ? (
             <>
-              <Text style={styles.cost}>{t("productRow.buy", { price: formatMAD(cost) })}</Text>
+              <Text style={styles.cost}>
+                {t("productRow.buy", { price: isolateLtr(formatMAD(cost)) })}
+              </Text>
               <Text style={[styles.profit, belowCost && styles.profitNegative]}>
-                {(unitProfit as number) >= 0 ? "+" : ""}
-                {formatMAD(unitProfit as number)} · {formatMargin(margin)}
+                {isolateLtr(
+                  `${(unitProfit as number) >= 0 ? "+" : ""}${formatMAD(unitProfit as number)} · ${formatMargin(margin)}`
+                )}
               </Text>
             </>
           ) : (

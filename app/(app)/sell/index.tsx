@@ -65,7 +65,7 @@ import { useBasket } from "@/src/lib/sales/basketStore";
 import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
 import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
@@ -400,7 +400,7 @@ export default function SellScreen() {
       setSaleDiscount("");
       setDiscountOpen(false);
       setPaymentOpen(false);
-      showFlash(t("sell.recorded", { amount: formatMAD(total) }));
+      showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(total)) }));
       setChangeDue(method === "cash" && change > 0 ? change : null);
       setLastReceipt(
         receiptFromPendingSale(acceptedSale, {
@@ -450,7 +450,7 @@ export default function SellScreen() {
         setDiscountOpen(false);
         setPaymentOpen(false);
       }
-      showFlash(t("sell.recorded", { amount: formatMAD(attempt.total_cents) }));
+      showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(attempt.total_cents)) }));
       void sync.sync().catch(() => {
         /* Hook reports sync errors; sale is already accepted. */
       });
@@ -469,7 +469,7 @@ export default function SellScreen() {
       title: t("sell.attempt.discardTitle"),
       message: t("sell.attempt.discardMessage"),
       summary: t("sell.attempt.summary", {
-        amount: formatMAD(attemptedSale.current.total_cents),
+        amount: isolateLtr(formatMAD(attemptedSale.current.total_cents)),
         method: t(paymentMethodKey(attemptedSale.current.payment_method)),
       }),
       confirmLabel: t("sell.attempt.discardConfirm"),
@@ -711,7 +711,7 @@ export default function SellScreen() {
 
           <View style={styles.totalRow}>
             <Text style={[styles.footerLabel, styles.totalLabel]}>
-              {t("sell.subtotal", { amount: formatMAD(cartSubtotal(lines)) })}
+              {t("sell.subtotal", { amount: isolateLtr(formatMAD(cartSubtotal(lines))) })}
             </Text>
             <Text style={styles.totalValue}>{formatMAD(total)}</Text>
           </View>

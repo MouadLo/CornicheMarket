@@ -110,8 +110,8 @@ describe("sales history", () => {
   it("groups by day with the total of non-voided sales", async () => {
     await render();
     const texts = allTexts(tree.root).join("|");
-    expect(texts).toContain('sell.historyDayTotal:{"amount":"12.50 DH"}');
-    expect(texts).toContain('sell.historyDayTotal:{"amount":"3.00 DH"}');
+    expect(texts).toContain('sell.historyDayTotal:{"amount":"⁦12.50 DH⁩"}');
+    expect(texts).toContain('sell.historyDayTotal:{"amount":"⁦3.00 DH⁩"}');
     expect(texts).toContain("mardi 17 novembre 2026");
     expect(texts).toContain("10:00");
     expect(texts).toContain('sell.historyCustomer:{"name":"Hassan"}');
@@ -130,7 +130,7 @@ describe("sales history", () => {
     await act(async () => row.props.onPress());
     const texts = allTexts(tree.root).join("|");
     expect(texts).toContain("11.50 DH");
-    expect(texts).toContain('sell.historyLineDiscount:{"amount":"0.50 DH"}');
+    expect(texts).toContain('sell.historyLineDiscount:{"amount":"⁦−0.50 DH⁩"}');
   });
 
   it("loads the next page and stops when a page comes back short", async () => {
@@ -164,7 +164,7 @@ describe("sales history", () => {
       expect(texts).toContain("sell.historyRangeBanner:");
       expect(texts).toContain("sell.historyRangeClear");
       // 1250 + 300; the voided 999 is listed but not counted.
-      expect(texts).toContain('sell.historyRangeTotal:{"amount":"15.50 DH"}');
+      expect(texts).toContain('sell.historyRangeTotal:{"amount":"⁦15.50 DH⁩"}');
       expect(texts).toContain("sell.historyVoided");
     });
 

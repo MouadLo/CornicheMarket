@@ -33,7 +33,7 @@ import {
   nonVoidedTotalCents,
   parseHistoryRange,
 } from "@/src/lib/sales/historyRange";
-import { isolateBidi } from "@/src/lib/text/bidi";
+import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import {
   canOfferReceipt,
   receiptFromHistorySale,
@@ -255,7 +255,7 @@ export default function SalesHistory() {
               <Text style={styles.meta}>
                 {t(paymentMethodKey(sale.payment_method))}
                 {sale.discount_cents > 0
-                  ? ` ${t("sell.historyDiscount", { amount: formatMAD(sale.discount_cents) })}`
+                  ? ` ${t("sell.historyDiscount", { amount: isolateLtr(`−${formatMAD(sale.discount_cents)}`) })}`
                   : ""}
                 {sale.voided_at
                   ? ` ${t("sell.historyVoided", { reason: voidReasonDisplay(sale.void_reason, t, isolateBidi) })}`
@@ -314,7 +314,7 @@ export default function SalesHistory() {
                     <Text style={styles.meta}>
                       {`${line.quantity} ${line.unit ? unitLabel(line.unit, line.quantity, t) : ""}`.trim()}
                       {line.discount_cents > 0
-                        ? ` · ${t("sell.historyLineDiscount", { amount: formatMAD(line.discount_cents) })}`
+                        ? ` · ${t("sell.historyLineDiscount", { amount: isolateLtr(`−${formatMAD(line.discount_cents)}`) })}`
                         : ""}
                     </Text>
                   </View>
@@ -423,7 +423,9 @@ export default function SalesHistory() {
           />
           {!hasMore ? (
             <Text style={styles.rangeTotal}>
-              {t("sell.historyRangeTotal", { amount: formatMAD(nonVoidedTotalCents(sales)) })}
+              {t("sell.historyRangeTotal", {
+                amount: isolateLtr(formatMAD(nonVoidedTotalCents(sales))),
+              })}
             </Text>
           ) : null}
         </View>
@@ -459,7 +461,7 @@ export default function SalesHistory() {
               {formatLocaleDayHeading(new Date(group.instant), language, timeZone)}
             </Text>
             <Text style={styles.dayTotal}>
-              {t("sell.historyDayTotal", { amount: formatMAD(group.totalCents) })}
+              {t("sell.historyDayTotal", { amount: isolateLtr(formatMAD(group.totalCents)) })}
             </Text>
           </View>
           {group.sales.map((sale) => renderSale(sale))}

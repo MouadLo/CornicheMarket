@@ -126,7 +126,10 @@ export function PaymentSheet({
   const confirmLabel = saving
     ? t("common.saving")
     : method === "credit" && chosen
-      ? t("sell.putOnCredit", { amount: formatMAD(totalCents), name: isolateBidi(chosen.name) })
+      ? t("sell.putOnCredit", {
+          amount: isolateLtr(formatMAD(totalCents)),
+          name: isolateBidi(chosen.name),
+        })
       : t("sell.completeSale");
 
   return (
@@ -174,7 +177,9 @@ export function PaymentSheet({
                 </View>
                 {short ? (
                   <Text style={styles.short}>
-                    {t("sell.shortBy", { amount: formatMAD(totalCents - tenderedCents) })}
+                    {t("sell.shortBy", {
+                      amount: isolateLtr(formatMAD(totalCents - tenderedCents)),
+                    })}
                   </Text>
                 ) : (
                   <View style={styles.changeBox}>
@@ -252,7 +257,11 @@ export function PaymentSheet({
                       <Chip
                         key={customer.id}
                         label={customer.name}
-                        alert={owed > 0 ? t("sell.owes", { amount: formatMAD(owed) }) : undefined}
+                        alert={
+                          owed > 0
+                            ? t("sell.owes", { amount: isolateLtr(formatMAD(owed)) })
+                            : undefined
+                        }
                         selected={selected}
                         onPress={() => setCustomerId(customer.id)}
                       />

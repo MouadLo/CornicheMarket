@@ -29,6 +29,7 @@ import { closeDay, fetchDaySummary, reopenDay, type DaySummary } from "@/src/lib
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import { Text } from "@/src/theme/Text";
 import { colors, radius } from "@/src/theme/tokens";
+import { isolateLtr } from "@/src/lib/text/bidi";
 
 // The cash drawer and the day's figures (UX O2). A cashier sees their own
 // totals; the owner sees every cashier, counts the drawer and closes the day,
@@ -281,7 +282,10 @@ function CashierCard({ row, title }: { row: CashierDay; title: string }) {
       <Line label={t("day.handOver")} value={formatMAD(cashierCashCents(row))} strong />
       {row.voids_count > 0 && (
         <Text style={styles.meta}>
-          {t("day.voids", { count: row.voids_count, amount: formatMAD(row.voids_cents) })}
+          {t("day.voids", {
+            count: row.voids_count,
+            amount: isolateLtr(formatMAD(row.voids_cents)),
+          })}
         </Text>
       )}
     </Card>
@@ -303,8 +307,8 @@ function DifferenceLine({ cents }: { cents: number }) {
     cents === 0
       ? t("day.differenceOk")
       : cents > 0
-        ? t("day.differenceOver", { amount: formatMAD(cents) })
-        : t("day.differenceShort", { amount: formatMAD(-cents) });
+        ? t("day.differenceOver", { amount: isolateLtr(formatMAD(cents)) })
+        : t("day.differenceShort", { amount: isolateLtr(formatMAD(-cents)) });
   return (
     <View style={styles.line}>
       <Text style={styles.lineLabel}>{t("day.difference")}</Text>

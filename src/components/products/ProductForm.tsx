@@ -53,6 +53,7 @@ import {
 } from "@/src/lib/sellGrid/tileSettings";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
+import { isolateLtr } from "@/src/lib/text/bidi";
 
 const UNITS: ProductUnit[] = ["piece", "kg", "pack"];
 
@@ -232,10 +233,10 @@ export function ProductForm({
             : t("products.formBelowCostTitle"),
         message:
           warning.kind === "zero"
-            ? t("products.formZeroPriceMessage", { price: formatMAD(priceCents) })
+            ? t("products.formZeroPriceMessage", { price: isolateLtr(formatMAD(priceCents)) })
             : t("products.formBelowCostMessage", {
-                price: formatMAD(warning.priceCents),
-                cost: formatMAD(warning.costCents),
+                price: isolateLtr(formatMAD(warning.priceCents)),
+                cost: isolateLtr(formatMAD(warning.costCents)),
               }),
         confirmLabel: t("products.formSaveAnyway"),
         cancelLabel: t("common.cancel"),
@@ -517,18 +518,21 @@ function CostSummary({ product, price }: { product: Product; price: string }) {
   return (
     <View style={styles.summary}>
       <Text style={styles.summaryLine}>
-        {t("products.formCostBuyingPrice", { qty: product.stock_quantity, price: formatMAD(cost) })}
+        {t("products.formCostBuyingPrice", {
+          qty: product.stock_quantity,
+          price: isolateLtr(formatMAD(cost)),
+        })}
       </Text>
       {profit !== null && (
         <Text style={[styles.summaryProfit, profit < 0 && styles.summaryLoss]}>
           {profit >= 0
             ? t("products.formCostProfit", {
-                amount: formatMAD(Math.abs(profit)),
+                amount: isolateLtr(formatMAD(Math.abs(profit))),
                 unit: product.unit,
                 margin: formatMargin(margin),
               })
             : t("products.formCostLoss", {
-                amount: formatMAD(Math.abs(profit)),
+                amount: isolateLtr(formatMAD(Math.abs(profit))),
                 unit: product.unit,
                 margin: formatMargin(margin),
               })}

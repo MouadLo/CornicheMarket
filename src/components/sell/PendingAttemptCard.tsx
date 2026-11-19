@@ -7,6 +7,7 @@ import type { PendingSale } from "@/src/lib/sales/offlineQueue";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, spacing } from "@/src/theme/tokens";
+import { isolateLtr } from "@/src/lib/text/bidi";
 
 // A sale the cashier tried to record whose result is not known: saving it failed
 // (or its acknowledgement was lost) and the basket has since changed. It says
@@ -33,7 +34,7 @@ export function PendingAttemptCard({
       <Text style={styles.title}>{t("sell.attempt.title")}</Text>
       <Text style={styles.summary}>
         {t("sell.attempt.summary", {
-          amount: formatMAD(sale.total_cents),
+          amount: isolateLtr(formatMAD(sale.total_cents)),
           method: t(paymentMethodKey(sale.payment_method)),
         })}
       </Text>
