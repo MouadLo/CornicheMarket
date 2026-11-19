@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: "600" },
   meta: { fontSize: 13, color: colors.ink600 },
   right: { alignItems: "flex-end" },
-  days: { fontSize: 17, fontWeight: "800", color: colors.success700 },
+  days: { fontSize: 17, fontWeight: "800", color: colors.ink700 },
   urgent: { color: colors.warning700 },
   expired: { color: colors.danger600 },
   date: { fontSize: 13, color: colors.ink600 },
