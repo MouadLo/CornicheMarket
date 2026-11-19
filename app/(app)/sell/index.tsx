@@ -20,6 +20,7 @@ import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { EmptyStorePrompt } from "@/src/components/sell/EmptyStorePrompt";
 import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
 import { PendingAttemptCard } from "@/src/components/sell/PendingAttemptCard";
+import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirm, showToast } from "@/src/lib/dialog/store";
@@ -40,6 +41,7 @@ import {
 import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 import { rankBySearch } from "@/src/lib/products/search";
 import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
+import { receiptFromPendingSale, type ReceiptModel } from "@/src/lib/sales/receipt";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
   createCustomer,
@@ -117,6 +119,11 @@ export default function SellScreen() {
   // After a cash sale: the change to hand back, kept until the next item is
   // added or the cashier dismisses it (it used to vanish with the payment sheet).
   const [changeDue, setChangeDue] = useState<number | null>(null);
+  // The receipt of the sale just accepted (confirmed or queued), offered until
+  // the next item is added or the cashier dismisses it. Never set for a sale
+  // whose result is unknown.
+  const [lastReceipt, setLastReceipt] = useState<ReceiptModel | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   // null = not checked yet (or the check failed) -- only an explicit `false`
   // shows the empty-store prompt, so a load error never hides the normal
   // screen behind a wrong "add your first product" message.
@@ -248,6 +255,7 @@ export default function SellScreen() {
   const addLine = useCallback(
     (product: Product, quantity: number) => {
       setChangeDue(null);
+      setLastReceipt(null);
       setLines((current) => {
         const existing = current.findIndex((line) => line.product_id === product.id);
         if (existing >= 0) {
@@ -382,6 +390,7 @@ export default function SellScreen() {
       // Queued first, then synced: if the request dies midway the sale is
       // still on the device, and the id makes a retry safe to repeat.
       await enqueueSale(attemptedSale.current);
+      const acceptedSale = attemptedSale.current;
       attemptedSale.current = null;
       setUnconfirmed(null);
       // Local persistence is the acceptance boundary. Sync is best effort;
@@ -393,6 +402,16 @@ export default function SellScreen() {
       setPaymentOpen(false);
       showFlash(t("sell.recorded", { amount: formatMAD(total) }));
       setChangeDue(method === "cash" && change > 0 ? change : null);
+      setLastReceipt(
+        receiptFromPendingSale(acceptedSale, {
+          cashierName: profile.full_name,
+          customerName: customers.find((c) => c.id === customerId)?.name ?? null,
+          // Cash received is only known when there was change to give.
+          cashReceivedCents:
+            method === "cash" && change > 0 ? acceptedSale.total_cents + change : null,
+          changeCents: method === "cash" && change > 0 ? change : null,
+        })
+      );
       void sync.sync().catch(() => {
         /* Hook reports sync errors; sale is already accepted. */
       });
@@ -533,6 +552,15 @@ export default function SellScreen() {
       ))}
     </View>
   );
+  const receiptButton = (
+    <Pressable
+      style={styles.receiptButton}
+      accessibilityRole="button"
+      onPress={() => setReceiptOpen(true)}
+    >
+      <Text style={styles.receiptButtonText}>{t("receipt.action")}</Text>
+    </Pressable>
+  );
   const noticesNode = (
     <>
       {todayClosed && <Banner tone="warn" text={t("day.todayClosed")} />}
@@ -542,15 +570,31 @@ export default function SellScreen() {
             <Text style={styles.changeLabel}>{t("sell.changeToGive")}</Text>
             <Text style={styles.changeValue}>{formatMAD(changeDue)}</Text>
           </View>
+          {lastReceipt ? receiptButton : null}
           <Pressable
             style={styles.changeDismiss}
             accessibilityRole="button"
-            onPress={() => setChangeDue(null)}
+            onPress={() => {
+              setChangeDue(null);
+              setLastReceipt(null);
+            }}
           >
             <Text style={styles.changeDismissText}>{t("sell.changeDone")}</Text>
           </Pressable>
         </View>
       )}
+      {changeDue === null && lastReceipt ? (
+        <View style={styles.receiptCard}>
+          {receiptButton}
+          <Pressable
+            style={styles.receiptDismiss}
+            accessibilityRole="button"
+            onPress={() => setLastReceipt(null)}
+          >
+            <Text style={styles.receiptDismissText}>{t("sell.changeDone")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {unconfirmed && (
         <PendingAttemptCard
           sale={unconfirmed}
@@ -786,6 +830,9 @@ export default function SellScreen() {
           }
         }}
       />
+      {receiptOpen && lastReceipt ? (
+        <ReceiptPanel receipt={lastReceipt} onClose={() => setReceiptOpen(false)} />
+      ) : null}
     </View>
   );
 }
@@ -890,6 +937,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
   },
+  receiptCard: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  receiptButton: {
+    minHeight: 48,
+    minWidth: 72,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.brand700,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  receiptButtonText: { color: colors.brand700, fontWeight: "700", fontSize: 16 },
+  receiptDismiss: {
+    minHeight: 48,
+    minWidth: 72,
+    borderRadius: 10,
+    backgroundColor: colors.success600,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  receiptDismissText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   changeDismissText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   result: {
     flexDirection: "row",

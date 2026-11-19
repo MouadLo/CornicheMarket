@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "reac
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
 import { Text } from "@/src/theme/Text";
@@ -33,6 +34,11 @@ import {
   parseHistoryRange,
 } from "@/src/lib/sales/historyRange";
 import { isolateBidi } from "@/src/lib/text/bidi";
+import {
+  canOfferReceipt,
+  receiptFromHistorySale,
+  type ReceiptModel,
+} from "@/src/lib/sales/receipt";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import {
   fetchRecentSales,
@@ -80,6 +86,7 @@ export default function SalesHistory() {
   const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
   const [linesBySale, setLinesBySale] = useState<Map<string, SaleLine[]>>(new Map());
   const [linesError, setLinesError] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptModel | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState<false | "page" | "more">(false);
   const [voidingId, setVoidingId] = useState<string | null>(null);
@@ -318,6 +325,18 @@ export default function SalesHistory() {
           </View>
         ) : null}
 
+        {isOpen && lines && lines.length > 0 && canOfferReceipt(sale) ? (
+          <Pressable
+            accessibilityRole="button"
+            style={styles.receiptButton}
+            onPress={() =>
+              setReceipt(receiptFromHistorySale(sale, lines, t("receipt.unknownProduct")))
+            }
+          >
+            <Text style={styles.receiptButtonText}>{t("receipt.action")}</Text>
+          </Pressable>
+        ) : null}
+
         {isOwner &&
           !sale.voided_at &&
           (voidingId === sale.id ? (
@@ -456,6 +475,8 @@ export default function SalesHistory() {
         />
       )}
 
+      <ReceiptPanel receipt={receipt} timeZone={timeZone} onClose={() => setReceipt(null)} />
+
       {askingId && (
         <VoidRequestSheet
           key={askingId}
@@ -509,6 +530,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.danger100,
     alignItems: "center",
   },
+  receiptButton: {
+    minHeight: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.brand700,
+  },
+  receiptButtonText: { color: colors.brand700, fontWeight: "700", fontSize: 15 },
   voidButtonText: { color: colors.danger600, fontWeight: "700", fontSize: 14 },
   voidBox: { gap: 10 },
   voidTitle: { fontSize: 15, fontWeight: "700", color: colors.ink700 },
