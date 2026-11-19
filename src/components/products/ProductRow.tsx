@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
     gap: 12,
+    backgroundColor: colors.surface,
   },
   pressed: { backgroundColor: colors.sunken },
   main: { flex: 1, gap: 4 },

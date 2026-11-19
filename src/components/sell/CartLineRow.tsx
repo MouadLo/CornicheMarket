@@ -182,6 +182,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
     gap: 4,
+    backgroundColor: colors.surface,
   },
   main: { flexDirection: "row", alignItems: "center", gap: 10 },
   info: { flex: 1, minHeight: 48, justifyContent: "center", minWidth: 70 },

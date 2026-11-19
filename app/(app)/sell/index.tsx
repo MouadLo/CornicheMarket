@@ -791,17 +791,23 @@ export default function SellScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+  container: { flex: 1, backgroundColor: colors.bg },
   // Tablet and laptop (>= 900 dp): grid and cart side by side, cart always visible.
   split: { flex: 1, flexDirection: "row" },
   gridPane: { flex: 1, minWidth: 0 },
-  cartPane: { width: 420, borderStartWidth: 1, borderStartColor: colors.divider },
+  cartPane: {
+    width: 420,
+    borderStartWidth: 1,
+    borderStartColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
   backBar: {
     minHeight: 52,
     justifyContent: "center",
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+    backgroundColor: colors.surface,
   },
   basketBar: {
     flexDirection: "row",
@@ -815,7 +821,13 @@ const styles = StyleSheet.create({
   basketCount: { color: colors.white, fontSize: 14, fontWeight: "600" },
   basketTotal: { color: colors.white, fontSize: 22, fontWeight: "800" },
   basketAction: { color: colors.white, fontSize: 16, fontWeight: "700" },
-  header: { padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  header: {
+    padding: 14,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerLinks: { flexDirection: "row", gap: 8 },
   headerLink: {
@@ -841,6 +853,7 @@ const styles = StyleSheet.create({
     borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 17,
+    backgroundColor: colors.surface,
   },
   scanButton: {
     minHeight: 56,
@@ -895,7 +908,13 @@ const styles = StyleSheet.create({
     color: colors.ink600,
     fontSize: 15,
   },
-  footer: { padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: colors.divider },
+  footer: {
+    padding: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
   discountRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   footerLabel: { fontSize: 15, color: colors.ink700 },
   discountInput: {
@@ -907,6 +926,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
     textAlign: "right",
+    backgroundColor: colors.surface,
   },
   discountInputInvalid: { borderColor: colors.danger600 },
   discountError: { color: colors.danger600, fontSize: 13 },

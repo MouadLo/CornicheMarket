@@ -476,8 +476,14 @@ function ActionButton({ label, onPress }: { label: string; onPress: () => void }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  header: { padding: 16, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  container: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    padding: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
   headerCompact: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   flex: { flex: 1 },
   toolbar: { flexDirection: "row", gap: 8 },
@@ -519,6 +525,7 @@ const styles = StyleSheet.create({
     borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
+    backgroundColor: colors.surface,
   },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
