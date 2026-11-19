@@ -255,7 +255,7 @@ export default function SalesHistory() {
               <Text style={styles.meta}>
                 {t(paymentMethodKey(sale.payment_method))}
                 {sale.discount_cents > 0
-                  ? ` ${t("sell.historyDiscount", { amount: isolateLtr(`−${formatMAD(sale.discount_cents)}`) })}`
+                  ? ` ${t("sell.historyDiscount", { amount: isolateLtr(formatMAD(sale.discount_cents)) })}`
                   : ""}
                 {sale.voided_at
                   ? ` ${t("sell.historyVoided", { reason: voidReasonDisplay(sale.void_reason, t, isolateBidi) })}`
@@ -285,7 +285,7 @@ export default function SalesHistory() {
                 >
                   {preview.shown.map((name) => isolateBidi(name)).join(", ")}
                   {preview.more > 0
-                    ? ` ${t("sell.historyItemsMore", { count: preview.more })}`
+                    ? ` ${isolateLtr(t("sell.historyItemsMore", { count: preview.more }))}`
                     : ""}
                 </Text>
               ) : null}
@@ -314,7 +314,7 @@ export default function SalesHistory() {
                     <Text style={styles.meta}>
                       {`${line.quantity} ${line.unit ? unitLabel(line.unit, line.quantity, t) : ""}`.trim()}
                       {line.discount_cents > 0
-                        ? ` · ${t("sell.historyLineDiscount", { amount: isolateLtr(`−${formatMAD(line.discount_cents)}`) })}`
+                        ? ` · ${t("sell.historyLineDiscount", { amount: isolateLtr(formatMAD(line.discount_cents)) })}`
                         : ""}
                     </Text>
                   </View>

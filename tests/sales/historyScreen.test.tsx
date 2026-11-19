@@ -130,7 +130,7 @@ describe("sales history", () => {
     await act(async () => row.props.onPress());
     const texts = allTexts(tree.root).join("|");
     expect(texts).toContain("11.50 DH");
-    expect(texts).toContain('sell.historyLineDiscount:{"amount":"⁦−0.50 DH⁩"}');
+    expect(texts).toContain('sell.historyLineDiscount:{"amount":"⁦0.50 DH⁩"}');
   });
 
   it("loads the next page and stops when a page comes back short", async () => {
