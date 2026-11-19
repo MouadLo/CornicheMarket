@@ -1,12 +1,14 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { LoadError } from "@/src/components/ui/LoadError";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { PriceHistoryChart } from "@/src/components/stock/PriceHistoryChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import { fetchProduct, type Product } from "@/src/lib/products/queries";
 import { fetchPriceHistory, type PricePoint } from "@/src/lib/stock/queries";
@@ -121,31 +123,36 @@ function Stat({ label, value, negative }: { label: string; value: string; negati
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 14, paddingBottom: 48 },
   title: { fontSize: 22, fontWeight: "700" },
-  subtitle: { fontSize: 14, color: "#666" },
+  subtitle: { fontSize: 14, color: colors.ink600 },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   stat: {
-    backgroundColor: "#f4f6f5",
+    backgroundColor: colors.sunken,
     borderRadius: 10,
     padding: 12,
     minWidth: 120,
     flexGrow: 1,
     gap: 4,
   },
-  statLabel: { fontSize: 13, color: "#666", textTransform: "uppercase" },
+  statLabel: { fontSize: 13, color: colors.ink600, textTransform: "uppercase" },
   statValue: { fontSize: 18, fontWeight: "700" },
-  statNegative: { color: "#b3261e" },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#555", textTransform: "uppercase" },
+  statNegative: { color: colors.danger600 },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.ink600,
+    textTransform: "uppercase",
+  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.divider,
     gap: 10,
   },
   rowDate: { fontSize: 14, flex: 1 },
-  rowQty: { fontSize: 14, color: "#666" },
+  rowQty: { fontSize: 14, color: colors.ink600 },
   rowPrice: { fontSize: 15, fontWeight: "600" },
-  note: { fontSize: 13, color: "#666", fontStyle: "italic", marginTop: 8 },
-  error: { padding: 20, color: "#b3261e" },
+  note: { fontSize: 13, color: colors.ink600, fontStyle: "italic", marginTop: 8 },
+  error: { padding: 20, color: colors.danger600 },
 });

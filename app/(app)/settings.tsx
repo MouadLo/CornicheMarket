@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -18,6 +9,8 @@ import { InlineError } from "@/src/components/ui/InlineError";
 import { inviteCashier } from "@/src/lib/auth/inviteCashier";
 import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import { useSignOut } from "@/src/lib/auth/useSignOut";
 import { confirm } from "@/src/lib/dialog/store";
 import { changeLanguage, type SupportedLang } from "@/src/i18n";
@@ -315,12 +308,14 @@ function InviteCashierForm({ onInvited }: { onInvited: () => void }) {
       <TextInput
         style={styles.input}
         placeholder={t("settings.fullName")}
+        accessibilityLabel={t("settings.fullName")}
         value={fullName}
         onChangeText={setFullName}
       />
       <TextInput
         style={styles.input}
         placeholder={t("settings.email")}
+        accessibilityLabel={t("settings.email")}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
@@ -341,9 +336,14 @@ const styles = StyleSheet.create({
   container: { padding: 24, gap: 24 },
   title: { fontSize: 24, fontWeight: "700" },
   section: { gap: 10 },
-  sectionLabel: { fontSize: 14, fontWeight: "600", color: "#555", textTransform: "uppercase" },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.ink600,
+    textTransform: "uppercase",
+  },
   value: { fontSize: 16 },
-  hint: { fontSize: 13, color: "#777", lineHeight: 18 },
+  hint: { fontSize: 13, color: colors.ink600, lineHeight: 18 },
   tzBox: { gap: 10 },
   langRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   langButton: {
@@ -351,39 +351,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#f5f5f5",
+    borderColor: colors.ink400,
+    backgroundColor: colors.sunken,
   },
-  langButtonActive: { backgroundColor: "#1d7a46", borderColor: "#1d7a46" },
-  langText: { fontSize: 14, color: "#333" },
-  langTextActive: { color: "#fff", fontWeight: "700" },
+  langButtonActive: { backgroundColor: colors.brand700, borderColor: colors.brand700 },
+  langText: { fontSize: 14, color: colors.ink700 },
+  langTextActive: { color: colors.white, fontWeight: "700" },
   reminderBanner: {
-    backgroundColor: "#fff8e1",
+    backgroundColor: colors.warning100,
     borderRadius: 10,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: "#f9a825",
+    borderLeftColor: colors.warning500,
   },
-  reminderText: { color: "#7a5c00", fontSize: 14 },
+  reminderText: { color: colors.warning700, fontSize: 14 },
   exportButtons: { gap: 10 },
-  exportMessage: { color: "#1d7a46", fontSize: 14 },
+  exportMessage: { color: colors.success700, fontSize: 14 },
   smallButton: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: "#eee",
+    backgroundColor: colors.sunken,
     alignItems: "center",
   },
   smallButtonDisabled: { opacity: 0.5 },
-  smallButtonText: { fontSize: 15, color: "#333", fontWeight: "600" },
+  smallButtonText: { fontSize: 15, color: colors.ink700, fontWeight: "600" },
   inviteForm: { gap: 10 },
   input: {
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.ink400,
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  success: { color: "#1d7a46" },
+  success: { color: colors.success700 },
 });

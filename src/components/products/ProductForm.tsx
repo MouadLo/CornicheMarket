@@ -290,6 +290,7 @@ export function ProductForm({
           value={name}
           onChangeText={setName}
           placeholder={t("products.formNamePlaceholder")}
+          accessibilityLabel={t("products.formName")}
         />
       </Field>
 
@@ -300,6 +301,7 @@ export function ProductForm({
             value={barcode}
             onChangeText={setBarcode}
             placeholder={t("products.formBarcodePlaceholder")}
+            accessibilityLabel={t("products.formBarcode")}
             keyboardType="number-pad"
           />
           {cameraScan && (
@@ -429,6 +431,7 @@ export function ProductForm({
           value={price}
           onChangeText={setPrice}
           placeholder="0.00"
+          accessibilityLabel={t("products.formSellingPrice")}
           keyboardType="decimal-pad"
         />
       </Field>
@@ -439,6 +442,7 @@ export function ProductForm({
           value={threshold}
           onChangeText={setThreshold}
           placeholder="0"
+          accessibilityLabel={t("products.formLowStockThreshold")}
           keyboardType="decimal-pad"
         />
       </Field>

@@ -1,9 +1,10 @@
 import { Redirect, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { Chip } from "@/src/components/ui/Chip";
 import { InlineError } from "@/src/components/ui/InlineError";
 import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
@@ -23,6 +24,8 @@ import {
   importProducts,
   type ImportResult,
 } from "@/src/lib/products/import";
+import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import { fetchCategories, type Category } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 
@@ -272,44 +275,19 @@ export default function ImportProducts() {
   );
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
-      onPress={onPress}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 16, paddingBottom: 48 },
   title: { fontSize: 22, fontWeight: "700" },
-  body: { fontSize: 15, color: "#555", lineHeight: 21 },
+  body: { fontSize: 15, color: colors.ink600, lineHeight: 21 },
   summary: { fontSize: 16, fontWeight: "600" },
   field: { gap: 6 },
   label: { fontSize: 15, fontWeight: "600" },
-  hint: { fontSize: 13, color: "#777" },
+  hint: { fontSize: 13, color: colors.ink600 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: "#eee" },
-  chipSelected: { backgroundColor: "#1d7a46" },
-  chipText: { fontSize: 14, color: "#333" },
-  chipTextSelected: { color: "#fff", fontWeight: "600" },
-  previewRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
+  previewRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.divider },
   previewName: { fontSize: 15, fontWeight: "600" },
-  previewMeta: { fontSize: 13, color: "#666" },
-  errorBox: { backgroundColor: "#fdecea", borderRadius: 10, padding: 12, gap: 4 },
-  errorTitle: { fontWeight: "700", color: "#b3261e" },
-  errorLine: { fontSize: 13, color: "#8c1d18" },
+  previewMeta: { fontSize: 13, color: colors.ink600 },
+  errorBox: { backgroundColor: colors.danger100, borderRadius: 10, padding: 12, gap: 4 },
+  errorTitle: { fontWeight: "700", color: colors.danger600 },
+  errorLine: { fontSize: 13, color: colors.danger700 },
 });

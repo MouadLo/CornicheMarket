@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
+import { ActivityIndicator } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
@@ -8,6 +8,7 @@ import { LoadError } from "@/src/components/ui/LoadError";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { Text } from "@/src/theme/Text";
 import {
   fetchCategories,
   fetchProduct,
