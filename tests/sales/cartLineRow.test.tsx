@@ -15,6 +15,7 @@ const kgLine: CartLine = {
   unit_price_cents: 900,
   discount_cents: 0,
   unit_cost_cents: null,
+  discountable: true,
 };
 
 // A parent that behaves like SellScreen: it feeds every change back in as

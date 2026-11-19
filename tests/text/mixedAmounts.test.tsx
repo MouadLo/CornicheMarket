@@ -17,6 +17,7 @@ const line: CartLine = {
   unit_price_cents: 700,
   discount_cents: 50,
   unit_cost_cents: null,
+  discountable: true,
 };
 
 let tree: ReactTestRenderer;

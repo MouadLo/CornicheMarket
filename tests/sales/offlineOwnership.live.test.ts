@@ -108,6 +108,7 @@ suite("a queued sale belongs to the user who rang it up (live)", () => {
           unit_price_cents: priceCents,
           discount_cents: 0,
           unit_cost_cents: null,
+          discountable: true,
         },
       ],
       userId as string

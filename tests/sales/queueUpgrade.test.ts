@@ -84,7 +84,7 @@ function fresh(id: string, cashier = A): PendingSale {
   return pendingSaleFrom(
     id,
     { customer_id: null, payment_method: "cash", discount_cents: 0, total_cents: 1200 },
-    [{ ...oldLine, unit_cost_cents: null }],
+    [{ ...oldLine, unit_cost_cents: null, discountable: true }],
     cashier
   );
 }

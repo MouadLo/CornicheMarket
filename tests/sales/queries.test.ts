@@ -87,6 +87,7 @@ describe("submitSale", () => {
           unit_price_cents: 1000,
           discount_cents: 0,
           unit_cost_cents: null,
+          discountable: true,
         },
       ],
       "user-1"

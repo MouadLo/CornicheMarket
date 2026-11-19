@@ -46,6 +46,7 @@ const pending = (extra: Partial<PendingSale> = {}): PendingSale => ({
       unit_price_cents: 700,
       discount_cents: 50,
       unit_cost_cents: 420,
+      discountable: true,
     },
     {
       product_id: "p2",
@@ -55,6 +56,7 @@ const pending = (extra: Partial<PendingSale> = {}): PendingSale => ({
       unit_price_cents: 400,
       discount_cents: 0,
       unit_cost_cents: 250,
+      discountable: true,
     },
   ],
   ...extra,
@@ -206,6 +208,7 @@ describe("receipt html", () => {
             unit_price_cents: 100,
             discount_cents: 0,
             unit_cost_cents: null,
+            discountable: true,
           },
         ],
       }),

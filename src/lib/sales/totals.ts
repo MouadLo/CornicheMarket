@@ -10,6 +10,10 @@ export type CartLine = {
   discount_cents: number;
   // Only known to owners; null for cashiers, who never receive cost data.
   unit_cost_cents: number | null;
+  // Whether a cashier may discount this item (stamped by the server on the
+  // sale; here it only drives the cashier's limit). A basket saved before this
+  // field existed has it missing, which is read as true (see basketStore).
+  discountable: boolean;
 };
 
 // The one place a cart line is built from a product. The Sell screen and the
@@ -21,6 +25,8 @@ export function cartLineFrom(
     unit: string;
     selling_price_cents: number;
     current_cost_cents?: number | null;
+    // Missing on a product the device cached before this field existed.
+    discountable?: boolean | null;
   },
   quantity: number
 ): CartLine {
@@ -32,6 +38,7 @@ export function cartLineFrom(
     unit_price_cents: product.selling_price_cents,
     discount_cents: 0,
     unit_cost_cents: product.current_cost_cents ?? null,
+    discountable: product.discountable ?? true,
   };
 }
 
