@@ -1,4 +1,3 @@
-import { Chip } from "@/src/components/ui/Chip";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -12,6 +11,7 @@ import { isScannerBurst, keyFromKeyboardEvent, type WeightKey } from "@/src/lib/
 import type { Customer, PaymentMethod } from "@/src/lib/sales/queries";
 import { isolateBidi } from "@/src/lib/text/bidi";
 import { colors, radius, touch } from "@/src/theme/tokens";
+import { Chip } from "@/src/components/ui/Chip";
 import { Text } from "@/src/theme/Text";
 
 type Props = {
@@ -237,11 +237,8 @@ export function PaymentSheet({
                     return (
                       <Chip
                         key={customer.id}
-                        label={
-                          owed > 0
-                            ? `${isolateBidi(customer.name)} · ${t("sell.owes", { amount: formatMAD(owed) })}`
-                            : customer.name
-                        }
+                        label={customer.name}
+                        alert={owed > 0 ? t("sell.owes", { amount: formatMAD(owed) }) : undefined}
                         selected={selected}
                         onPress={() => setCustomerId(customer.id)}
                       />

@@ -4,6 +4,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from "rea
 
 import { Chip } from "../../src/components/ui/Chip";
 import { ListRow } from "../../src/components/ui/ListRow";
+import { colors } from "../../src/theme/tokens";
 
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: "ar" } }),
@@ -77,5 +78,24 @@ describe("ListRow", () => {
     expect(styleWhen(button(r), true).backgroundColor).not.toBe(
       styleWhen(button(r), false).backgroundColor
     );
+  });
+});
+
+describe("Chip alert text", () => {
+  const texts = (selected: boolean) => {
+    let tree!: ReactTestRenderer;
+    act(() => {
+      tree = create(
+        <Chip label="Fatima" alert="owes 12.00 DH" selected={selected} onPress={() => {}} />
+      );
+    });
+    return tree.root.findAll(
+      (n) => n.props.children === "owes 12.00 DH" && typeof n.type === "function"
+    );
+  };
+
+  it("shows money owed in the danger colour, and stays readable when selected", () => {
+    expect(StyleSheet.flatten(texts(false)[0].props.style).color).toBe(colors.danger600);
+    expect(StyleSheet.flatten(texts(true)[0].props.style).color).toBe(colors.white);
   });
 });

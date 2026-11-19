@@ -35,11 +35,8 @@ const label = (node: ReactTestInstance) =>
     .map((text) => [text.props.children].flat().join(""))
     .join("");
 
-// A customer chip reads "Name" or "Name · sell.owes" (name isolated for bidi): match on the name.
-const chipLabel = (node: ReactTestInstance) =>
-  label(node)
-    .replace(/[\u2066-\u2069]/g, "")
-    .replace(" · sell.owes", "");
+// A customer chip reads "Name" or "Name" + "sell.owes": match on the name.
+const chipLabel = (node: ReactTestInstance) => label(node).replace("sell.owes", "");
 
 const keys = (text: string) => {
   for (const ch of text) {
@@ -183,11 +180,11 @@ describe("Pay Later (C10)", () => {
     press("sell.payLater");
     const fatima = tree.root
       .findAllByType(Pressable)
-      .find((node) => label(node).includes("Fatima"))!;
+      .find((node) => label(node).startsWith("Fatima"))!;
     expect(label(fatima)).toContain("sell.owes");
     const khadija = tree.root
       .findAllByType(Pressable)
-      .find((node) => label(node).includes("Khadija"))!;
+      .find((node) => label(node).startsWith("Khadija"))!;
     expect(label(khadija)).not.toContain("sell.owes");
   });
 
