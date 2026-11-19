@@ -1,20 +1,24 @@
 import React from "react";
-import { Pressable, TextInput } from "react-native";
+import { Pressable, Text, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import InvoiceScreen from "../../app/(app)/stock-in/invoice/[id]";
 import { BigButton } from "../../src/components/BigButton";
 import { ProductSearchPicker } from "../../src/components/stock/ProductSearchPicker";
 import { createSupplier as createSupplierMock } from "../../src/lib/stock/queries";
+import { router } from "expo-router";
+import { confirmDestructive } from "../../src/lib/confirmDestructive";
 import {
   approveInvoiceDraft,
+  deleteInvoiceDraft,
+  InvoiceApprovalError,
   fetchInvoiceDraft,
   matchInvoiceLines,
   updateInvoiceHeader,
 } from "../../src/lib/stock/invoices";
 
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn() },
+  router: { push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => ({ id: "draft-1" }),
 }));
 jest.mock("react-i18next", () => ({
@@ -35,6 +39,7 @@ jest.mock("../../src/lib/stock/queries", () => ({
   fetchSuppliers: async () => [{ id: "supplier-1", name: "Supplier" }],
   createSupplier: jest.fn(async (name: string) => ({ id: "supplier-new", name, phone: null })),
 }));
+jest.mock("../../src/lib/confirmDestructive", () => ({ confirmDestructive: jest.fn() }));
 jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/components/stock/ProductSearchPicker", () => ({
   ProductSearchPicker: () => null,
@@ -44,6 +49,7 @@ jest.mock("../../src/lib/stock/invoices", () => ({
   fetchInvoiceDraft: jest.fn(),
   approveInvoiceDraft: jest.fn(),
   updateInvoiceHeader: jest.fn(),
+  deleteInvoiceDraft: jest.fn(),
   matchInvoiceLines: jest.fn(async () => []),
 }));
 
@@ -124,6 +130,71 @@ it("submits the corrected quantities and costs only after the owner reconfirms",
     },
   ]);
   act(() => tree.unmount());
+});
+
+describe("deleting a draft", () => {
+  beforeEach(() => {
+    jest.mocked(router.replace).mockClear();
+    jest.mocked(deleteInvoiceDraft).mockReset();
+    jest.mocked(confirmDestructive).mockReset();
+  });
+  const deleteButton = (tree: ReactTestRenderer) =>
+    tree.root.findAllByType(BigButton).find((b) => b.props.label === "invoices.deleteDraft");
+
+  it("is offered only while the draft is not approved", async () => {
+    jest.mocked(fetchInvoiceDraft).mockResolvedValue({ ...draft, purchase_id: "purchase-1" });
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = create(<InvoiceScreen />);
+    });
+    expect(deleteButton(tree)).toBeUndefined();
+    act(() => tree.unmount());
+  });
+
+  it("asks first, names the invoice, deletes, then returns to the list", async () => {
+    jest.mocked(fetchInvoiceDraft).mockResolvedValue(draft);
+    jest.mocked(confirmDestructive).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    jest.mocked(deleteInvoiceDraft).mockResolvedValue(undefined);
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = create(<InvoiceScreen />);
+    });
+    await act(async () => {
+      await deleteButton(tree)!.props.onPress();
+    });
+    expect(confirmDestructive).toHaveBeenCalledWith(
+      "invoices.deleteTitle",
+      "invoices.deleteMessageSupplier",
+      "invoices.deleteConfirm",
+      "common.cancel"
+    );
+    expect(deleteInvoiceDraft).not.toHaveBeenCalled();
+    await act(async () => {
+      await deleteButton(tree)!.props.onPress();
+    });
+    expect(deleteInvoiceDraft).toHaveBeenCalledWith("draft-1");
+    expect(router.replace).toHaveBeenCalledWith("/(app)/stock-in/invoice");
+    act(() => tree.unmount());
+  });
+
+  it("shows the server's refusal inline and stays on the screen", async () => {
+    jest.mocked(fetchInvoiceDraft).mockResolvedValue(draft);
+    jest.mocked(confirmDestructive).mockResolvedValue(true);
+    jest
+      .mocked(deleteInvoiceDraft)
+      .mockRejectedValue(new InvoiceApprovalError("approved", "CM413"));
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = create(<InvoiceScreen />);
+    });
+    await act(async () => {
+      await deleteButton(tree)!.props.onPress();
+    });
+    expect(router.replace).not.toHaveBeenCalled();
+    const texts = tree.root.findAllByType(Text).map((n) => n.props.children);
+    expect(texts).toContain("invoices.deleteApproved");
+    act(() => tree.unmount());
+  });
 });
 
 describe("buildReviewedInvoiceLine", () => {
