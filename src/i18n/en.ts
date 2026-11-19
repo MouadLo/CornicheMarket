@@ -677,6 +677,16 @@ const en: Translations = {
     statusApproved: "Approved",
     noDrafts: "No invoice drafts yet.",
     moreDrafts: "Load more",
+    deleteDraft: "Delete draft",
+    deleteTitle: "Delete this draft?",
+    deleteMessage: "Draft {{number}} and its photos will be deleted. This cannot be undone.",
+    deleteMessageSupplier:
+      "Draft {{number}} ({{supplier}}) and its photos will be deleted. This cannot be undone.",
+    deleteConfirm: "Delete",
+    deleteApproved: "This invoice is already approved and cannot be deleted.",
+    deleteBusy: "The invoice is still being read. Try again in a couple of minutes.",
+    deleteGone: "This draft no longer exists.",
+    deleteError: "Could not delete the draft. Try again.",
     untitled: "Invoice without a number",
     totals_mismatch: "The printed totals do not reconcile. Check the original.",
     duplicate_invoice:

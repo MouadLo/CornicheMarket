@@ -686,6 +686,17 @@ const fr = {
     statusApproved: "Approuvée",
     noDrafts: "Aucun brouillon de facture pour le moment.",
     moreDrafts: "Afficher plus",
+    deleteDraft: "Supprimer le brouillon",
+    deleteTitle: "Supprimer ce brouillon ?",
+    deleteMessage:
+      "Le brouillon {{number}} et ses photos seront supprimés. Cette action est irréversible.",
+    deleteMessageSupplier:
+      "Le brouillon {{number}} ({{supplier}}) et ses photos seront supprimés. Cette action est irréversible.",
+    deleteConfirm: "Supprimer",
+    deleteApproved: "Cette facture est déjà approuvée : elle ne peut pas être supprimée.",
+    deleteBusy: "La facture est encore en cours de lecture. Réessayez dans quelques minutes.",
+    deleteGone: "Ce brouillon n’existe plus.",
+    deleteError: "Impossible de supprimer le brouillon. Réessayez.",
     untitled: "Facture sans numéro",
     totals_mismatch: "Les totaux imprimés ne concordent pas. Vérifiez l’original.",
     duplicate_invoice:

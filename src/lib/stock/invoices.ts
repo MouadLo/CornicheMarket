@@ -693,3 +693,29 @@ export function approvalErrorKey(code: string | null, revisionChanged: boolean):
   if (code === "22023") return "invoices.invalidLines";
   return "invoices.approveError";
 }
+
+// Delete a draft that was never approved, then its photos (migration 042).
+// The database decides whether the draft may go; the photos are removed only
+// after it is gone, and the policy only lets files of a deleted draft be
+// removed. A failed photo removal is ignored: the draft is already deleted and
+// leftover files cost nothing.
+export async function deleteInvoiceDraft(id: string): Promise<void> {
+  const { data, error } = await supabase.rpc("delete_invoice_draft", { p_id: id });
+  if (error) throw new InvoiceApprovalError(error.message, error.code || null);
+  const paths = (data ?? []) as string[];
+  if (!paths.length) return;
+  try {
+    const { error: removeError } = await supabase.storage.from("invoices").remove(paths);
+    if (removeError) console.warn("Could not remove invoice photos", removeError.message);
+  } catch (failure) {
+    console.warn("Could not remove invoice photos", failure);
+  }
+}
+
+// The server's refusals to delete, in the owner's language.
+export function deleteErrorKey(code: string | null): string {
+  if (code === "CM413") return "invoices.deleteApproved";
+  if (code === "CM415") return "invoices.deleteBusy";
+  if (code === "CM404") return "invoices.deleteGone";
+  return "invoices.deleteError";
+}

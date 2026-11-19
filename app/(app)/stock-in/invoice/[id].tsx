@@ -67,6 +67,7 @@ import {
   type InvoiceReviewLine,
   type ProductChoice,
 } from "@/src/lib/stock/invoices";
+import { confirmAndDeleteInvoiceDraft } from "@/src/lib/stock/deleteInvoiceDraftFlow";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
 import { colors, radius, touch } from "@/src/theme/tokens";
@@ -177,6 +178,7 @@ function DraftLoader({ id }: { id: string }) {
           <BigButton label={t("invoices.retry")} disabled={working} onPress={retryExtraction} />
         )}
         <InvoicePhotos paths={draft.photo_paths} />
+        <DeleteDraft draft={draft} />
       </ScrollView>
     );
   }
@@ -787,9 +789,57 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
             onPress={approve}
             disabled={!ready || !confirmed || saving}
           />
+          <DeleteDraft draft={draft} disabled={saving} />
         </>
       )}
     </ScrollView>
+  );
+}
+
+// Delete a draft that was never approved, with its photos. The database has
+// the last word (an approved draft, or one still being read, is refused).
+function DeleteDraft({
+  draft,
+  disabled,
+}: {
+  draft: Pick<InvoiceDraft, "id" | "invoice_number" | "suppliers" | "purchase_id">;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = useRef(false);
+  if (draft.purchase_id) return null;
+
+  async function remove() {
+    if (busy.current) return;
+    busy.current = true;
+    setDeleting(true);
+    setError(null);
+    try {
+      const outcome = await confirmAndDeleteInvoiceDraft(draft, t);
+      if (outcome.result === "deleted") router.replace("/(app)/stock-in/invoice");
+      else if (outcome.result === "error") setError(outcome.key);
+    } finally {
+      busy.current = false;
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+      {error && (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {t(error)}
+        </Text>
+      )}
+      <BigButton
+        variant="danger"
+        label={t("invoices.deleteDraft")}
+        disabled={disabled || deleting}
+        onPress={remove}
+      />
+    </>
   );
 }
 
