@@ -1,3 +1,4 @@
+import { formatLocaleDateTime } from "@/src/lib/text/dates";
 import { useCallback, useEffect, useState } from "react";
 import { Share, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -28,7 +29,7 @@ export function StuckSalesList({
   onRetry: () => Promise<void>;
   onChanged: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [stuck, setStuck] = useState<StuckSale[]>([]);
 
   const load = useCallback(async () => {
@@ -88,7 +89,9 @@ export function StuckSalesList({
         <View key={entry.sale.id} style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.date}>
-              {t("shell.stuckDate", { date: new Date(entry.sale.created_at).toLocaleString() })}
+              {t("shell.stuckDate", {
+                date: formatLocaleDateTime(new Date(entry.sale.created_at), i18n.language),
+              })}
             </Text>
             <Money cents={entry.sale.total_cents} size="subtitle" />
           </View>

@@ -1,3 +1,4 @@
+import { resolveLocale } from "@/src/lib/text/dates";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -13,8 +14,11 @@ export function formatClock(date: Date): string {
 // Western digits in every language, as on Moroccan price tags.
 function formatDate(date: Date, lang: string): string {
   try {
-    const locale = lang === "ar" ? "ar-MA-u-nu-latn" : lang;
-    return date.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+    return date.toLocaleDateString(resolveLocale(lang), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
   } catch {
     return "";
   }

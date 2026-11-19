@@ -1,3 +1,4 @@
+import { formatLocaleDate } from "@/src/lib/text/dates";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,7 @@ import { colors } from "@/src/theme/tokens";
 
 export default function AdjustScreen() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOwner = profile?.role === "owner";
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -176,7 +177,8 @@ export default function AdjustScreen() {
             <View style={styles.rowMain}>
               <Text style={styles.historyName}>{record.product_name}</Text>
               <Text style={styles.meta}>
-                {reasonLabel(record.reason, t)} · {new Date(record.created_at).toLocaleDateString()}
+                {reasonLabel(record.reason, t)} ·{" "}
+                {formatLocaleDate(new Date(record.created_at), i18n.language)}
                 {record.note ? ` · ${record.note}` : ""}
               </Text>
             </View>

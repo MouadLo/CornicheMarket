@@ -1,3 +1,4 @@
+import { formatLocaleDayMonth } from "@/src/lib/text/dates";
 import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -17,7 +18,7 @@ type Props = {
 // Drawn with plain Views rather than a charting library: a bar per delivery
 // is all this needs, and it keeps the mobile bundle free of an SVG dependency.
 export function PriceHistoryChart({ points, averageCostCents }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (points.length === 0) {
     return <Text style={styles.empty}>{t("priceChart.empty")}</Text>;
   }
@@ -54,10 +55,7 @@ export function PriceHistoryChart({ points, averageCostCents }: Props) {
                 style={[styles.bar, { height }, rose && styles.barUp, fell && styles.barDown]}
               />
               <Text style={styles.barLabel} numberOfLines={1}>
-                {new Date(point.created_at).toLocaleDateString(undefined, {
-                  day: "2-digit",
-                  month: "2-digit",
-                })}
+                {formatLocaleDayMonth(new Date(point.created_at), i18n.language)}
               </Text>
             </View>
           );

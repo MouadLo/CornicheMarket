@@ -1,3 +1,4 @@
+import { formatIsoDate, formatLocaleMonthYear } from "@/src/lib/text/dates";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -24,7 +25,7 @@ import { colors } from "@/src/theme/tokens";
 type Tab = "deliveries" | "months" | "suppliers";
 
 export default function PurchaseHistory() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile } = useAuth();
   const isOwner = profile?.role === "owner";
   const [tab, setTab] = useState<Tab>("deliveries");
@@ -105,7 +106,7 @@ export default function PurchaseHistory() {
                     {purchase.supplier_name ?? t("stockIn.historyNoSupplier")}
                   </Text>
                   <Text style={styles.rowMeta}>
-                    {formatDate(purchase.purchase_date)} · {purchase.line_count}{" "}
+                    {formatIsoDate(purchase.purchase_date, i18n.language)} · {purchase.line_count}{" "}
                     {purchase.line_count === 1
                       ? t("stockIn.historyLine")
                       : t("stockIn.historyLines")}
@@ -132,7 +133,9 @@ export default function PurchaseHistory() {
           months.map((month) => (
             <View key={month.month} style={styles.row}>
               <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>{formatMonth(month.month)}</Text>
+                <Text style={styles.rowTitle}>
+                  {formatLocaleMonthYear(new Date(month.month), i18n.language)}
+                </Text>
                 <Text style={styles.rowMeta}>
                   {month.purchase_count}{" "}
                   {month.purchase_count === 1
@@ -166,14 +169,6 @@ export default function PurchaseHistory() {
         ))}
     </ScrollView>
   );
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString();
-}
-
-function formatMonth(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
 function TabButton({
