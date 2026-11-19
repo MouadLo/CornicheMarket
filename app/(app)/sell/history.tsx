@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { DateField } from "@/src/components/ui/DateField";
 import { BigButton } from "@/src/components/BigButton";
 import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
@@ -21,6 +22,7 @@ import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
 import { fetchStoreTimezone } from "@/src/lib/reports/queries";
 import {
   groupSalesByDay,
+  storeDayKey,
   itemsPreview,
   composeVoidReason,
   saleInstant,
@@ -29,7 +31,10 @@ import {
 import {
   HISTORY_RANGE_FROM,
   HISTORY_RANGE_TO,
+  HISTORY_PICKED,
+  dayRangeParams,
   lastInstantOf,
+  singleDayOf,
   nonVoidedTotalCents,
   parseHistoryRange,
 } from "@/src/lib/sales/historyRange";
@@ -69,7 +74,12 @@ export default function SalesHistory() {
 
   // Opened from a report: only the sales of that report's range. Bad or
   // partial params mean no filter at all.
-  const params = useLocalSearchParams<{ rangeFrom?: string; rangeTo?: string }>();
+  const params = useLocalSearchParams<{
+    rangeFrom?: string;
+    rangeTo?: string;
+    picked?: string;
+  }>();
+  const pickedHere = params?.[HISTORY_PICKED] === "1";
   const rangeFromParam = params?.[HISTORY_RANGE_FROM];
   const rangeToParam = params?.[HISTORY_RANGE_TO];
   const range = useMemo(
@@ -395,22 +405,55 @@ export default function SalesHistory() {
     return <LoadQueryError what={t("sell.historyLoadWhat")} onRetry={load} />;
   }
 
+  const today = storeDayKey(new Date().toISOString(), timeZone);
+  const pickedDay = singleDayOf(range, timeZone, storeDayKey);
+  const goToDay = (day: string) => {
+    if (!day) return clearRange();
+    const target = dayRangeParams(day, timeZone);
+    if (!target) return;
+    // Opened from a report: changing the day keeps the way back to it.
+    const fromReport = range !== null && !pickedHere;
+    router.replace({
+      pathname: "/(app)/sell/history",
+      params: fromReport ? target : { ...target, [HISTORY_PICKED]: "1" },
+    });
+  };
   const clearRange = () => router.replace("/(app)/sell/history");
   const firstDay = range ? formatLocaleDayHeading(range.from, language, timeZone) : "";
   const lastDay = range ? formatLocaleDayHeading(lastInstantOf(range), language, timeZone) : "";
 
+  // Shown with no filter, or a one-day filter (a longer report range keeps its
+  // own banner and is not replaced by a day picker).
+  const dayPicker =
+    !range || pickedDay ? (
+      <View style={styles.dayPicker}>
+        <DateField
+          label={t("sell.historyGoToDay")}
+          value={pickedDay}
+          onChange={goToDay}
+          today={today}
+          max={today}
+          clearable
+        />
+      </View>
+    ) : null;
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {!range ? dayPicker : null}
       {range ? (
         <View style={styles.rangeBox}>
           {/* Opened from Reports, another section: the stack has no screen to go back to. */}
-          <Pressable
-            accessibilityRole="button"
-            style={styles.backToReport}
-            onPress={() => router.navigate("/(app)/reports")}
-          >
-            <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
-          </Pressable>
+          {!pickedHere && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.backToReport}
+              onPress={() => router.navigate("/(app)/reports")}
+            >
+              <Text style={styles.backToReportText}>{t("sell.historyBackToReport")}</Text>
+            </Pressable>
+          )}
+          {dayPicker}
           <Banner
             tone="info"
             icon="calendar"
@@ -498,6 +541,7 @@ const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 48 },
   day: { gap: 10 },
   rangeBox: { gap: 8 },
+  dayPicker: { flexDirection: "row" },
   backToReport: { minHeight: 48, justifyContent: "center", alignSelf: "flex-start" },
   backToReportText: { fontSize: 15, fontWeight: "700", color: colors.brand700 },
   rangeTotal: { fontSize: 15, fontWeight: "700", color: colors.ink700 },

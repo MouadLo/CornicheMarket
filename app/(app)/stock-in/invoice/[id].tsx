@@ -10,6 +10,12 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { DateField } from "@/src/components/ui/DateField";
+import { formatShortDate } from "@/src/lib/text/calendar";
+import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
+import { fetchStoreTimezone } from "@/src/lib/reports/queries";
+import { storeDayKey } from "@/src/lib/sales/historyView";
+import { invoiceDateFieldValue } from "@/src/lib/stock/receive";
 import { validInvoiceDate } from "@/supabase/functions/_shared/invoiceParse";
 import { InvoicePhotos } from "@/src/components/stock/InvoicePhotos";
 import { createSupplier, fetchSuppliers, type Supplier } from "@/src/lib/stock/queries";
@@ -352,7 +358,11 @@ function InvoiceReview({ initialDraft }: { initialDraft: InvoiceDraft }) {
           </Text>
         ))}
       </View>
-      {!!draft.invoice_date && <Text>{isolateBidi(draft.invoice_date)}</Text>}
+      {!!draft.invoice_date && (
+        <Text>
+          {isolateBidi(formatShortDate(draft.invoice_date, i18n.language) || draft.invoice_date)}
+        </Text>
+      )}
       {draft.flags.map((flag) => (
         <Text key={flag} style={styles.warning}>
           {t("invoices." + flag)}
@@ -943,7 +953,16 @@ function InvoiceHeader({
   const [number, setNumber] = useState(
     draft.invoice_number ?? draft.extraction?.invoice_number ?? ""
   );
-  const [date, setDate] = useState(draft.invoice_date ?? "");
+  const [date, setDate] = useState(invoiceDateFieldValue(draft.invoice_date));
+  // The store's day, not the device's, for the calendar's maximum and Today.
+  const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  useEffect(() => {
+    Promise.resolve(fetchStoreTimezone())
+      .then(setTimeZone)
+      .catch(() => {});
+  }, []);
+  const today = storeDayKey(new Date().toISOString(), timeZone);
+  const dateInvalid = date.trim() !== "" && !validInvoiceDate(date.trim());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
@@ -1059,12 +1078,22 @@ function InvoiceHeader({
         onChange={setNumber}
         disabled={saving}
       />
-      <InvoiceInput
+      <DateField
         label={t("invoices.invoiceDate")}
         value={date}
-        onChange={setDate}
+        onChange={(next) => {
+          setDate(next);
+          if (error === "invoices.invalidDate") setError("");
+        }}
+        today={today}
+        max={today}
+        clearable
+        invalid={dateInvalid}
         disabled={saving}
       />
+      {dateInvalid && error !== "invoices.invalidDate" && (
+        <Text style={styles.error}>{t("invoices.invalidDate")}</Text>
+      )}
       {error !== "" && (
         <Text accessibilityRole="alert" style={styles.error}>
           {t(error)}

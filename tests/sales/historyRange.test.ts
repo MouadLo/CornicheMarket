@@ -1,6 +1,9 @@
 import { resolveRange } from "../../src/lib/reports/ranges";
 import {
+  dayRange,
+  dayRangeParams,
   historyRangeParams,
+  singleDayOf,
   lastInstantOf,
   nonVoidedTotalCents,
   parseHistoryRange,
@@ -87,5 +90,40 @@ describe("fetchRecentSales range", () => {
     await fetchRecentSales(50, 0);
     await fetchRecentSales(50, 0, null);
     expect(calls.filter(([name]) => name === "gte" || name === "lt")).toEqual([]);
+  });
+});
+
+describe("dayRange", () => {
+  it("is the store day, half-open, in the store's zone", () => {
+    // Lagos is UTC+1 all year. Casablanca's rules differ between time-zone
+    // database versions, so its offset would make this test machine-dependent.
+    const range = dayRange("2026-11-18", "Africa/Lagos");
+    expect(range?.from.toISOString()).toBe("2026-11-17T23:00:00.000Z");
+    expect(range?.to.toISOString()).toBe("2026-11-18T23:00:00.000Z");
+    const tokyo = dayRange("2026-11-18", "Asia/Tokyo");
+    expect(tokyo?.from.toISOString()).toBe("2026-11-17T15:00:00.000Z");
+    expect(tokyo?.to.toISOString()).toBe("2026-11-18T15:00:00.000Z");
+    const newYork = dayRange("2026-11-18", "America/New_York");
+    expect(newYork?.from.toISOString()).toBe("2026-11-18T05:00:00.000Z");
+  });
+
+  it("matches the report's own single-day range", () => {
+    const report = resolveRange("custom", "2026-06-15", "2026-06-15", "Africa/Casablanca");
+    expect(dayRangeParams("2026-06-15", "Africa/Casablanca")).toEqual(historyRangeParams(report));
+  });
+
+  it("rejects things that are not a date", () => {
+    expect(dayRange("", "UTC")).toBeNull();
+    expect(dayRange("2026-02-31", "UTC")).toBeNull();
+    expect(dayRangeParams("18/11/2026", "UTC")).toBeNull();
+  });
+
+  it("round-trips through singleDayOf, and is empty for longer ranges", () => {
+    const key = (iso: string, tz: string) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(iso));
+    expect(singleDayOf(dayRange("2026-11-18", "Asia/Tokyo"), "Asia/Tokyo", key)).toBe("2026-11-18");
+    expect(singleDayOf(null, "UTC", key)).toBe("");
+    const two = resolveRange("custom", "2026-11-17", "2026-11-18", "UTC");
+    expect(singleDayOf(two, "UTC", key)).toBe("");
   });
 });

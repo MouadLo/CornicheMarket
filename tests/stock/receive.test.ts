@@ -5,7 +5,11 @@
  * real calendar dates only, DD/MM/YYYY accepted, and a bad date makes the
  * line invalid instead of quietly dropping the expiry.
  */
-import { buildReceivePayload, normalizeExpiryDate } from "../../src/lib/stock/receive";
+import {
+  buildReceivePayload,
+  invoiceDateFieldValue,
+  normalizeExpiryDate,
+} from "../../src/lib/stock/receive";
 
 describe("normalizeExpiryDate", () => {
   it("treats an empty field as no expiry", () => {
@@ -180,5 +184,24 @@ describe("buildReceivePayload names the lines it cannot save (O3)", () => {
       },
     ]);
     expect(invalid).toEqual([]);
+  });
+});
+
+describe("invoiceDateFieldValue", () => {
+  it("keeps YYYY-MM-DD and converts DD/MM/YYYY", () => {
+    expect(invoiceDateFieldValue("2026-03-31")).toBe("2026-03-31");
+    expect(invoiceDateFieldValue("31/03/2026")).toBe("2026-03-31");
+    expect(invoiceDateFieldValue(" 5/3/2026 ")).toBe("2026-03-05");
+  });
+
+  it("is empty for nothing", () => {
+    expect(invoiceDateFieldValue(null)).toBe("");
+    expect(invoiceDateFieldValue(undefined)).toBe("");
+    expect(invoiceDateFieldValue("  ")).toBe("");
+  });
+
+  it("keeps what it cannot read so the owner sees it", () => {
+    expect(invoiceDateFieldValue("31/02/2026")).toBe("31/02/2026");
+    expect(invoiceDateFieldValue("March 3rd")).toBe("March 3rd");
   });
 });
