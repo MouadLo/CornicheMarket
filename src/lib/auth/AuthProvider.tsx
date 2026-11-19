@@ -41,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  // Whose profile the loaded state is for. Without it, the render where a
+  // session first arrives still carried "loaded" from the signed-out check
+  // (no user, nothing to fetch), so for that one render the app saw a signed-in
+  // user with no profile -- a cashier -- and sent an owner who had just
+  // reloaded an owner page to Vente.
+  const [profileFor, setProfileFor] = useState<string | null | undefined>(undefined);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileRetry, setProfileRetry] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null);
       setProfileError(null);
       setProfileLoaded(true);
+      setProfileFor(null);
       return;
     }
 
@@ -128,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(data as Profile);
           }
           setProfileLoaded(true);
+          setProfileFor(userId);
         }
       });
 
@@ -136,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId, profileRetry]);
 
-  const loading = !sessionLoaded || !profileLoaded;
+  const loading = !sessionLoaded || !profileLoaded || profileFor !== userId;
 
   // Counts only while loading. It used to start once at mount and stay "timed
   // out" for good after ten seconds, so any later moment of loading (such as

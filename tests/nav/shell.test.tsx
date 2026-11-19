@@ -11,6 +11,7 @@ import { __resetForTests } from "../../src/lib/dialog/store";
 jest.setTimeout(15_000);
 
 let mockPathname = "/sell";
+let mockLoading = false;
 let mockProfile: { id: string; role: "owner" | "cashier"; full_name: string } | null = null;
 let mockSync = {
   online: true,
@@ -65,7 +66,7 @@ jest.mock("react-native-svg", () => {
   };
 });
 jest.mock("../../src/lib/auth/AuthProvider", () => ({
-  useAuth: () => ({ profile: mockProfile, signOut: jest.fn() }),
+  useAuth: () => ({ profile: mockProfile, loading: mockLoading, signOut: jest.fn() }),
 }));
 jest.mock("../../src/lib/sales/useSaleSync", () => ({
   useSaleSync: () => ({ ...mockSync, sync: jest.fn(), refreshPending: jest.fn() }),
@@ -128,6 +129,7 @@ const cashier = { id: "c", role: "cashier" as const, full_name: "Salma" };
 
 beforeEach(() => {
   mockPathname = "/sell";
+  mockLoading = false;
   mockProfile = cashier;
   mockSync = { online: true, pending: 0, stuck: 0, syncing: false, lastError: null };
   mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
@@ -251,6 +253,45 @@ describe("the route guard in the layout", () => {
     const r = await render(<AppLayout />);
     expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
     expect(r.root.findAllByType("Slot" as never)).toHaveLength(1);
+  });
+
+  it("does not decide while auth is loading, then keeps the owner on the page", async () => {
+    mockLoading = true;
+    mockProfile = null;
+    mockPathname = "/stock-in/invoice/abc";
+    const r = await render(<AppLayout />);
+    expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
+    // The page stays mounted (hidden under the spinner): on web a layout
+    // without a Slot makes the router drop the reloaded URL.
+    expect(r.root.findAllByType("Slot" as never)).toHaveLength(1);
+    expect(r.root.findAll((n) => n.props.testID === "app-auth-loading").length).toBeGreaterThan(0);
+
+    mockLoading = false;
+    mockProfile = owner;
+    await act(async () => r.update(<AppLayout />));
+    expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
+    expect(r.root.findAllByType("Slot" as never)).toHaveLength(1);
+    expect(r.root.findAll((n) => n.props.testID === "app-auth-loading")).toHaveLength(0);
+  });
+
+  it("sends a loaded cashier away from an owner URL", async () => {
+    mockLoading = true;
+    mockProfile = null;
+    mockPathname = "/reports";
+    const r = await render(<AppLayout />);
+    expect(r.root.findAllByType("Redirect" as never)).toHaveLength(0);
+    mockLoading = false;
+    mockProfile = cashier;
+    await act(async () => r.update(<AppLayout />));
+    expect(r.root.findByType("Redirect" as never).props.href).toBe("/(app)/sell");
+  });
+
+  it("finished loading with no profile falls back to the cashier view, never a spinner", async () => {
+    mockLoading = false;
+    mockProfile = null;
+    mockPathname = "/reports";
+    const r = await render(<AppLayout />);
+    expect(r.root.findByType("Redirect" as never).props.href).toBe("/(app)/sell");
   });
 
   it("lets a cashier into Clients and Vente", async () => {

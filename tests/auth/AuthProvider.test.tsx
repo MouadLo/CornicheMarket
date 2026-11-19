@@ -215,3 +215,46 @@ describe("AuthProvider: returning to the tab keeps the screen", () => {
     expect(renders.at(-1)).toMatchObject({ loading: false, profile: null, session: null });
   });
 });
+
+describe("AuthProvider: a stored session on start", () => {
+  it("never reports a signed-in user as loaded before their profile arrives", async () => {
+    const { supabase } = jest.requireMock("../../src/lib/supabase/client") as {
+      supabase: { from: jest.Mock };
+    };
+    let resolveProfile: (value: unknown) => void = () => {};
+    supabase.from.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            new Promise((resolve) => {
+              resolveProfile = resolve;
+            }),
+        }),
+      }),
+    });
+    // The stored session arrives on its own, after the first (signed-out) pass.
+    mockGetSession.mockReturnValue(new Promise(() => {}));
+
+    const renders: ReturnType<typeof useAuth>[] = [];
+    await act(async () => {
+      create(
+        <AuthProvider>
+          <Probe onRender={(value) => renders.push(value)} />
+        </AuthProvider>
+      );
+    });
+    const emit = mockOnAuthStateChange.mock.calls.at(-1)![0] as (e: string, s: unknown) => void;
+    await act(async () => {
+      emit("INITIAL_SESSION", { user: { id: "owner-1" } });
+    });
+    await act(async () => {
+      resolveProfile({ data: { id: "owner-1", full_name: "Owner", role: "owner" }, error: null });
+    });
+
+    // The bug: one render had loading=false with a session and no profile,
+    // which the route guard read as a cashier and sent the owner to Vente.
+    const premature = renders.filter((r) => !r.loading && r.session && !r.profile);
+    expect(premature).toHaveLength(0);
+    expect(renders.at(-1)).toMatchObject({ loading: false, profile: { role: "owner" } });
+  });
+});
