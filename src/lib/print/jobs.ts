@@ -1,4 +1,5 @@
 import type { ReceiptLine, ReceiptModel } from "@/src/lib/sales/receipt";
+import type { RefundMethod } from "@/src/lib/sales/returns";
 
 // Pure helpers for the shared shop printer. A print job carries the receipt as
 // DATA (a ReceiptModel in JSON), never HTML. The station validates it strictly
@@ -73,6 +74,26 @@ function parseLine(value: unknown): ReceiptLine | null {
   };
 }
 
+const REFUND_METHODS: readonly RefundMethod[] = ["cash", "card", "credit"];
+
+// The "after returns" footer of an updated receipt. Absent or null means a
+// plain receipt; anything present but malformed makes the whole job invalid.
+function parseAfterReturns(value: unknown): NonNullable<ReceiptModel["afterReturns"]> | null {
+  if (!isObject(value)) return null;
+  const { originalTotalCents, refundedCents, refundMethods, lastReturnAt } = value;
+  if (!cents(originalTotalCents) || !cents(refundedCents)) return null;
+  if (refundedCents > originalTotalCents) return null;
+  if (!text(lastReturnAt, 40) || Number.isNaN(new Date(lastReturnAt).getTime())) return null;
+  if (!Array.isArray(refundMethods) || refundMethods.length > REFUND_METHODS.length) return null;
+  const methods: RefundMethod[] = [];
+  for (const method of refundMethods) {
+    if (!REFUND_METHODS.includes(method as RefundMethod)) return null;
+    if (methods.includes(method as RefundMethod)) return null;
+    methods.push(method as RefundMethod);
+  }
+  return { originalTotalCents, refundedCents, refundMethods: methods, lastReturnAt };
+}
+
 // Copies the known fields one by one: anything else in the JSON is dropped.
 export function parseReceiptJob(json: unknown): ReceiptModel | null {
   if (!isObject(json)) return null;
@@ -93,7 +114,12 @@ export function parseReceiptJob(json: unknown): ReceiptModel | null {
     if (!line) return null;
     lines.push(line);
   }
-  return {
+  let afterReturns: ReceiptModel["afterReturns"];
+  if (v.afterReturns !== undefined && v.afterReturns !== null) {
+    afterReturns = parseAfterReturns(v.afterReturns);
+    if (!afterReturns) return null;
+  }
+  const model: ReceiptModel = {
     shopName: v.shopName,
     receiptNumber: v.receiptNumber,
     occurredAt: v.occurredAt,
@@ -107,6 +133,8 @@ export function parseReceiptJob(json: unknown): ReceiptModel | null {
     cashReceivedCents: v.cashReceivedCents,
     changeCents: v.changeCents,
   };
+  if (afterReturns) model.afterReturns = afterReturns;
+  return model;
 }
 
 export function isStale(createdAt: string, now: number = Date.now()): boolean {

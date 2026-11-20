@@ -201,6 +201,28 @@ describe("print station screen (web)", () => {
     expect(finish).toHaveBeenCalledWith("job-1", true);
   });
 
+  it("prints the after-returns footer of an updated receipt", async () => {
+    const updated = {
+      ...receipt,
+      afterReturns: {
+        originalTotalCents: 1900,
+        refundedCents: 1200,
+        refundMethods: ["cash"],
+        lastReturnAt: "2026-11-18T09:30:00.000Z",
+      },
+    };
+    claimNext.mockResolvedValueOnce(job({ language: "fr", receipt: updated }));
+    await mount();
+    await tick(0);
+    expect(print).toHaveBeenCalledTimes(1);
+    const html = print.mock.calls[0][0];
+    expect(html).toContain("fr:receipt.updatedAfterReturn");
+    expect(html).toContain("fr:receipt.originalTotal");
+    expect(html).toContain("19.00");
+    expect(html).toContain("-12.00");
+    expect(finish).toHaveBeenCalledWith("job-1", true);
+  });
+
   it("does not overlap ticks: the next claim waits for the print to end", async () => {
     let endPrint: () => void = () => {};
     print.mockImplementationOnce(() => new Promise<void>((resolve) => (endPrint = resolve)));
