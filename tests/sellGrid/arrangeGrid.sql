@@ -35,6 +35,9 @@ begin
   select id into main_tab from public.sell_grid_tabs where category_id = '44000000-0000-0000-0000-0000000000c1';
   select id into other_tab from public.sell_grid_tabs where category_id = '44000000-0000-0000-0000-0000000000c2';
   select id into fav_tab from public.sell_grid_tabs where kind = 'favorites';
+  -- The local seed puts a few products on Favoris; start from an empty tab so
+  -- the order checks below see only this test's tiles (rolled back at the end).
+  delete from public.sell_grid_tiles where tab_id = fav_tab;
 
   -- A coloured tile with a short label on the category tab, and two favourites.
   insert into public.sell_grid_tiles (tab_id, product_id, position, color, short_label, pinned)

@@ -71,33 +71,37 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange, onA
       onLayout={(e: LayoutChangeEvent) => setPaneWidth(e.nativeEvent.layout.width)}
     >
       <View style={styles.tabsRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabsScroll}
-          contentContainerStyle={styles.tabs}
-          accessibilityLabel={t("sell.grid.tabs")}
-        >
-          {tabs.map((tab) => {
-            const on = tab.id === current.id;
-            return (
-              <Pressable
-                key={tab.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                onPress={() => select(tab.id)}
-                style={[styles.tab, on && styles.tabOn]}
-              >
-                {tab.kind === "favorites" ? (
-                  <Icon name="star" size={18} color={on ? colors.white : colors.sand500} />
-                ) : null}
-                <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
-                  {isolateBidi(tab.label)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {/* Takes the row's spare width (and gives it up), so the arrange button
+            always fits; the strip itself still never shrinks in height. */}
+        <View style={styles.tabsWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsScroll}
+            contentContainerStyle={styles.tabs}
+            accessibilityLabel={t("sell.grid.tabs")}
+          >
+            {tabs.map((tab) => {
+              const on = tab.id === current.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => select(tab.id)}
+                  style={[styles.tab, on && styles.tabOn]}
+                >
+                  {tab.kind === "favorites" ? (
+                    <Icon name="star" size={18} color={on ? colors.white : colors.sand500} />
+                  ) : null}
+                  <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
+                    {isolateBidi(tab.label)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
         {onArrange ? (
           <Pressable
             accessibilityRole="button"
@@ -166,22 +170,12 @@ export function Tile({
   const level = stockLevel(product.stock_quantity, product.low_stock_threshold);
   const stock = kg ? product.stock_quantity.toFixed(1) : String(product.stock_quantity);
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        count > 0
-          ? t("sell.grid.tileLabel", { name: product.name, price, count })
-          : t("sell.grid.tileLabelEmpty", { name: product.name, price })
-      }
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        { width, backgroundColor: palette.tint },
-        pressed && styles.tilePressed,
-      ]}
-    >
+  const label =
+    count > 0
+      ? t("sell.grid.tileLabel", { name: product.name, price, count })
+      : t("sell.grid.tileLabelEmpty", { name: product.name, price });
+  const content = (
+    <>
       <View style={[styles.strip, { backgroundColor: palette.strip }]} />
       <View style={styles.tileTop}>
         <Text style={[styles.name, namePad(language)]} numberOfLines={2}>
@@ -241,6 +235,34 @@ export function Tile({
           </Text>
         </View>
       </View>
+    </>
+  );
+
+  // Arrange mode draws the tile with nothing to tap. A disabled Pressable would
+  // be a disabled <button> on web, and browsers deliver no mouse presses to it
+  // or anything inside it, so the drag around it would never start.
+  if (!onPress) {
+    return (
+      <View
+        accessibilityLabel={label}
+        style={[styles.tile, { width, backgroundColor: palette.tint }]}
+      >
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        { width, backgroundColor: palette.tint },
+        pressed && styles.tilePressed,
+      ]}
+    >
+      {content}
     </Pressable>
   );
 }

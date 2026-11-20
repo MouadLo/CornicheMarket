@@ -186,7 +186,7 @@ export function ArrangeGrid({ initial, onSave, onClose }: Props) {
       <View style={styles.tabTools}>
         <RoundButton
           label={t("sell.grid.tabEarlier", { name: current.label })}
-          icon="back"
+          icon="chevronBack"
           disabled={tabIndex <= 0}
           onPress={() => edit((tabs) => moveTab(tabs, tabIndex, tabIndex - 1))}
         />
@@ -237,11 +237,15 @@ export function ArrangeGrid({ initial, onSave, onClose }: Props) {
                 onEnd={(dx, dy) => finishDrag(tile.key, dx, dy)}
                 onCancel={() => setDrag(null)}
               >
-                <Tile tile={tile} width={tileWidth} count={0} />
+                {/* A picture of the tile only: on web even a disabled Pressable
+                    claims the press, so the drag would never start. */}
+                <View pointerEvents="none">
+                  <Tile tile={tile} width={tileWidth} count={0} />
+                </View>
                 <View style={styles.tileTools}>
                   <MiniButton
                     label={t("sell.grid.moveEarlier", { name: tile.product.name })}
-                    icon="back"
+                    icon="chevronBack"
                     disabled={tile.hidden || index === 0}
                     onPress={() => edit((tabs) => moveTile(tabs, current.id, index, index - 1))}
                   />
@@ -275,7 +279,7 @@ function RoundButton({
   onPress,
 }: {
   label: string;
-  icon: "back" | "chevron" | "eye" | "eyeOff";
+  icon: "chevronBack" | "chevron" | "eye" | "eyeOff";
   disabled?: boolean;
   onPress: () => void;
 }) {
@@ -300,7 +304,7 @@ function MiniButton({
   onPress,
 }: {
   label: string;
-  icon: "back" | "chevron" | "eye" | "eyeOff";
+  icon: "chevronBack" | "chevron" | "eye" | "eyeOff";
   disabled?: boolean;
   onPress: () => void;
 }) {
@@ -483,7 +487,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-evenly",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.85)",
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     borderBottomLeftRadius: radius.control,
     borderBottomRightRadius: radius.control,
   },
