@@ -7,18 +7,23 @@ import {
   CAMERA_CONSTRAINTS,
   classifyCameraError,
   createCameraController,
+  preferContinuousFocus,
   type CameraErrorKind,
 } from "@/src/lib/scanner/cameraSession";
+import { AIM_BOX } from "@/src/lib/scanner/frameCrop";
 import { readScanEnv } from "@/src/lib/scanner/scanMode";
 import { createFrameDecoder } from "@/src/lib/scanner/webDecoder";
-import { createScanFilter } from "@/src/lib/scanner/webScanRules";
+import { createScanFilter } from "@/src/lib/scanner/scanFilter";
 import { Text } from "@/src/theme/Text";
 import { colors, radius } from "@/src/theme/tokens";
 
 import type { CameraBarcodeViewProps } from "./CameraBarcodeView";
 
-// Decode a few times a second, not every frame: the phone stays responsive.
-const DECODE_INTERVAL_MS = 150;
+// Pause between two decodes. The browser's own detector works off the main
+// thread and is fast; zxing runs on it, so it leaves the page a little more
+// room. Both read about 10 frames a second, enough to catch a code as it
+// passes without heating the phone.
+const DECODE_PAUSE_MS = { native: 60, zxing: 80 } as const;
 
 const ERROR_KEYS: Record<CameraErrorKind, string> = {
   denied: "barcodeScanner.webDenied",
@@ -74,6 +79,9 @@ export function CameraBarcodeView({ onBarcode, onClose, children }: CameraBarcod
         if (dead || !stream || !video) return;
         video.srcObject = stream;
         await video.play().catch(() => {});
+        const tracks = (stream as unknown as MediaStream).getVideoTracks?.() ?? [];
+        void preferContinuousFocus(tracks[0] as never);
+        const pause = DECODE_PAUSE_MS[decoder.kind];
 
         const tick = async () => {
           if (dead) return;
@@ -85,7 +93,7 @@ export function CameraBarcodeView({ onBarcode, onClose, children }: CameraBarcod
           } catch {
             // one bad frame is not an error
           }
-          if (!dead) timer = setTimeout(tick, DECODE_INTERVAL_MS);
+          if (!dead) timer = setTimeout(tick, pause);
         };
         tick();
       } catch (e) {
@@ -136,9 +144,9 @@ export function CameraBarcodeView({ onBarcode, onClose, children }: CameraBarcod
 const styles = StyleSheet.create({
   aimWrap: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   aim: {
-    width: "78%",
-    maxWidth: 420,
-    aspectRatio: 1.7,
+    width: `${AIM_BOX.widthRatio * 100}%`,
+    maxWidth: AIM_BOX.maxWidth,
+    aspectRatio: AIM_BOX.aspect,
     borderWidth: 3,
     borderColor: colors.white,
     borderRadius: radius.control,

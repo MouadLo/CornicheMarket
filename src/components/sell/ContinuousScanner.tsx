@@ -1,12 +1,12 @@
-import { useRef, useState } from "react";
-import { Modal, Platform, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Modal, StyleSheet, View } from "react-native";
 
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { CameraBarcodeView } from "@/src/components/scanner/CameraBarcodeView";
 import { useScanFeedback } from "@/src/lib/sales/scanFeedback";
-import { shouldAcceptScan, type LastScan, type ScanOutcome } from "@/src/lib/sales/scanRules";
+import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 
@@ -21,17 +21,11 @@ type Props = {
 export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
   const { t } = useTranslation();
   const [feed, setFeed] = useState<string[]>([]);
-  const lastScan = useRef<LastScan>(null);
   const feedback = useScanFeedback(visible);
 
   const handleScan = async (code: string) => {
-    const now = Date.now();
-    // Window starts at the last ACCEPTED scan; see shouldAcceptScan. On web the
-    // camera view already holds a code until it has left the frame, so a
-    // product swapped for an identical one is not swallowed by this window.
-    if (Platform.OS !== "web" && !shouldAcceptScan(lastScan.current, code, now)) return;
-    lastScan.current = { code, at: now };
-
+    // The camera view hands over a code once per item: it holds a code until
+    // it has left the frame (see createScanFilter), on every platform.
     let outcome: ScanOutcome;
     try {
       outcome = await onScanned(code);
@@ -44,7 +38,6 @@ export function ContinuousScanner({ visible, onClose, onScanned }: Props) {
 
   const close = () => {
     setFeed([]);
-    lastScan.current = null;
     onClose();
   };
 

@@ -12,7 +12,7 @@ const mockStop = jest.fn();
 jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 jest.mock("../../src/lib/scanner/scanMode", () => ({ readScanEnv: () => mockEnv }));
 jest.mock("../../src/lib/scanner/webDecoder", () => ({
-  createFrameDecoder: async () => ({ decode: async () => null }),
+  createFrameDecoder: async () => ({ kind: "native", decode: async () => null }),
 }));
 jest.mock("../../src/lib/scanner/cameraSession", () => {
   const actual = jest.requireActual("../../src/lib/scanner/cameraSession");

@@ -1,8 +1,10 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { StyleSheet, View } from "react-native";
 
 import { BigButton } from "@/src/components/BigButton";
+import { normalizeFormat } from "@/src/lib/scanner/barcode";
+import { createScanFilter } from "@/src/lib/scanner/scanFilter";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
 
@@ -17,7 +19,9 @@ export type CameraBarcodeViewProps = {
   children?: ReactNode;
 };
 
-// Native camera: expo-camera does the decoding and the permission flow.
+// Native camera: expo-camera does the decoding and the permission flow. It
+// reports a code many times a second while it is in view; the scan filter
+// turns that into one scan per item (see createScanFilter).
 export function CameraBarcodeView({
   onBarcode,
   onClose,
@@ -25,6 +29,8 @@ export function CameraBarcodeView({
   children,
 }: CameraBarcodeViewProps) {
   const [permission, requestPermission] = useCameraPermissions();
+  const filter = useRef<ReturnType<typeof createScanFilter> | null>(null);
+  if (!filter.current) filter.current = createScanFilter();
 
   if (!permission?.granted) {
     return (
@@ -44,7 +50,13 @@ export function CameraBarcodeView({
         barcodeScannerSettings={{
           barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
         }}
-        onBarcodeScanned={({ data }) => onBarcode(data)}
+        onBarcodeScanned={({ data, type }) => {
+          const code = filter.current?.push(
+            { text: data, format: normalizeFormat(type) },
+            Date.now()
+          );
+          if (code) onBarcode(code);
+        }}
       />
       {children}
     </>
