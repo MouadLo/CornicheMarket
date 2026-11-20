@@ -1,5 +1,5 @@
 import { Chip } from "@/src/components/ui/Chip";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal, StyleSheet, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -19,11 +19,13 @@ import {
 import {
   bulkAdjustSellingPrice,
   fetchBulkPriceTargets,
+  fetchRecentPriceChanges,
   type Category,
 } from "@/src/lib/products/queries";
 import { colors, radius } from "@/src/theme/tokens";
 import { Text } from "@/src/theme/Text";
 import { isolateLtr } from "@/src/lib/text/bidi";
+import { undoPriceChangeWithConfirm } from "@/src/lib/products/undoPriceChangeFlow";
 
 type Props = {
   visible: boolean;
@@ -32,12 +34,25 @@ type Props = {
   onApplied: () => void;
 };
 
+// A failed read here must never block the price change itself.
+async function latestBatch() {
+  try {
+    return (await fetchRecentPriceChanges(1))[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function BulkPriceModal({ visible, categories, onClose, onApplied }: Props) {
   const { t, i18n } = useTranslation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [percent, setPercent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The undo toast outlives this render; it must refresh the list the screen
+  // has NOW, not the one from when the change was applied.
+  const onUndoneRef = useRef(onApplied);
+  onUndoneRef.current = onApplied;
   const percentValue = Number(percent.replace(",", "."));
   const valid = validBulkPercent(percentValue);
   const scope = categoryId
@@ -48,8 +63,7 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
       )
     : t("products.bulkAll");
 
-  // Changing prices touches every till at once and has no undo, so the owner
-  // first sees how many products change, real before/after prices, and how
+  // Changing prices touches every till at once, so the owner first sees how many products change, real before/after prices, and how
   // many would sell below their buying price.
   const handleApply = async () => {
     if (submitting || !valid) return;
@@ -90,8 +104,28 @@ export function BulkPriceModal({ visible, categories, onClose, onApplied }: Prop
         cancelLabel: t("common.cancel"),
       });
       if (!ok) return;
+      // bulkAdjustSellingPrice returns only a count; the batch it recorded is
+      // the newest one that was not there before.
+      const before = await latestBatch();
       const count = await bulkAdjustSellingPrice(categoryId, percentValue);
-      showToast({ text: t("products.bulkUpdated", { count }), tone: "success" });
+      const batch = await latestBatch();
+      const undoable = batch && batch.id !== before?.id && !batch.reverted_at ? batch : null;
+      showToast({
+        text: t("products.bulkUpdated", { count }),
+        tone: "success",
+        // A longer toast than usual: this is the one chance to take it back quickly.
+        duration: 10000,
+        action: undoable
+          ? {
+              label: t("products.priceUndoAction"),
+              onPress: () => {
+                void undoPriceChangeWithConfirm(undoable, t).then((result) => {
+                  if (result) onUndoneRef.current();
+                });
+              },
+            }
+          : undefined,
+      });
       setPercent("");
       onApplied();
     } catch (applyError) {

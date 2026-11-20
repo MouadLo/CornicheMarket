@@ -57,6 +57,10 @@ $$;
 insert into public.products (name, selling_price_cents, category_id)
   select 'Sub product', 1000, id from public.categories where name = 'Sub A1';
 
+-- (the bulk change is owner-only since migration 045)
+select set_config('request.jwt.claims',
+  json_build_object('sub', '00000000-0000-0000-0000-0000000000aa', 'role', 'authenticated')::text, true);
+
 do $$
 begin
   perform public.bulk_adjust_selling_price((select id from public.categories where name = 'Main A'), 10);

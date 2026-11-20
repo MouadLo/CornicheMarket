@@ -5,7 +5,12 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { BigButton } from "../../src/components/BigButton";
 import { BulkPriceModal } from "../../src/components/products/BulkPriceModal";
 import { confirm, showToast } from "../../src/lib/dialog/store";
-import { bulkAdjustSellingPrice, fetchBulkPriceTargets } from "../../src/lib/products/queries";
+import {
+  bulkAdjustSellingPrice,
+  fetchBulkPriceTargets,
+  fetchRecentPriceChanges,
+  undoPriceChange,
+} from "../../src/lib/products/queries";
 
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -16,7 +21,18 @@ jest.mock("../../src/lib/dialog/store", () => ({ confirm: jest.fn(), showToast: 
 jest.mock("../../src/lib/products/queries", () => ({
   fetchBulkPriceTargets: jest.fn(),
   bulkAdjustSellingPrice: jest.fn(),
+  fetchRecentPriceChanges: jest.fn(),
+  undoPriceChange: jest.fn(),
 }));
+
+const batch = (id: string) => ({
+  id,
+  created_at: "2026-11-20T10:00:00Z",
+  category_id: null,
+  percent: 5,
+  product_count: 3,
+  reverted_at: null,
+});
 
 const target = (name: string, price: number, cost: number | null) =>
   ({ name, selling_price_cents: price, current_cost_cents: cost }) as never;
@@ -34,6 +50,12 @@ beforeEach(() => {
       target("Lait", 1200, 1100),
     ]);
   jest.mocked(bulkAdjustSellingPrice).mockResolvedValue(3);
+  // Before the change the newest batch is "old"; after it, "new".
+  jest.mocked(fetchRecentPriceChanges).mockReset();
+  jest
+    .mocked(fetchRecentPriceChanges)
+    .mockResolvedValueOnce([batch("old")])
+    .mockResolvedValue([batch("new")]);
 });
 afterEach(() => act(() => tree?.unmount()));
 
@@ -131,4 +153,65 @@ it("says plainly when the failure is the connection", async () => {
   await apply();
   expect(JSON.stringify(tree.toJSON())).toContain("errors.network");
   expect(JSON.stringify(tree.toJSON())).not.toContain("Failed to fetch");
+});
+
+describe("undo from the success toast", () => {
+  const applyAndGetToast = async () => {
+    jest.mocked(confirm).mockResolvedValueOnce(true);
+    await open();
+    type("5");
+    await apply();
+    return jest.mocked(showToast).mock.calls[0][0];
+  };
+
+  it("offers Undo, asks how many products go back, then undoes and refreshes", async () => {
+    jest.mocked(undoPriceChange).mockResolvedValue({ restored: 3, skipped: 0 });
+    const toast = await applyAndGetToast();
+    expect(toast.action?.label).toBe("products.priceUndoAction");
+    expect(undoPriceChange).not.toHaveBeenCalled();
+
+    jest.mocked(confirm).mockResolvedValueOnce(true);
+    await act(async () => {
+      toast.action!.onPress();
+    });
+    const options = jest.mocked(confirm).mock.calls[1][0];
+    expect(options.tone).toBe("danger");
+    expect(options.message).toContain('"count":3');
+    expect(undoPriceChange).toHaveBeenCalledWith("new");
+    expect(showToast).toHaveBeenLastCalledWith(
+      expect.objectContaining({ text: 'products.priceUndoDone{"restored":3,"skipped":0}' })
+    );
+    expect(onApplied).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing when the owner declines the confirmation", async () => {
+    const toast = await applyAndGetToast();
+    jest.mocked(confirm).mockResolvedValueOnce(false);
+    await act(async () => {
+      toast.action!.onPress();
+    });
+    expect(undoPriceChange).not.toHaveBeenCalled();
+    expect(onApplied).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the skipped products in the result message", async () => {
+    jest.mocked(undoPriceChange).mockResolvedValue({ restored: 2, skipped: 1 });
+    const toast = await applyAndGetToast();
+    jest.mocked(confirm).mockResolvedValueOnce(true);
+    await act(async () => {
+      toast.action!.onPress();
+    });
+    expect(showToast).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        text: 'products.priceUndoDoneSkipped{"restored":2,"skipped":1}',
+      })
+    );
+  });
+
+  it("offers no Undo when no new batch was recorded", async () => {
+    jest.mocked(fetchRecentPriceChanges).mockReset();
+    jest.mocked(fetchRecentPriceChanges).mockResolvedValue([batch("old")]);
+    const toast = await applyAndGetToast();
+    expect(toast.action).toBeUndefined();
+  });
 });
