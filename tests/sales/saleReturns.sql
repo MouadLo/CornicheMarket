@@ -565,4 +565,132 @@ begin
   reset role;
 end $$;
 
+
+-- ---------------------------------------------------------------------------
+-- Second part (the day closed above is reopened for it; everything is still
+-- rolled back): the debt-limit review after a credit return, and the
+-- customer's credit returns for the Clients timeline.
+-- ---------------------------------------------------------------------------
+select set_config('request.jwt.claims', '', true);
+delete from public.day_closes;
+
+insert into public.products (id, name, selling_price_cents, current_cost_cents, stock_quantity)
+values ('20000000-0000-0000-0000-000000000014', 'Return limit item', 1000, 600, 1000);
+-- Limit L = 5000. Two customers, so both halves of the check start from "owes
+-- exactly L after a return" fresh.
+insert into public.customers (id, name, credit_limit_cents)
+values ('00000000-0000-0000-0000-0000000000e1', 'Limit client R', 5000),
+       ('00000000-0000-0000-0000-0000000000e2', 'Limit client R+1', 5000);
+-- Each owes exactly L: one credit sale of 5 x 1000, rung up by the owner.
+insert into public.sales (id, cashier_id, customer_id, payment_method, discount_cents, total_cents, occurred_at)
+values
+  ('30000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000e1', 'credit', 0, 5000, now()),
+  ('30000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000e2', 'credit', 0, 5000, now());
+insert into public.sale_items (id, sale_id, product_id, quantity, unit_price_cents, line_total_cents)
+values
+  ('40000000-0000-0000-0000-0000000000e2', '30000000-0000-0000-0000-0000000000b2', '20000000-0000-0000-0000-000000000014', 5, 1000, 5000),
+  ('40000000-0000-0000-0000-0000000000e3', '30000000-0000-0000-0000-0000000000b3', '20000000-0000-0000-0000-000000000014', 5, 1000, 5000);
+
+do $$
+declare
+  owner_id uuid := '00000000-0000-0000-0000-0000000000aa';
+  bb uuid := '00000000-0000-0000-0000-0000000000bb';
+  cc uuid := '00000000-0000-0000-0000-0000000000cc';
+  prod uuid := '20000000-0000-0000-0000-000000000014';
+  c1 uuid := '00000000-0000-0000-0000-0000000000e1';
+  c2 uuid := '00000000-0000-0000-0000-0000000000e2';
+  client uuid := '00000000-0000-0000-0000-0000000000d9';
+  sale_c uuid := '30000000-0000-0000-0000-0000000000c1';
+  sale_z uuid := '30000000-0000-0000-0000-0000000000b2';
+  n int;
+  v bigint;
+  r record;
+  new_sale uuid;
+begin
+  ------------------------------------------- debt limit after a credit return
+  perform pg_temp.as_user(owner_id);
+  -- Both owe exactly L (5000); each hands one unit (R = 1000) back on account.
+  perform public.record_sale_return('50000000-0000-0000-0000-0000000000e1', sale_z,
+    jsonb_build_array(jsonb_build_object('sale_item_id', '40000000-0000-0000-0000-0000000000e2', 'quantity', 1)),
+    'wrong_item', null, 'credit');
+  perform public.record_sale_return('50000000-0000-0000-0000-0000000000e2', '30000000-0000-0000-0000-0000000000b3',
+    jsonb_build_array(jsonb_build_object('sale_item_id', '40000000-0000-0000-0000-0000000000e3', 'quantity', 1)),
+    'wrong_item', null, 'credit');
+  select balance_cents into v from public.customer_balances where id = c1;
+  if v <> 4000 then raise exception 'balance after the return should be 4000, got %', v; end if;
+
+  -- A cashier credit sale of R (1000) takes the customer back to exactly L: fine.
+  perform pg_temp.as_user(bb);
+  new_sale := '30000000-0000-0000-0000-0000000000f2';
+  perform public.record_sale(new_sale, c1, 'credit', 0,
+    jsonb_build_array(jsonb_build_object('product_id', prod, 'quantity', 1, 'unit_price_cents', 1000)), now());
+  if (select needs_credit_review from public.sales where id = new_sale) then
+    raise exception 'a credit sale of R after a return of R was flagged over the limit';
+  end if;
+
+  -- R + 1 goes over L and is flagged.
+  new_sale := '30000000-0000-0000-0000-0000000000f3';
+  perform public.record_sale(new_sale, c2, 'credit', 0,
+    jsonb_build_array(jsonb_build_object('product_id', prod, 'quantity', 1, 'unit_price_cents', 1001)), now());
+  if not (select needs_credit_review from public.sales where id = new_sale) then
+    raise exception 'a credit sale of R+1 over the limit was not flagged';
+  end if;
+
+  ----------------------------------------------- the customer's credit returns
+  -- Sale C (client d9, credit) had 1 of 2 units returned on account earlier.
+  -- A cashier who did not ring it up can read it.
+  perform pg_temp.as_user(cc);
+  select count(*) into n from public.customer_credit_returns(client);
+  if n <> 1 then raise exception 'cashier cc should see 1 credit return, saw %', n; end if;
+  select * into r from public.customer_credit_returns(client);
+  if r.refund_cents <> 1000 or r.sale_id <> sale_c or r.item_count <> 1 or r.occurred_at is null then
+    raise exception 'wrong credit return row: %', r;
+  end if;
+  -- The shape has no cost, line or reason column.
+  if exists (
+    select 1 from information_schema.parameters
+    where specific_schema = 'public' and parameter_mode = 'OUT'
+      and specific_name like 'customer_credit_returns%'
+      and parameter_name in ('unit_cost_cents', 'reason_code', 'note', 'cost_cents')
+  ) then raise exception 'the credit returns function exposes more than it should'; end if;
+  -- Another customer sees nothing of it.
+  select count(*) into n from public.customer_credit_returns(c2) where sale_id = sale_c;
+  if n <> 0 then raise exception 'credit returns leaked across customers'; end if;
+  -- No session: refused.
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    perform * from public.customer_credit_returns(client);
+    raise exception 'an anonymous caller read credit returns';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform pg_temp.as_user(cc);
+    perform * from public.customer_credit_returns(client, 10, -1);
+    raise exception 'a negative offset was accepted';
+  exception when invalid_parameter_value then null;
+  end;
+
+  -- Only credit returns: add a cash-method return row to sale C and 104 more
+  -- credit ones (as the database owner), to check the filter and the page cap.
+  perform set_config('request.jwt.claims', '', true);
+  insert into public.sale_returns (id, sale_id, created_by, created_at, reason_code, refund_method, refund_cents)
+  values (gen_random_uuid(), sale_c, owner_id, now() + interval '1 hour', 'other', 'cash', 123);
+  insert into public.sale_returns (id, sale_id, created_by, created_at, reason_code, refund_method, refund_cents)
+  select gen_random_uuid(), sale_c, owner_id, now() - (g || ' minutes')::interval, 'other', 'credit', 0
+  from generate_series(1, 104) g;
+  perform pg_temp.as_user(cc);
+  if exists (select 1 from public.customer_credit_returns(client, 100) where refund_cents = 123) then
+    raise exception 'a cash refund was listed as a credit return';
+  end if;
+  select count(*) into n from public.customer_credit_returns(client, 1000);
+  if n <> 100 then raise exception 'the page size should be capped at 100, got %', n; end if;
+  select count(*) into n from public.customer_credit_returns(client, 100, 100);
+  if n <> 5 then raise exception 'the next page should hold the other 5 of 105, got %', n; end if;
+  select count(*) into n from public.customer_credit_returns(client, 0);
+  if n <> 1 then raise exception 'a limit below 1 should give 1 row, got %', n; end if;
+  -- Newest first.
+  select refund_cents into v from public.customer_credit_returns(client, 1, 0);
+  if v <> 1000 then raise exception 'the newest credit return should come first, got %', v; end if;
+end $$;
+
 rollback;

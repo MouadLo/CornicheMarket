@@ -1315,3 +1315,62 @@ begin
   return p_sale_id;
 end;
 $$;
+
+-------------------------------------------------------------------------------
+-- 9. A customer's credit returns, for every signed-in staff member
+-------------------------------------------------------------------------------
+-- The customer's credit timeline (Clients) must add up to customer_balances,
+-- which now nets credit returns off the debt. Same shape and auth check as
+-- customer_credit_sales (039): readable by the owner and any cashier whoever
+-- rang the sale up, and nothing else - no cost, no lines, no reason or note.
+-- Only returns refunded on the account (refund_method = 'credit') appear: a
+-- cash or card refund never touched the customer's balance.
+create function public.customer_credit_returns(
+  p_customer_id uuid,
+  p_limit integer default 30,
+  p_offset integer default 0
+)
+returns table (
+  id uuid,
+  created_at timestamptz,
+  refund_cents bigint,
+  sale_id uuid,
+  item_count bigint,
+  occurred_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_limit integer := least(greatest(coalesce(p_limit, 30), 1), 100);
+begin
+  if v_actor is null or not exists (
+    select 1 from public.profiles p where p.id = v_actor and p.role in ('owner', 'cashier')
+  ) then
+    raise exception 'Authenticated staff required' using errcode = '42501';
+  end if;
+  if p_offset is null or p_offset < 0 then
+    raise exception 'Offset must not be negative' using errcode = '22023';
+  end if;
+
+  return query
+  select sr.id,
+         sr.created_at,
+         sr.refund_cents,
+         sr.sale_id,
+         (select count(*) from public.sale_return_items ri where ri.return_id = sr.id),
+         s.occurred_at
+  from public.sale_returns sr
+  join public.sales s on s.id = sr.sale_id
+  where s.customer_id = p_customer_id
+    and sr.refund_method = 'credit'
+  order by sr.created_at desc, sr.id desc
+  limit v_limit offset p_offset;
+end;
+$$;
+
+revoke all on function public.customer_credit_returns(uuid, integer, integer) from public, anon;
+grant execute on function public.customer_credit_returns(uuid, integer, integer) to authenticated;
