@@ -22,6 +22,7 @@ import { LoadError } from "@/src/components/ui/LoadError";
 import { Panel } from "@/src/components/ui/Panel";
 import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { BulkPriceModal } from "@/src/components/products/BulkPriceModal";
+import { RecentPriceChangesPanel } from "@/src/components/products/RecentPriceChangesPanel";
 import { PRODUCT_ROW_HEIGHT, ProductRow } from "@/src/components/products/ProductRow";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { saveTextFile } from "@/src/lib/files";
@@ -66,6 +67,7 @@ export default function ProductsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
@@ -245,6 +247,11 @@ export default function ProductsScreen() {
     },
     { icon: "download", label: t("products.exportCsv"), onPress: () => void handleExport() },
     { icon: "tag", label: t("products.bulkPrice"), onPress: () => setBulkOpen(true) },
+    {
+      icon: "undo",
+      label: t("products.priceChangesRecent"),
+      onPress: () => setRecentOpen(true),
+    },
     {
       icon: "clipboard",
       label: t("products.manageCategories"),
@@ -438,6 +445,15 @@ export default function ProductsScreen() {
           load();
         }}
       />
+
+      {isOwner && (
+        <RecentPriceChangesPanel
+          visible={recentOpen}
+          categories={categories}
+          onClose={() => setRecentOpen(false)}
+          onUndone={load}
+        />
+      )}
     </View>
   );
 }

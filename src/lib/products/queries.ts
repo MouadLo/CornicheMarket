@@ -303,6 +303,42 @@ export async function bulkAdjustSellingPrice(
   return (data as number) ?? 0;
 }
 
+export type PriceChangeBatch = {
+  id: string;
+  created_at: string;
+  category_id: string | null;
+  percent: number;
+  product_count: number;
+  reverted_at: string | null;
+};
+
+// The latest bulk price changes, newest first (owner only: RLS returns nothing
+// to anyone else).
+export async function fetchRecentPriceChanges(limit = 10): Promise<PriceChangeBatch[]> {
+  const { data, error } = await supabase
+    .from("price_change_batches")
+    .select("id, created_at, category_id, percent, product_count, reverted_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as PriceChangeBatch[]).map((row) => ({
+    ...row,
+    percent: Number(row.percent),
+  }));
+}
+
+export type UndoPriceChangeResult = { restored: number; skipped: number };
+
+// Puts the old prices back, except on products edited since the change.
+export async function undoPriceChange(batchId: string): Promise<UndoPriceChangeResult> {
+  const { data, error } = await supabase.rpc("undo_price_change_batch", {
+    p_batch_id: batchId,
+  });
+  if (error) throw new Error(error.message);
+  const result = (data ?? {}) as Partial<UndoPriceChangeResult>;
+  return { restored: result.restored ?? 0, skipped: result.skipped ?? 0 };
+}
+
 // Export walks every page rather than relying on a single large request,
 // since PostgREST caps rows per response.
 export async function fetchAllProducts(isOwner: boolean): Promise<Product[]> {
