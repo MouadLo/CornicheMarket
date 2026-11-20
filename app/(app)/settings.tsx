@@ -22,7 +22,12 @@ import {
   getLastBackupTime,
 } from "@/src/lib/backup/export";
 import { centsToDisplay, parseMoneyToCents } from "@/src/lib/money";
-import { fetchDiscountLimits, updateDiscountLimits } from "@/src/lib/sales/queries";
+import {
+  fetchDiscountLimits,
+  fetchStoreCreditLimit,
+  updateDiscountLimits,
+  updateStoreCreditLimit,
+} from "@/src/lib/sales/queries";
 import { fetchStoreTimezone, updateStoreTimezone } from "@/src/lib/reports/queries";
 
 const LANGUAGES: { code: SupportedLang; labelKey: "languageFr" | "languageEn" | "languageAr" }[] = [
@@ -118,6 +123,14 @@ export default function Settings() {
           <Text style={styles.sectionLabel}>{t("settings.discountTitle")}</Text>
           <Text style={styles.hint}>{t("settings.discountHint")}</Text>
           <DiscountLimitsForm />
+        </View>
+      )}
+
+      {isOwner && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("settings.creditTitle")}</Text>
+          <Text style={styles.hint}>{t("settings.creditHint")}</Text>
+          <CreditLimitForm />
         </View>
       )}
 
@@ -300,6 +313,77 @@ function DiscountLimitsForm() {
       {error ? <InlineError reasonKey={error} /> : null}
       {message ? <Text style={styles.success}>{message}</Text> : null}
       <BigButton label={t("settings.discountSave")} onPress={save} disabled={saving} />
+    </View>
+  );
+}
+
+// The default debt limit for every customer (a cashier cannot put a credit
+// sale above it). One customer can have their own limit, set on their page.
+function CreditLimitForm() {
+  const { t } = useTranslation();
+  const [limit, setLimit] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoadFailed(false);
+    Promise.resolve()
+      .then(fetchStoreCreditLimit)
+      .then((cents) => {
+        setLimit(centsToDisplay(cents));
+        setLoaded(true);
+      })
+      .catch(() => setLoadFailed(true));
+  }, []);
+  useEffect(load, [load]);
+
+  const save = async () => {
+    setMessage(null);
+    const cents = parseMoneyToCents(limit);
+    if (cents === null || cents < 0) {
+      setError("settings.creditInvalid");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await updateStoreCreditLimit(cents);
+      setMessage(t("settings.creditSaved"));
+    } catch (e) {
+      setError(errorKeyOr(e, "errors.generic"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loadFailed) {
+    return (
+      <Banner
+        tone="warn"
+        text={t("settings.creditLoadError")}
+        action={{ label: t("common.retry"), onPress: load }}
+      />
+    );
+  }
+  if (!loaded) return <Text style={styles.hint}>{t("common.loading")}</Text>;
+
+  return (
+    <View style={styles.inviteForm}>
+      <Text style={styles.hint}>{t("settings.creditLimit")}</Text>
+      <TextInput
+        style={styles.input}
+        value={limit}
+        onChangeText={setLimit}
+        keyboardType="decimal-pad"
+        placeholder="300.00"
+        accessibilityLabel={t("settings.creditLimit")}
+      />
+      {error ? <InlineError reasonKey={error} /> : null}
+      {message ? <Text style={styles.success}>{message}</Text> : null}
+      <BigButton label={t("settings.creditSave")} onPress={save} disabled={saving} />
     </View>
   );
 }
