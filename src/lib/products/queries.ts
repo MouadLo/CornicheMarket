@@ -1,3 +1,4 @@
+import { barcodeVariants, pickByBarcode } from "@/src/lib/scanner/barcode";
 import { supabase } from "@/src/lib/supabase/client";
 import type { DiscountOverride } from "@/src/lib/sales/discountLimit";
 
@@ -205,39 +206,51 @@ export async function fetchProduct(id: string, isOwner: boolean): Promise<Produc
   return { current_cost_cents: null, ...(data as object) } as Product;
 }
 
-// The lookup a barcode scan needs: the ACTIVE product whose barcode equals
-// the scanned code, and nothing else. fetchProducts({search}) is a text
-// search (name contains OR barcode starts with), so using it for a scan could
-// add the wrong product for a short or partial code. This is the online
-// counterpart of the offline cache's exact `barcode === code` match.
+// The lookup a barcode scan needs: the ACTIVE product whose barcode is the
+// scanned code, and nothing else. fetchProducts({search}) is a text search
+// (name contains OR barcode starts with), so using it for a scan could add the
+// wrong product for a short or partial code. The scanned code is also tried in
+// its equivalent forms (a 12-digit UPC-A saved, the iPhone reads it with a
+// leading 0, see barcodeVariants), the exact text winning. The offline cache
+// does the same in findCachedByBarcode.
 export async function fetchProductByBarcode(
   barcode: string,
   isOwner: boolean
 ): Promise<Product | null> {
   const columns = isOwner ? OWNER_COLUMNS : LIST_COLUMNS;
+  const variants = barcodeVariants(barcode);
+  // Exact text only, never "starts with": in() over the equivalent forms.
   const { data, error } = await supabase
     .from(productsSource(isOwner))
     .select(columns)
-    .eq("barcode", barcode)
+    .in("barcode", variants)
     .eq("active", true)
-    .maybeSingle();
+    .limit(variants.length * 2);
 
   if (error) throw new Error(error.message);
-  return data ? ({ current_cost_cents: null, ...(data as object) } as Product) : null;
+  const row = pickByBarcode(barcode, (data ?? []) as unknown as { barcode: string | null }[]);
+  return row ? ({ current_cost_cents: null, ...(row as object) } as Product) : null;
 }
 
+// Any product (active or not) already using this barcode or an equivalent form
+// of it: the duplicate warning of the product form, and stock receiving.
 export async function findByBarcode(
   barcode: string,
   isOwner: boolean
 ): Promise<{ id: string; name: string } | null> {
+  const variants = barcodeVariants(barcode);
   const { data, error } = await supabase
     .from(productsSource(isOwner))
-    .select("id, name")
-    .eq("barcode", barcode)
-    .maybeSingle();
+    .select("id, name, barcode")
+    .in("barcode", variants)
+    .limit(variants.length * 2);
 
   if (error) throw new Error(error.message);
-  return (data as { id: string; name: string } | null) ?? null;
+  const row = pickByBarcode(
+    barcode,
+    (data ?? []) as unknown as { id: string; name: string; barcode: string | null }[]
+  );
+  return row ? { id: row.id, name: row.name } : null;
 }
 
 export async function createProduct(input: ProductInput): Promise<string> {

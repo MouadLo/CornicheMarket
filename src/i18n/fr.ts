@@ -483,6 +483,8 @@ const fr = {
       priceInvalid: "Le prix de vente « {{value}} » n'est pas un montant valide",
       barcodeExists: "Le code-barres {{value}} existe déjà",
       barcodeInFile: "Le code-barres {{value}} apparaît plusieurs fois dans ce fichier",
+      barcodeScientific:
+        "Le code-barres « {{value}} » a été abîmé par le tableur (format scientifique). Mettez la colonne en format Texte et exportez à nouveau",
       unitInvalid: "L'unité « {{value}} » doit être piece, kg ou pack",
       categoryUnknown: "Catégorie inconnue « {{value}} »",
       thresholdInvalid: "Le seuil de stock bas « {{value}} » n'est pas un nombre valide",

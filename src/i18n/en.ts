@@ -478,6 +478,8 @@ const en: Translations = {
       priceInvalid: 'Selling price "{{value}}" is not a valid amount',
       barcodeExists: "Barcode {{value}} already exists",
       barcodeInFile: "Barcode {{value}} appears more than once in this file",
+      barcodeScientific:
+        'Barcode "{{value}}" was damaged by the spreadsheet (scientific notation). Set the column to Text format and export again',
       unitInvalid: 'Unit "{{value}}" must be piece, kg or pack',
       categoryUnknown: 'Unknown category "{{value}}"',
       thresholdInvalid: 'Low stock threshold "{{value}}" is not a valid number',

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 
+import { cleanScannedCode } from "@/src/lib/scanner/barcode";
+
 // USB and Bluetooth barcode scanners act as keyboards: they "type" the code
 // far faster than a person can and finish with Enter. We buffer keystrokes
 // and only treat a burst as a scan, so ordinary typing is left alone.
@@ -91,7 +93,11 @@ export function useKeyboardWedge(
               restoreFieldValue(mark.field, mark.before);
             }
           }
-          handler.current(code);
+          // A scanner set to a US keyboard on an AZERTY PC types "&é\"'(..."
+          // for "12345...": cleaned back to digits, with stray spaces or
+          // control characters removed.
+          const cleaned = cleanScannedCode(code);
+          if (cleaned) handler.current(cleaned);
           return;
         }
         // Too short to be a scan: whatever was held is ordinary typing.

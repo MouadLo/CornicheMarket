@@ -220,3 +220,24 @@ describe("guarded: swallowed keys are held, never lost", () => {
     expect(field.value).toBe("1");
   });
 });
+
+describe("what a scan hands over", () => {
+  it("a US-layout scanner on an AZERTY PC: the digit row becomes digits again", () => {
+    mount(false);
+    // 6111245100135 as an AZERTY keyboard types it without Shift.
+    scan("-&&&é'(&àà&\"(", null);
+    expect(onScan).toHaveBeenCalledWith("6111245100135");
+  });
+
+  it("drops an AIM prefix the scanner is set to send", () => {
+    mount(false);
+    scan("]E06111245100135", null);
+    expect(onScan).toHaveBeenCalledWith("6111245100135");
+  });
+
+  it("guarded screens get the cleaned code too", () => {
+    mount(true);
+    scan("-&&&é'(&àà&\"(", makeField(""));
+    expect(onScan).toHaveBeenCalledWith("6111245100135");
+  });
+});

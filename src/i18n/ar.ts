@@ -475,6 +475,8 @@ const ar: Translations = {
       priceInvalid: 'سعر البيع "{{value}}" ليس مبلغاً صالحاً',
       barcodeExists: "الباركود {{value}} موجود بالفعل",
       barcodeInFile: "الباركود {{value}} يظهر أكثر من مرة في هذا الملف",
+      barcodeScientific:
+        "الباركود «{{value}}» أفسده جدول البيانات (صيغة علمية). اجعل العمود بصيغة نص وصدّر الملف من جديد",
       unitInvalid: 'الوحدة "{{value}}" يجب أن تكون piece أو kg أو pack',
       categoryUnknown: 'فئة غير معروفة "{{value}}"',
       thresholdInvalid: 'حد المخزون المنخفض "{{value}}" ليس رقماً صالحاً',

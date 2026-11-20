@@ -68,3 +68,22 @@ export function createCameraController<S extends StreamLike>(getStream: () => Pr
     isLive: () => current !== null,
   };
 }
+
+type FocusTrack = {
+  getCapabilities?: () => { focusMode?: string[] };
+  applyConstraints?: (constraints: { advanced: { focusMode: string }[] }) => Promise<void>;
+};
+
+// Asks the camera to keep refocusing as products come closer or go further
+// (Chrome on Android exposes this; Safari does not, and decides by itself).
+// Never fails: a camera that can't do it just keeps its default.
+export async function preferContinuousFocus(track: FocusTrack | null | undefined): Promise<void> {
+  try {
+    const modes = track?.getCapabilities?.().focusMode ?? [];
+    if (modes.includes("continuous")) {
+      await track?.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] });
+    }
+  } catch {
+    // keep the default focus
+  }
+}
