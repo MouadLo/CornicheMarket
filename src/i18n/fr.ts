@@ -1066,6 +1066,8 @@ const fr = {
     historySection: "Historique",
     timelineSale: "Vente à crédit",
     timelinePayment: "Paiement reçu",
+    timelineReturn: "Retour d'articles",
+    returnItems: "{{count}} article(s) rendu(s) sur son compte",
     voidedTag: "ANNULÉE",
     noHistory: "Aucune vente à crédit ni paiement pour ce client.",
     loadMore: "Voir plus",

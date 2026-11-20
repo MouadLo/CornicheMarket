@@ -1041,6 +1041,8 @@ const ar: Translations = {
     historySection: "السجل",
     timelineSale: "بيع بالدين",
     timelinePayment: "دفعة مستلمة",
+    timelineReturn: "إرجاع منتجات",
+    returnItems: "{{count}} منتج(ات) خُصمت من حسابه",
     voidedTag: "ملغاة",
     noHistory: "لا يوجد بيع بالدين ولا دفعات لهذا الزبون بعد.",
     loadMore: "عرض المزيد",

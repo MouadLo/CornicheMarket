@@ -1052,6 +1052,8 @@ const en: Translations = {
     historySection: "History",
     timelineSale: "Credit sale",
     timelinePayment: "Payment received",
+    timelineReturn: "Items returned",
+    returnItems: "{{count}} item(s) taken off their account",
     voidedTag: "VOIDED",
     noHistory: "No credit sale or payment for this customer yet.",
     loadMore: "Load more",

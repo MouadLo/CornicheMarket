@@ -404,6 +404,38 @@ export async function fetchCustomerCreditSales(
   }));
 }
 
+// One credit return as the customer history shows it: refunded on the account,
+// so it lowers the debt. No cost, lines or reason: every signed-in user gets
+// these rows.
+export type CustomerCreditReturn = {
+  id: string;
+  created_at: string;
+  refund_cents: number;
+  sale_id: string;
+  item_count: number;
+  occurred_at: string | null;
+};
+
+// One page of a customer's credit returns, newest first (customer_credit_returns,
+// migration 046; at most 100 a page).
+export async function fetchCustomerCreditReturns(
+  customerId: string,
+  limit: number,
+  offset: number
+): Promise<CustomerCreditReturn[]> {
+  const { data, error } = await supabase.rpc("customer_credit_returns", {
+    p_customer_id: customerId,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as CustomerCreditReturn[]).map((row) => ({
+    ...row,
+    refund_cents: Number(row.refund_cents),
+    item_count: Number(row.item_count),
+  }));
+}
+
 // One page of a customer's repayments, newest first. Every signed-in user may
 // read customer_payments (policy "staff read payments").
 export async function fetchCustomerPayments(
