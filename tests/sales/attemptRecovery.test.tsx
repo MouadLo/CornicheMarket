@@ -26,6 +26,8 @@ const mockPush = jest.fn();
 let mockProduct: Record<string, unknown> = {};
 const mockT = (key: string, options?: object) =>
   options ? `${keyEcho(key)}${JSON.stringify(options)}` : keyEcho(key);
+// Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
+jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => mockUuid() }));
 jest.mock("expo-router", () => ({ router: { push: (...a: unknown[]) => mockPush(...a) } }));
 jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT }) }));

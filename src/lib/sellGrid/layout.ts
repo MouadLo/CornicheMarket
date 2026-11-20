@@ -101,8 +101,9 @@ export function resolveGrid(input: {
     if (tab.kind === "favorites") {
       // Hand-picked only, in the owner's order. A pick whose product is gone or
       // inactive is simply not shown (the row is kept: reactivating restores it).
+      // A row the owner hid while arranging the grid stays a favourite but is not shown.
       tiles = rows.flatMap((row) => {
-        const product = productById.get(row.product_id);
+        const product = row.hidden ? undefined : productById.get(row.product_id);
         return product ? [tileFor(product, row)] : [];
       });
     } else {

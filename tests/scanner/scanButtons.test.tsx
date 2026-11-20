@@ -22,6 +22,8 @@ const DESKTOP: Env = { ...PHONE, coarsePointer: false };
 const NATIVE: Env = { ...DESKTOP, platform: "ios" };
 let mockEnv: Env = PHONE;
 
+// Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
+jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, o?: object) => (o ? `${key}${JSON.stringify(o)}` : key),

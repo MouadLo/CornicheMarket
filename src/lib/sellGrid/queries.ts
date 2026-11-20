@@ -1,3 +1,4 @@
+import type { ArrangementPayload } from "@/src/lib/sellGrid/arrange";
 import { supabase } from "@/src/lib/supabase/client";
 import type { GridCategory, GridTab, GridTile, TileColor } from "@/src/lib/sellGrid/layout";
 import {
@@ -166,4 +167,17 @@ export async function saveProductTileSettings(
   } catch (cause) {
     throw new TileSettingsError(cause);
   }
+}
+
+// ---- The owner's arrangement of the whole grid (O7), saved in one call ----
+
+// save_sell_grid_arrangement (migration 044): tab order and visibility, and the
+// order and hidden flag of the tiles of each tab arranged, in one transaction.
+// Throws the Supabase error as it is, so errorKey() can say why (42501: not the owner).
+export async function saveGridArrangement(payload: ArrangementPayload): Promise<void> {
+  const { error } = await supabase.rpc("save_sell_grid_arrangement", {
+    p_tabs: payload.tabs,
+    p_tiles: payload.tiles,
+  });
+  if (error) throw error;
 }

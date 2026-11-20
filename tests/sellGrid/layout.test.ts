@@ -122,6 +122,12 @@ describe("Favoris is hand-picked only", () => {
     expect(names(out[0])).toEqual(["Pain", "Coca"]);
   });
 
+  it("does not show a pick the owner hid while arranging the grid", () => {
+    const tabs = [tab("f", "favorites", null, 0)];
+    const tiles = [tile("f", "p2", 1, { hidden: true }), tile("f", "p1", 2)];
+    expect(names(run(tabs, tiles, products)[0])).toEqual(["Coca"]);
+  });
+
   it("is hidden while empty", () => {
     expect(run([tab("f", "favorites", null, 0)], [], products)).toEqual([]);
   });

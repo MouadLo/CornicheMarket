@@ -10,6 +10,7 @@ import {
   Check,
   ClipboardList,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Info,
@@ -70,6 +71,7 @@ export const ICONS = {
   clipboard: ClipboardList,
   down: ChevronDown,
   chevron: ChevronRight,
+  chevronBack: ChevronLeft,
   clock: Clock,
   info: Info,
   card: CreditCard,
@@ -108,6 +110,7 @@ export type IconName = keyof typeof ICONS;
 export const FLIP_IN_RTL: ReadonlySet<IconName> = new Set<IconName>([
   "back",
   "chevron",
+  "chevronBack",
   "undo",
   "logout",
   "message",

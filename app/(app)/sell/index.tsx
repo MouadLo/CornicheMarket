@@ -81,7 +81,14 @@ import {
   useStoreCreditLimit,
 } from "@/src/lib/sales/creditLimitCache";
 import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
-import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
+import { refreshGridCache, subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
+import {
+  resolveArrangeTabs,
+  type ArrangeTab,
+  type ArrangementPayload,
+} from "@/src/lib/sellGrid/arrange";
+import { ArrangeGrid } from "@/src/components/sell/ArrangeGrid";
+import { saveGridArrangement } from "@/src/lib/sellGrid/queries";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -163,10 +170,10 @@ export default function SellScreen() {
   }, [loadGrid]);
   // The owner changed a tile (colour, favourite) on this device: reload it now.
   useEffect(() => subscribeGridRefresh(() => void loadGrid()), [loadGrid]);
-  const gridTabs: ResolvedTab[] = useMemo(
+  const gridInput = useMemo(
     () =>
       cachedGrid
-        ? resolveGrid({
+        ? {
             tabs: cachedGrid.tabs,
             tiles: cachedGrid.tiles,
             categories: cachedGrid.categories.map((category) => ({
@@ -186,10 +193,21 @@ export default function SellScreen() {
               active: p.active,
               discountable: p.discountable,
             })),
-          })
-        : [],
+          }
+        : null,
     [cachedGrid, t, i18n?.language]
   );
+  const gridTabs: ResolvedTab[] = useMemo(
+    () => (gridInput ? resolveGrid(gridInput) : []),
+    [gridInput]
+  );
+  // Owner only: the grid being arranged (null = normal Sell). Captured when the
+  // owner starts, so a refresh from elsewhere never changes it under their hands.
+  const [arranging, setArranging] = useState<ArrangeTab[] | null>(null);
+  const saveArrangement = useCallback(async (payload: ArrangementPayload) => {
+    await saveGridArrangement(payload);
+    await refreshGridCache(true);
+  }, []);
 
   const debounced = useDebouncedValue(search, 250);
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
@@ -845,12 +863,23 @@ export default function SellScreen() {
   );
   const gridNode =
     shownResults.length === 0 && !query ? (
-      <ProductGrid
-        tabs={gridTabs}
-        inCart={inCart}
-        // The cache rows and live rows share the fields addProduct reads.
-        onAdd={(product) => addProduct(product as unknown as Product)}
-      />
+      arranging && isOwner ? (
+        <ArrangeGrid
+          initial={arranging}
+          onSave={saveArrangement}
+          onClose={() => setArranging(null)}
+        />
+      ) : (
+        <ProductGrid
+          tabs={gridTabs}
+          inCart={inCart}
+          // The cache rows and live rows share the fields addProduct reads.
+          onAdd={(product) => addProduct(product as unknown as Product)}
+          onArrange={
+            isOwner && gridInput ? () => setArranging(resolveArrangeTabs(gridInput)) : undefined
+          }
+        />
+      )
     ) : null;
   const showBasket = phoneView === "basket" && lines.length > 0;
 

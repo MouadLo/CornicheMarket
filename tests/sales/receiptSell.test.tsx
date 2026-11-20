@@ -12,6 +12,8 @@ import { allTexts } from "./sellTestUtils";
 const mockSync = jest.fn();
 const mockUuid = jest.fn();
 const mockT = (key: string) => key;
+// Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
+jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => mockUuid() }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: mockT }) }));

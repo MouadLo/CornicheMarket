@@ -126,7 +126,14 @@ describe("Icon", () => {
       expect(shouldFlip(name, "fr")).toBe(false);
       expect(shouldFlip(name, "ar")).toBe(FLIP_IN_RTL.has(name));
     }
-    expect([...FLIP_IN_RTL].sort()).toEqual(["back", "chevron", "logout", "message", "undo"]);
+    expect([...FLIP_IN_RTL].sort()).toEqual([
+      "back",
+      "chevron",
+      "chevronBack",
+      "logout",
+      "message",
+      "undo",
+    ]);
     expect(shouldFlip("check", "ar")).toBe(false);
   });
 });
