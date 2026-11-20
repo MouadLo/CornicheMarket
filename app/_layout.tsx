@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthProvider";
 import { useOrientationLock } from "@/src/lib/device/orientation";
+import { authRedirect } from "@/src/lib/nav/authRedirect";
 import { DeactivatedScreen } from "@/src/components/auth/DeactivatedScreen";
 import { DialogHost } from "@/src/components/ui/DialogHost";
 import { bundledFonts } from "@/src/theme/fonts";
@@ -31,20 +32,8 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const onSignIn = segments[0] === "sign-in";
-    const onAcceptInvite = segments[0] === "accept-invite";
-    const inApp = segments[0] === "(app)";
-
-    if (!session && !onSignIn && !onAcceptInvite) {
-      router.replace("/sign-in");
-    } else if (session && !inApp && !onAcceptInvite) {
-      // Covers both arriving at /sign-in while already signed in AND
-      // landing on the bare index route (segments is empty there) with a
-      // persisted session -- e.g. a web user reloading or bookmarking "/".
-      // Without the second case, app/index.tsx's spinner never resolves:
-      // nothing was ever redirecting a logged-in user away from "/" itself.
-      router.replace("/(app)/sell");
-    }
+    const target = authRedirect(session, segments);
+    if (target) router.replace(target);
   }, [session, loading, segments, router]);
 
   // The owner turned this account off: nothing of the app is shown, whatever
@@ -141,6 +130,7 @@ export default function RootLayout() {
             <Stack>
               <Stack.Screen name="(app)" options={{ headerShown: false }} />
               <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+              <Stack.Screen name="card/[token]" options={{ headerShown: false }} />
               <Stack.Screen
                 name="accept-invite"
                 options={{ title: i18n.t("invite.screenTitle") }}

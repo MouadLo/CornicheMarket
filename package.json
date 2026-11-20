@@ -58,6 +58,7 @@
     "i18next": "^26.5.10",
     "lucide-react-native": "0.468.0",
     "papaparse": "^5.7.0",
+    "qrcode-generator": "1.4.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-i18next": "^17.1.9",

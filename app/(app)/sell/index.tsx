@@ -18,11 +18,25 @@ import { useTodayClosed } from "@/src/lib/day/useTodayClosed";
 import { CartLineRow } from "@/src/components/sell/CartLineRow";
 import { ContinuousScanner } from "@/src/components/sell/ContinuousScanner";
 import { EmptyStorePrompt } from "@/src/components/sell/EmptyStorePrompt";
-import { PaymentSheet } from "@/src/components/sell/PaymentSheet";
+import { PaymentSheet, type PaymentRedemption } from "@/src/components/sell/PaymentSheet";
 import { PendingAttemptCard } from "@/src/components/sell/PendingAttemptCard";
+import { MemberChip } from "@/src/components/loyalty/MemberChip";
+import { SaleLoyaltyPanel } from "@/src/components/loyalty/SaleLoyaltyPanel";
 import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { earnLinesOf, eligibleCentsOf } from "@/src/lib/loyalty/basket";
+import { cardTokenFromScan } from "@/src/lib/loyalty/card";
+import { formatMaPhone } from "@/src/lib/loyalty/phone";
+import { expectedEarn, maxRedeemablePoints, pointsValueCents } from "@/src/lib/loyalty/points";
+import { loyaltyCardCustomer, loyaltyCheckRedeem } from "@/src/lib/loyalty/queries";
+import {
+  creditCustomerOfMember,
+  loyaltyPayload,
+  receiptLoyaltyOf,
+  type SaleMember,
+} from "@/src/lib/loyalty/saleMember";
+import { useLoyaltyConfig } from "@/src/lib/loyalty/sellConfig";
 import { confirm, showToast } from "@/src/lib/dialog/store";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import {
@@ -110,6 +124,10 @@ export default function SellScreen() {
   // Kept above the screen: leaving Sell mid-sale must not lose the basket.
   const { lines, setLines, saleDiscount, setSaleDiscount } = useBasket(profile?.id ?? null);
   const [discountOpen, setDiscountOpen] = useState(false);
+  // Loyalty: the member attached to this sale (not saved with the basket: a
+  // reload starts without one), and whether the attach panel is open.
+  const [member, setMember] = useState<SaleMember | null>(null);
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const todayClosed = useTodayClosed();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
@@ -192,6 +210,11 @@ export default function SellScreen() {
               low_stock_threshold: p.low_stock_threshold ?? 0,
               active: p.active,
               discountable: p.discountable,
+              // Carried to the cart line so the points estimate knows the
+              // product's exclusion and bonus (absent on an older cache).
+              loyalty_excluded: p.loyalty_excluded,
+              loyalty_bonus_points: p.loyalty_bonus_points,
+              loyalty_bonus_until: p.loyalty_bonus_until,
             })),
           }
         : null,
@@ -210,6 +233,12 @@ export default function SellScreen() {
   }, []);
 
   const debounced = useDebouncedValue(search, 250);
+  // Whether loyalty is on at all (cached, so it is known offline). Off: no
+  // control, no chip, and a card QR is just an unknown code.
+  const loyaltyConfig = useLoyaltyConfig(sync.online);
+  const loyaltyOn = loyaltyConfig.enabled;
+  const activeMember = loyaltyOn ? member : null;
+  // The manual sale discount: the only discount the cashier's limit counts.
   const discountCents = parseMoneyToCents(saleDiscount) ?? 0;
   const total = useMemo(() => saleTotal(lines, discountCents), [lines, discountCents]);
   const discountError = validateSaleDiscounts(lines, discountCents);
@@ -350,8 +379,53 @@ export default function SellScreen() {
     [addLine]
   );
 
+  // The customer's card QR: online it names the member and is the proof to
+  // spend points; it never adds a product.
+  const attachByCard = useCallback(
+    async (token: string): Promise<ScanOutcome> => {
+      if (!sync.online) {
+        showFlash(t("loyalty.sellCardOffline"), true);
+        return { status: "error", message: t("loyalty.sellCardOffline") };
+      }
+      try {
+        const found = await loyaltyCardCustomer(token);
+        if (!found) {
+          showFlash(t("loyalty.sellCardUnknown"), true);
+          return { status: "unknown", message: t("loyalty.sellCardUnknown") };
+        }
+        setMember({
+          customerId: found.customerId,
+          phone: null,
+          name: found.name || null,
+          balance: found.balance,
+          cardToken: token,
+          pending: false,
+        });
+        setCustomers((current) =>
+          current.some((c) => c.id === found.customerId)
+            ? current
+            : [
+                ...current,
+                { id: found.customerId, name: found.name, phone: null, balance_cents: 0 },
+              ]
+        );
+        setLoyaltyOpen(false);
+        const message = t("loyalty.sellCardRead", { name: isolateBidi(found.name) });
+        showFlash(message);
+        return { status: "added", message };
+      } catch {
+        showFlash(t("sell.lookupFailed"), true);
+        return { status: "error", message: null };
+      }
+    },
+    [showFlash, sync.online, t]
+  );
+
   const addByBarcode = useCallback(
     async (barcode: string): Promise<ScanOutcome> => {
+      // The camera and a USB scanner both come here: a card QR is not a product.
+      const cardToken = loyaltyOn ? cardTokenFromScan(barcode) : null;
+      if (cardToken) return attachByCard(cardToken);
       try {
         let match: Product | CachedProduct | undefined;
 
@@ -381,7 +455,7 @@ export default function SellScreen() {
         return { status: "error", message: null };
       }
     },
-    [addProduct, isOwner, showFlash, sync.online, t]
+    [addProduct, attachByCard, isOwner, loyaltyOn, showFlash, sync.online, t]
   );
 
   // USB/Bluetooth scanners on web type the code and press Enter.
@@ -394,7 +468,39 @@ export default function SellScreen() {
     !paymentOpen && !weighing && !scannerOpen
   );
 
-  const handleConfirm = async (method: PaymentMethod, customerId: string | null, change = 0) => {
+  const attachMember = useCallback((attached: SaleMember) => {
+    setMember(attached);
+    // A member found online is a customer the credit list may not know yet.
+    if (attached.customerId) {
+      setCustomers((current) =>
+        current.some((c) => c.id === attached.customerId)
+          ? current
+          : [
+              ...current,
+              {
+                id: attached.customerId as string,
+                name: attached.name ?? "",
+                phone: attached.phone,
+                balance_cents: 0,
+              },
+            ]
+      );
+    }
+  }, []);
+
+  // What a points sale is allowed to spend: lines that earn points AND take a
+  // sale discount, minus the manual discount (see eligibleCentsOf).
+  const eligibleCents = Math.min(
+    eligibleCentsOf(lines, loyaltyConfig.excludedCategories, discountCents),
+    total
+  );
+
+  const handleConfirm = async (
+    method: PaymentMethod,
+    customerId: string | null,
+    change = 0,
+    redemption?: PaymentRedemption
+  ) => {
     if (accepting.current || !profile || lines.length === 0) return;
 
     if (hasInvalidQuantity(lines)) {
@@ -402,11 +508,39 @@ export default function SellScreen() {
       return;
     }
 
+    // Points spent: a sale may only spend what the member holds, what the
+    // eligible items cost and at least the minimum, and only online. The value
+    // joins the sale discount, but never the cashier's limit below.
+    let redeemPoints = 0;
+    if (redemption && redemption.points > 0) {
+      const max =
+        activeMember?.customerId && sync.online && activeMember.balance !== null
+          ? maxRedeemablePoints(activeMember.balance, eligibleCents, loyaltyConfig.rates)
+          : 0;
+      if (redemption.points > max) {
+        setError(t("loyalty.payCheckFailed"));
+        return;
+      }
+      redeemPoints = redemption.points;
+    }
+    const pointsValue = pointsValueCents(redeemPoints, loyaltyConfig.rates);
+    const saleDiscountCents = discountCents + pointsValue;
+    const finalTotal = total - pointsValue;
+
+    // A member on the sale is the one who pays a credit sale.
+    if (method === "credit" && activeMember) {
+      const debtor = creditCustomerOfMember(activeMember, customers);
+      if (!debtor || debtor !== customerId) {
+        setError(t("loyalty.payCreditUnknown"));
+        return;
+      }
+    }
+
     // A discount too large for what it discounts must never reach
     // enqueueSale: anything already queued goes through the offline sync
     // retry/quarantine pipeline, which is the wrong place to discover a
     // data-entry error. Caught here, it never gets that far.
-    const discountCheck = validateSaleDiscounts(lines, discountCents);
+    const discountCheck = validateSaleDiscounts(lines, saleDiscountCents);
     if (discountCheck === "line") {
       setError(t("sell.lineDiscountTooHigh"));
       return;
@@ -439,7 +573,11 @@ export default function SellScreen() {
         customers.find((c) => c.id === customerId),
         storeCreditLimit
       );
-      const creditProblem = creditLimitProblem(standing.balanceCents, total, standing.limitCents);
+      const creditProblem = creditLimitProblem(
+        standing.balanceCents,
+        finalTotal,
+        standing.limitCents
+      );
       if (creditProblem?.kind === "noCredit") {
         setError(t("sell.creditNone"));
         return;
@@ -459,13 +597,26 @@ export default function SellScreen() {
     try {
       // Who rang this sale up, fixed now: only this user's session may send it.
       if (!profile) throw new Error(t("sell.couldNotRecord"));
+      // The member and the points spent travel with the sale (p_loyalty), part
+      // of what a retry re-sends under the same id. The card token is only
+      // sent with points to spend.
+      const loyalty = loyaltyPayload(
+        activeMember,
+        redeemPoints > 0
+          ? {
+              points: redeemPoints,
+              cardToken: redemption?.cardToken ?? activeMember?.cardToken ?? null,
+            }
+          : null
+      );
       const sale = pendingSaleFrom(
         attemptedSale.current?.id ?? Crypto.randomUUID(),
         {
           customer_id: method === "credit" ? customerId : null,
           payment_method: method,
-          discount_cents: discountCents,
-          total_cents: total,
+          discount_cents: saleDiscountCents,
+          total_cents: finalTotal,
+          ...(loyalty ? { loyalty } : {}),
         },
         lines,
         profile.id
@@ -497,16 +648,17 @@ export default function SellScreen() {
       setSaleDiscount("");
       setDiscountOpen(false);
       setPaymentOpen(false);
+      setMember(null);
       // The sale is accepted: from now on this customer owes it, for the next
       // sale's debt limit (the list is only read when the screen opens).
       if (method === "credit" && customerId) {
         setCustomers((current) =>
           current.map((c) =>
-            c.id === customerId ? { ...c, balance_cents: (c.balance_cents ?? 0) + total } : c
+            c.id === customerId ? { ...c, balance_cents: (c.balance_cents ?? 0) + finalTotal } : c
           )
         );
       }
-      showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(total)) }));
+      showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(finalTotal)) }));
       setChangeDue(method === "cash" && change > 0 ? change : null);
       setLastReceipt(
         receiptFromPendingSale(acceptedSale, {
@@ -516,6 +668,18 @@ export default function SellScreen() {
           cashReceivedCents:
             method === "cash" && change > 0 ? acceptedSale.total_cents + change : null,
           changeCents: method === "cash" && change > 0 ? change : null,
+          loyalty: activeMember
+            ? receiptLoyaltyOf({
+                member: activeMember,
+                redeemedPoints: redeemPoints,
+                earnedPoints: expectedEarn(
+                  earnLinesOf(lines, loyaltyConfig.excludedCategories, Date.now()),
+                  saleDiscountCents,
+                  loyaltyConfig.rates
+                ).total,
+                rates: loyaltyConfig.rates,
+              })
+            : null,
         })
       );
       void sync.sync().catch(() => {
@@ -555,6 +719,7 @@ export default function SellScreen() {
         setSaleDiscount("");
         setDiscountOpen(false);
         setPaymentOpen(false);
+        setMember(null);
       }
       showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(attempt.total_cents)) }));
       void sync.sync().catch(() => {
@@ -608,6 +773,16 @@ export default function SellScreen() {
             <Icon name="calendar" size={20} color={colors.brand700} />
             <Text style={styles.link}>{t("day.link")}</Text>
           </Pressable>
+          {loyaltyOn && !activeMember ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.headerLink}
+              onPress={() => setLoyaltyOpen(true)}
+            >
+              <Icon name="star" size={20} color={colors.brand700} />
+              <Text style={styles.link}>{t("loyalty.sellButton")}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -670,6 +845,22 @@ export default function SellScreen() {
   const noticesNode = (
     <>
       {todayClosed && <Banner tone="warn" text={t("day.todayClosed")} />}
+      {activeMember ? (
+        <MemberChip
+          member={activeMember}
+          pointValueCents={loyaltyConfig.rates.pointValueCents}
+          earnPoints={
+            lines.length > 0
+              ? expectedEarn(
+                  earnLinesOf(lines, loyaltyConfig.excludedCategories, Date.now()),
+                  discountCents,
+                  loyaltyConfig.rates
+                ).total
+              : null
+          }
+          onRemove={() => setMember(null)}
+        />
+      ) : null}
       {changeDue !== null && (
         <View style={styles.changeCard} accessibilityRole="alert">
           <View style={styles.changeText}>
@@ -737,14 +928,17 @@ export default function SellScreen() {
     if (!ok) return;
     const removed = lines;
     const previousDiscount = saleDiscount;
+    const previousMember = member;
     setLines([]);
     setSaleDiscount("");
     setDiscountOpen(false);
+    setMember(null);
     showToast({
       text: t("sell.basketEmptied"),
       action: {
         label: t("common.undo"),
         onPress: () => {
+          setMember((current) => current ?? previousMember);
           setLines((current) => restoreLines(current, removed));
           setSaleDiscount((current) => restoreSaleDiscount(current, previousDiscount));
         },
@@ -961,6 +1155,32 @@ export default function SellScreen() {
         onConfirm={handleConfirm}
         isOwner={isOwner}
         storeCreditLimitCents={storeCreditLimit}
+        loyalty={
+          activeMember?.customerId && sync.online && activeMember.balance !== null
+            ? {
+                customerId: activeMember.customerId,
+                balance: activeMember.balance,
+                eligibleCents,
+                rates: loyaltyConfig.rates,
+                cardToken: activeMember.cardToken,
+                canScan: cameraScan,
+                resolveCard: loyaltyCardCustomer,
+                checkRedeem: loyaltyCheckRedeem,
+              }
+            : undefined
+        }
+        loyaltyCredit={
+          activeMember
+            ? {
+                customerId: creditCustomerOfMember(activeMember, customers),
+                name:
+                  activeMember.name ??
+                  (activeMember.phone
+                    ? formatMaPhone(activeMember.phone)
+                    : t("loyalty.sellNoName")),
+              }
+            : undefined
+        }
         onCreateCustomer={async (name) => {
           try {
             const created = await createCustomer(name, null);
@@ -970,6 +1190,12 @@ export default function SellScreen() {
             return null;
           }
         }}
+      />
+      <SaleLoyaltyPanel
+        visible={loyaltyOpen}
+        online={sync.online}
+        onClose={() => setLoyaltyOpen(false)}
+        onAttach={attachMember}
       />
       {receiptOpen && lastReceipt ? (
         <ReceiptPanel receipt={lastReceipt} onClose={() => setReceiptOpen(false)} />

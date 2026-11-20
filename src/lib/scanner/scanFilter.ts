@@ -20,8 +20,9 @@ export const CONFIRM_WINDOW_MS = 1000;
 // UPC-E can be a misread fragment of a longer code, and Code 39 has no check,
 // so those need the same text twice. Two reads in a row were required before
 // for every format; a camera that reads a held code only every other frame
-// then never confirmed it, which is why some codes "would not scan".
-const ONE_READ: ReadonlySet<BarcodeFormatName> = new Set(["ean13", "upca", "code128"]);
+// then never confirmed it, which is why some codes "would not scan". A QR (the
+// loyalty card) has its own error correction: one read is enough.
+const ONE_READ: ReadonlySet<BarcodeFormatName> = new Set(["ean13", "upca", "code128", "qr"]);
 
 // Rejects reads whose digits cannot be that format (a damaged read).
 export function plausibleRead(text: string, format: BarcodeFormatName): boolean {

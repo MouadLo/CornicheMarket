@@ -36,6 +36,10 @@ export type GridProduct = {
   low_stock_threshold: number;
   active: boolean;
   discountable?: boolean;
+  // Loyalty (migration 048), passed through to the cart line untouched.
+  loyalty_excluded?: boolean;
+  loyalty_bonus_points?: number;
+  loyalty_bonus_until?: string | null;
 };
 
 // parent_id: set on a sub-category (migration 036); its products show in the parent's tab.

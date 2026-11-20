@@ -193,3 +193,80 @@ describe("labels and stats", () => {
     expect(jobReceiptNumber({ receipt: null })).toBe("—");
   });
 });
+
+describe("parseReceiptJob: loyalty", () => {
+  // valid() has a 0.50 DH discount; give it room for a points discount.
+  const base = () => ({ ...valid(), subtotalCents: 2700, discountCents: 1000, totalCents: 1700 });
+  const loyalty = () => ({
+    discountCents: 800,
+    pointsEarned: 12,
+    balanceAfterPoints: 252,
+    balanceAfterValueCents: 2520,
+    pending: false,
+  });
+  const parse = (patch: Record<string, unknown> | null | undefined) => {
+    const r = base() as Record<string, unknown>;
+    if (patch === undefined) return parseReceiptJob(r);
+    r.loyalty = patch === null ? null : { ...loyalty(), ...patch };
+    return parseReceiptJob(r);
+  };
+
+  it("absent or null is a plain receipt", () => {
+    expect(parse(undefined)).not.toBeNull();
+    expect(parse(undefined)).not.toHaveProperty("loyalty");
+    expect(parse(null)).not.toBeNull();
+    expect(parse(null)).not.toHaveProperty("loyalty");
+  });
+
+  it("accepts a well-formed block and copies only its known fields", () => {
+    const r = base() as Record<string, unknown>;
+    r.loyalty = { ...loyalty(), phone: "+212612345678", cardToken: "secret" };
+    const model = parseReceiptJob(r);
+    expect(model?.loyalty).toEqual(loyalty());
+    expect(JSON.stringify(model)).not.toContain("secret");
+  });
+
+  it("accepts nulls for what is unknown, and a pending member", () => {
+    expect(
+      parse({ pointsEarned: null, balanceAfterPoints: null, balanceAfterValueCents: null })
+    ).not.toBeNull();
+    expect(
+      parse({
+        discountCents: 0,
+        balanceAfterPoints: null,
+        balanceAfterValueCents: null,
+        pending: true,
+      })?.loyalty?.pending
+    ).toBe(true);
+  });
+
+  it("the points discount can equal the receipt's discount but not exceed it", () => {
+    expect(parse({ discountCents: 1000 })).not.toBeNull();
+    expect(parse({ discountCents: 1001 })).toBeNull();
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["float discount", { discountCents: 10.5 }],
+    ["negative discount", { discountCents: -1 }],
+    ["string discount", { discountCents: "800" }],
+    ["float points", { pointsEarned: 1.5 }],
+    ["negative points", { pointsEarned: -3 }],
+    ["huge points", { pointsEarned: 2_000_000_000 }],
+    ["string points", { balanceAfterPoints: "252" }],
+    ["float balance value", { balanceAfterValueCents: 2.5 }],
+    ["balance points without value", { balanceAfterValueCents: null }],
+    ["balance value without points", { balanceAfterPoints: null }],
+    ["pending not a boolean", { pending: "yes" }],
+    ["pending missing", { pending: undefined }],
+  ])("a malformed block (%s) makes the whole job invalid", (_name, patch) => {
+    expect(parse(patch)).toBeNull();
+  });
+
+  it("a loyalty block that is not an object makes the job invalid", () => {
+    for (const value of ["x", 5, [], true]) {
+      const r = base() as Record<string, unknown>;
+      r.loyalty = value;
+      expect(parseReceiptJob(r)).toBeNull();
+    }
+  });
+});

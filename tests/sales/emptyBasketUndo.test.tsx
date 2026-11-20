@@ -44,6 +44,10 @@ const mockSearchCached = jest.fn(async (term: string) =>
   CACHE.filter((p) => p.name.toLowerCase().includes(term.toLowerCase()))
 );
 
+jest.mock(
+  "../../src/lib/loyalty/queries",
+  () => require("../fixtures/loyaltyQueriesMock").loyaltyQueriesMock
+);
 // Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
 jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => "sale-id" }));

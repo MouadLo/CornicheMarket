@@ -17,7 +17,9 @@ import {
   shareReceipt,
 } from "@/src/lib/sales/printReceipt";
 import {
+  discountSplit,
   formatReceiptQuantity,
+  loyaltyFooterLines,
   receiptDateText,
   receiptToHtml,
   receiptToText,
@@ -65,6 +67,10 @@ export function receiptLabels(t: Translate, model: ReceiptModel): ReceiptLabels 
     refundMethod: (method) => t(REFUND_KEYS[method]),
     allReturned: t("receipt.allReturned"),
     lineDiscount: (amount) => t("receipt.lineDiscount", { amount }),
+    loyaltyDiscount: t("receipt.loyaltyDiscount"),
+    pointsEarned: (points) => t("receipt.pointsEarned", { points }),
+    loyaltyBalance: (value, points) => t("receipt.loyaltyBalance", { value, points }),
+    loyaltyPending: t("receipt.loyaltyPending"),
     unit: (unit, quantity) =>
       unitLabel(unit, quantity, (key, options) => t(key, options as Record<string, unknown>)),
   };
@@ -225,7 +231,15 @@ export function ReceiptPanel({
           {receipt.discountCents > 0 ? (
             <>
               {amountRow(labels.subtotal, formatMAD(receipt.subtotalCents))}
-              {amountRow(labels.discount, `-${formatMAD(receipt.discountCents)}`)}
+              {discountSplit(receipt).manualCents > 0
+                ? amountRow(labels.discount, `-${formatMAD(discountSplit(receipt).manualCents)}`)
+                : null}
+              {discountSplit(receipt).pointsCents > 0
+                ? amountRow(
+                    labels.loyaltyDiscount,
+                    `-${formatMAD(discountSplit(receipt).pointsCents)}`
+                  )
+                : null}
             </>
           ) : null}
           {amountRow(labels.total, formatMAD(receipt.totalCents), true)}
@@ -245,6 +259,11 @@ export function ReceiptPanel({
               {amountRow(labels.change, formatMAD(receipt.changeCents))}
             </>
           ) : null}
+          {loyaltyFooterLines(receipt, labels, isolateLtr).map((line) => (
+            <Text key={line} style={styles.meta} testID="receipt-loyalty-line">
+              {line}
+            </Text>
+          ))}
           <Text style={styles.thanks}>{labels.thanks}</Text>
         </ScrollView>
         {error ? <Banner tone="bad" text={error} /> : null}

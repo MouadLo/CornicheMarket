@@ -13,6 +13,7 @@ jest.mock("react-i18next", () => ({
 jest.mock("../../src/lib/sales/queries", () => ({
   fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
 }));
+jest.mock("../../src/lib/reports/queries", () => ({ fetchStoreTimezone: async () => "UTC" }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("../../src/components/products/BarcodeScannerModal", () => ({
   BarcodeScannerModal: () => null,

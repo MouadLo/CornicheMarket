@@ -1,4 +1,4 @@
-import type { ReceiptLine, ReceiptModel } from "@/src/lib/sales/receipt";
+import type { ReceiptLine, ReceiptLoyalty, ReceiptModel } from "@/src/lib/sales/receipt";
 import type { RefundMethod } from "@/src/lib/sales/returns";
 
 // Pure helpers for the shared shop printer. A print job carries the receipt as
@@ -32,6 +32,7 @@ export const INVALID_RECEIPT_ERROR = "invalid receipt";
 const MAX_TEXT = 200;
 const MAX_CENTS = 100_000_000_000; // 1 billion DH: far beyond any sale
 const MAX_QUANTITY = 1_000_000;
+const MAX_POINTS = 1_000_000_000;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -94,6 +95,29 @@ function parseAfterReturns(value: unknown): NonNullable<ReceiptModel["afterRetur
   return { originalTotalCents, refundedCents, refundMethods: methods, lastReturnAt };
 }
 
+function points(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= MAX_POINTS;
+}
+function nullablePoints(value: unknown): value is number | null {
+  return value === null || points(value);
+}
+
+// The loyalty block of a receipt. Absent or null means a plain receipt; anything
+// present but malformed makes the whole job invalid. The points discount is part
+// of the receipt's discount, so it can never be more than it.
+function parseLoyalty(value: unknown, receiptDiscountCents: number): ReceiptLoyalty | null {
+  if (!isObject(value)) return null;
+  const { discountCents, pointsEarned, balanceAfterPoints, balanceAfterValueCents, pending } =
+    value;
+  if (!cents(discountCents) || discountCents > receiptDiscountCents) return null;
+  if (!nullablePoints(pointsEarned) || !nullablePoints(balanceAfterPoints)) return null;
+  if (!nullableCents(balanceAfterValueCents)) return null;
+  // A balance is a pair: points and what they are worth, or neither.
+  if ((balanceAfterPoints === null) !== (balanceAfterValueCents === null)) return null;
+  if (typeof pending !== "boolean") return null;
+  return { discountCents, pointsEarned, balanceAfterPoints, balanceAfterValueCents, pending };
+}
+
 // Copies the known fields one by one: anything else in the JSON is dropped.
 export function parseReceiptJob(json: unknown): ReceiptModel | null {
   if (!isObject(json)) return null;
@@ -119,6 +143,11 @@ export function parseReceiptJob(json: unknown): ReceiptModel | null {
     afterReturns = parseAfterReturns(v.afterReturns);
     if (!afterReturns) return null;
   }
+  let loyalty: ReceiptModel["loyalty"];
+  if (v.loyalty !== undefined && v.loyalty !== null) {
+    loyalty = parseLoyalty(v.loyalty, v.discountCents);
+    if (!loyalty) return null;
+  }
   const model: ReceiptModel = {
     shopName: v.shopName,
     receiptNumber: v.receiptNumber,
@@ -134,6 +163,7 @@ export function parseReceiptJob(json: unknown): ReceiptModel | null {
     changeCents: v.changeCents,
   };
   if (afterReturns) model.afterReturns = afterReturns;
+  if (loyalty) model.loyalty = loyalty;
   return model;
 }
 

@@ -31,6 +31,13 @@ describe("plausibleRead", () => {
 });
 
 describe("createScanFilter", () => {
+  it("a card QR is accepted on its first read, once while held", () => {
+    const filter = createScanFilter();
+    const url = "https://shop.example.com/card/AbC_dEf-1234567890abcd";
+    expect(filter.push({ text: url, format: "qr" }, 0)).toBe(url);
+    expect(filter.push({ text: url, format: "qr" }, 100)).toBeNull();
+  });
+
   it("an EAN-13 is accepted on its first read", () => {
     expect(createScanFilter().push(ean(), 0)).toBe(EAN);
   });

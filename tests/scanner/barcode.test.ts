@@ -21,7 +21,11 @@ describe("normalizeFormat", () => {
     ["ean_8", "ean8"],
     ["CODE_128", "code128"],
     ["org.iso.Code39Mod43", "code39"],
-    ["qr", "unknown"],
+    ["qr", "qr"],
+    ["qr_code", "qr"],
+    ["QR_CODE", "qr"],
+    ["org.iso.QRCode", "qr"],
+    ["aztec", "unknown"],
     [undefined, "unknown"],
   ])("%s → %s", (input, expected) => {
     expect(normalizeFormat(input)).toBe(expected);
@@ -29,6 +33,13 @@ describe("normalizeFormat", () => {
 });
 
 describe("cleanScannedCode", () => {
+  it("leaves a card URL (QR from a 2D USB scanner) intact", () => {
+    const url = "https://shop.example.com/card/AbC_dEf-1234567890abcd";
+    expect(cleanScannedCode(url)).toBe(url);
+    expect(cleanScannedCode(`${url}\r\n`)).toBe(url);
+    expect(cleanScannedCode(`]Q1${url}`)).toBe(url);
+  });
+
   it("keeps a clean code as it is", () => {
     expect(cleanScannedCode("6111234567890")).toBe("6111234567890");
     expect(cleanScannedCode("ABC-123")).toBe("ABC-123");

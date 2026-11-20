@@ -32,6 +32,11 @@ jest.mock("../../src/lib/reports/export", () => ({
   exportTablesAsCsv: jest.fn(),
   exportTablesAsPdf: jest.fn(),
 }));
+jest.mock("../../src/lib/loyalty/queries", () => ({
+  fetchLoyaltyReport: async () => {
+    throw new Error("not read");
+  },
+}));
 jest.mock("../../src/lib/reports/queries", () => {
   const summary = {
     revenue_cents: 5000,

@@ -44,6 +44,19 @@ jest.mock("../src/lib/reports/queries", () => ({
   fetchStoreTimezone: jest.fn(async () => "UTC"),
   updateStoreTimezone: jest.fn(),
 }));
+jest.mock("../src/lib/loyalty/queries", () => ({
+  fetchLoyaltySettings: async () => ({
+    enabled: false,
+    centsPerPoint: 1000,
+    pointValueCents: 10,
+    minRedeemPoints: 100,
+    dailyReviewPoints: 100,
+    welcomePoints: 0,
+  }),
+  fetchLoyaltyCategories: async () => [],
+  updateLoyaltySettings: jest.fn(),
+  setCategoryLoyaltyExcluded: jest.fn(),
+}));
 jest.mock("../src/lib/sales/queries", () => ({
   fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
   updateDiscountLimits: jest.fn(),

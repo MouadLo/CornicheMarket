@@ -23,6 +23,18 @@ export type ReceiptLine = {
   totalCents: number;
 };
 
+// The loyalty part of a receipt, from what the device knew when it rang the sale.
+// discountCents is the part of the sale's discount paid with points. Earned and
+// balance are null when unknown (a history receipt, or a member attached
+// offline); pending means the points are added when the sale syncs.
+export type ReceiptLoyalty = {
+  discountCents: number;
+  pointsEarned: number | null;
+  balanceAfterPoints: number | null;
+  balanceAfterValueCents: number | null;
+  pending: boolean;
+};
+
 export type ReceiptModel = {
   shopName: string;
   receiptNumber: string;
@@ -45,6 +57,8 @@ export type ReceiptModel = {
     refundMethods: RefundMethod[]; // distinct, in order of first use
     lastReturnAt: string; // ISO instant of the latest return
   } | null;
+  // Present only for a sale with a loyalty member (or one paid partly in points).
+  loyalty?: ReceiptLoyalty | null;
 };
 
 export function receiptNumberOf(saleId: string): string {
@@ -64,6 +78,7 @@ export function receiptFromPendingSale(
     customerName?: string | null;
     cashReceivedCents?: number | null;
     changeCents?: number | null;
+    loyalty?: ReceiptLoyalty | null;
   } = {}
 ): ReceiptModel {
   const lines: ReceiptLine[] = sale.lines.map((line) => ({
@@ -88,7 +103,13 @@ export function receiptFromPendingSale(
     customerName: sale.payment_method === "credit" ? clean(extra.customerName) : null,
     cashReceivedCents: known ? (extra.cashReceivedCents ?? null) : null,
     changeCents: known ? (extra.changeCents ?? null) : null,
+    ...(extra.loyalty ? { loyalty: loyaltyOnReceipt(extra.loyalty, sale.discount_cents) } : {}),
   };
+}
+
+// The loyalty discount can never be more than the discount it is part of.
+function loyaltyOnReceipt(loyalty: ReceiptLoyalty, discountCents: number): ReceiptLoyalty {
+  return { ...loyalty, discountCents: Math.min(Math.max(0, loyalty.discountCents), discountCents) };
 }
 
 // A sale read back from the history, with its lines. Stored totals are used as
@@ -122,8 +143,24 @@ export function receiptFromHistorySale(
     cashReceivedCents: null,
     changeCents: null,
   };
-  return returns.length > 0
-    ? receiptAfterReturns(base, sale, lines, returns, unknownProductName)
+  if (returns.length > 0)
+    return receiptAfterReturns(base, sale, lines, returns, unknownProductName);
+  // What the history knows of loyalty is the points part of the discount; what
+  // was earned and the balance were not stored on the sale, so they are left out.
+  // (After a return the discount is re-split between the kept lines, so the
+  // points part is no longer a figure of the receipt.)
+  const pointsDiscount = Math.min(sale.loyalty_discount_cents ?? 0, sale.discount_cents);
+  return pointsDiscount > 0
+    ? {
+        ...base,
+        loyalty: {
+          discountCents: pointsDiscount,
+          pointsEarned: null,
+          balanceAfterPoints: null,
+          balanceAfterValueCents: null,
+          pending: false,
+        },
+      }
     : base;
 }
 
@@ -152,6 +189,11 @@ export type ReceiptLabels = {
   refundMethod: (method: RefundMethod) => string;
   allReturned: string;
   lineDiscount: (amount: string) => string;
+  // Loyalty (shown only on a sale with a member).
+  loyaltyDiscount: string; // "Loyalty discount"
+  pointsEarned: (points: string) => string; // "Points earned +12"
+  loyaltyBalance: (value: string, points: string) => string; // "Balance 3.40 DH (34 points)"
+  loyaltyPending: string; // "Points added when synced"
   unit: (unit: string, quantity: number) => string;
 };
 
@@ -205,6 +247,39 @@ export function returnDateText(model: ReceiptModel, options: ReceiptRenderOption
   );
 }
 
+// The discount split the way the customer paid it: what the cashier took off,
+// and what the points paid. They add up to the discount.
+export function discountSplit(model: ReceiptModel): { manualCents: number; pointsCents: number } {
+  const pointsCents = Math.min(model.loyalty?.discountCents ?? 0, model.discountCents);
+  return { manualCents: model.discountCents - pointsCents, pointsCents };
+}
+
+// Lines under the totals: points earned, balance, or the pending note. Plain
+// strings; each renderer escapes and isolates its own way.
+export function loyaltyFooterLines(
+  model: ReceiptModel,
+  labels: ReceiptLabels,
+  wrap: (text: string) => string = (text) => text
+): string[] {
+  const loyalty = model.loyalty;
+  if (!loyalty) return [];
+  const out: string[] = [];
+  if (loyalty.pointsEarned !== null && loyalty.pointsEarned > 0) {
+    out.push(labels.pointsEarned(wrap(`+${loyalty.pointsEarned}`)));
+  }
+  if (loyalty.balanceAfterPoints !== null && loyalty.balanceAfterValueCents !== null) {
+    out.push(
+      labels.loyaltyBalance(
+        wrap(formatMAD(loyalty.balanceAfterValueCents)),
+        wrap(String(loyalty.balanceAfterPoints))
+      )
+    );
+  } else if (loyalty.pending) {
+    out.push(labels.loyaltyPending);
+  }
+  return out;
+}
+
 export function receiptToHtml(
   model: ReceiptModel,
   labels: ReceiptLabels,
@@ -251,8 +326,14 @@ export function receiptToHtml(
 
   const totals: string[] = [];
   if (model.discountCents > 0) {
+    const split = discountSplit(model);
     totals.push(row(labels.subtotal, num(formatMAD(model.subtotalCents))));
-    totals.push(row(labels.discount, num(`-${formatMAD(model.discountCents)}`)));
+    if (split.manualCents > 0) {
+      totals.push(row(labels.discount, num(`-${formatMAD(split.manualCents)}`)));
+    }
+    if (split.pointsCents > 0) {
+      totals.push(row(labels.loyaltyDiscount, num(`-${formatMAD(split.pointsCents)}`)));
+    }
   }
   totals.push(row(labels.total, num(formatMAD(model.totalCents)), "total"));
   if (model.afterReturns) {
@@ -269,6 +350,9 @@ export function receiptToHtml(
     totals.push(row(labels.cashReceived, num(formatMAD(model.cashReceivedCents))));
     totals.push(row(labels.change, num(formatMAD(model.changeCents))));
   }
+  const loyaltyNotes = loyaltyFooterLines(model, labels, (text) => (rtl ? isolateLtr(text) : text))
+    .map((line) => `<div class="loyalty">${escapeHtml(line)}</div>`)
+    .join("");
 
   const banner = options.banner?.trim()
     ? `<div class="banner">${name(options.banner.trim())}</div>\n`
@@ -296,6 +380,7 @@ export function receiptToHtml(
   .name { font-weight: 600; }
   .sub { font-size: 11px; }
   tr.total td { font-size: 15px; font-weight: 700; border-top: 1px solid #000; padding-top: 5px; }
+  .loyalty { margin-top: 4px; }
   .thanks { text-align: center; margin-top: 10px; }${
     banner
       ? "\n  .banner { font-size: 22px; font-weight: 700; text-align: center; border: 3px solid #000; padding: 6px 4px; margin: 0 0 8px; overflow-wrap: anywhere; }"
@@ -308,7 +393,7 @@ export function receiptToHtml(
 ${banner}<h1>${escapeHtml(model.shopName)}</h1>
 <div class="meta">${meta.join("")}</div>
 <table class="items"><tbody>${lineRows}</tbody></table>${allReturned ? `<div class="meta">${escapeHtml(labels.allReturned)}</div>` : ""}
-<table><tbody>${totals.join("")}</tbody></table>
+<table><tbody>${totals.join("")}</tbody></table>${loyaltyNotes}
 <div class="thanks">${escapeHtml(labels.thanks)}</div>
 </div>
 </body>
@@ -343,8 +428,12 @@ export function receiptToText(
   }
   out.push("");
   if (model.discountCents > 0) {
+    const split = discountSplit(model);
     out.push(`${labels.subtotal}: ${formatMAD(model.subtotalCents)}`);
-    out.push(`${labels.discount}: -${formatMAD(model.discountCents)}`);
+    if (split.manualCents > 0) out.push(`${labels.discount}: -${formatMAD(split.manualCents)}`);
+    if (split.pointsCents > 0) {
+      out.push(`${labels.loyaltyDiscount}: -${formatMAD(split.pointsCents)}`);
+    }
   }
   out.push(`${labels.total}: ${formatMAD(model.totalCents)}`);
   if (model.afterReturns) {
@@ -358,6 +447,7 @@ export function receiptToText(
     out.push(`${labels.cashReceived}: ${formatMAD(model.cashReceivedCents)}`);
     out.push(`${labels.change}: ${formatMAD(model.changeCents)}`);
   }
+  out.push(...loyaltyFooterLines(model, labels));
   out.push("", labels.thanks);
   return out.join("\n");
 }

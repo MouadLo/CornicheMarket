@@ -12,7 +12,7 @@ const LEGACY_CACHE_KEY = "corniche.productCache.v1";
 const PAGE_SIZE = 200;
 // Never a cost column: this cache is read on cashier devices too.
 const CACHE_COLUMNS =
-  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold, discountable";
+  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until";
 
 export type CachedProduct = {
   id: string;
@@ -27,6 +27,11 @@ export type CachedProduct = {
   low_stock_threshold?: number;
   // Added with the cashier discount limit. Missing on older entries (read as allowed).
   discountable?: boolean;
+  // Loyalty (migration 048), so points can be estimated offline. Not cost data.
+  // Missing on older entries (read as eligible, no bonus).
+  loyalty_excluded?: boolean;
+  loyalty_bonus_points?: number;
+  loyalty_bonus_until?: string | null;
 };
 
 type ProductCache = {
