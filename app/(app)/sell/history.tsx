@@ -1,3 +1,4 @@
+import * as Crypto from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -6,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { DateField } from "@/src/components/ui/DateField";
 import { BigButton } from "@/src/components/BigButton";
 import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
+import { ReturnSheet, type ReturnSubmission } from "@/src/components/sell/ReturnSheet";
 import { VoidReasonPicker } from "@/src/components/sell/VoidReasonPicker";
 import { VoidRequestSheet } from "@/src/components/sell/VoidRequestSheet";
 import { Text } from "@/src/theme/Text";
@@ -47,11 +49,25 @@ import {
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import {
   fetchRecentSales,
+  fetchReturnableLines,
   fetchSaleLines,
+  fetchSaleReturns,
+  recordSaleReturn,
   voidSale,
   type SaleLine,
   type SaleSummary,
 } from "@/src/lib/sales/queries";
+import {
+  describeReturnError,
+  fullyReturned,
+  netAfterReturnsCents,
+  refundMethodKey,
+  returnItemsPayload,
+  returnedByLine,
+  returnedLineCount,
+  type ReturnableLine,
+  type SaleReturnRecord,
+} from "@/src/lib/sales/returns";
 import { formatLocaleDayHeading, formatLocaleTime } from "@/src/lib/text/dates";
 import { voidSaleConfirmMessage } from "@/src/lib/sales/voidConfirm";
 import {
@@ -109,6 +125,17 @@ export default function SalesHistory() {
   const [askingId, setAskingId] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [requests, setRequests] = useState<Map<string, MyVoidRequest>>(new Map());
+  // Item returns (owner records them; both roles see them). A failure only hides
+  // the "returned" lines, never the list.
+  const [returnsBySale, setReturnsBySale] = useState<Map<string, SaleReturnRecord[]>>(new Map());
+  const [returningId, setReturningId] = useState<string | null>(null);
+  const [returnable, setReturnable] = useState<ReturnableLine[] | null>(null);
+  const [returnLoadingId, setReturnLoadingId] = useState<string | null>(null);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnNotice, setReturnNotice] = useState<{ saleId: string; text: string } | null>(null);
+  // One id per attempt: a retry after a lost answer reuses it, so the database
+  // refunds once.
+  const returnId = useRef<string | null>(null);
 
   // Lines for the sales just loaded (one query for the whole page, which also
   // feeds the items preview). A failure only hides the lines, not the list.
@@ -129,6 +156,20 @@ export default function SalesHistory() {
     [isOwner]
   );
 
+  const loadReturns = useCallback((ids: string[]) => {
+    Promise.resolve()
+      .then(() => fetchSaleReturns(ids))
+      .then((records) => {
+        setReturnsBySale((prev) => {
+          const next = new Map(prev);
+          for (const id of ids) next.set(id, []);
+          for (const record of records) next.get(record.saleId)?.push(record);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(() => {
     setLoading(true);
     setLoadFailed(false);
@@ -147,10 +188,11 @@ export default function SalesHistory() {
         setSales(page);
         setHasMore(page.length >= Math.max(PAGE_SIZE, salesCount.current));
         loadLines(page.map((sale) => sale.id));
+        loadReturns(page.map((sale) => sale.id));
       })
       .catch(() => setLoadFailed("page"))
       .finally(() => setLoading(false));
-  }, [isOwner, loadLines, range]);
+  }, [isOwner, loadLines, loadReturns, range]);
 
   useEffect(load, [load]);
 
@@ -162,6 +204,7 @@ export default function SalesHistory() {
       setSales((prev) => [...prev, ...page]);
       setHasMore(page.length >= PAGE_SIZE);
       loadLines(page.map((sale) => sale.id));
+      loadReturns(page.map((sale) => sale.id));
     } catch {
       setLoadFailed("more");
     } finally {
@@ -190,6 +233,66 @@ export default function SalesHistory() {
       load();
     } catch (failure) {
       setVoidError(describeVoidRequestError(failure, t));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Owner: open the return sheet for a sale. The server says what was paid for
+  // each line and what remains; nothing is guessed on the device.
+  const openReturn = async (saleId: string) => {
+    // The button is disabled for a cashier; the database refuses them as well.
+    if (!isOwner) return;
+    setReturnError(null);
+    setReturnNotice(null);
+    setReturnLoadingId(saleId);
+    try {
+      setReturnable(await fetchReturnableLines(saleId));
+      returnId.current = Crypto.randomUUID();
+      setReturningId(saleId);
+    } catch (failure) {
+      setReturnNotice({ saleId, text: describeReturnError(failure, t) });
+    } finally {
+      setReturnLoadingId(null);
+    }
+  };
+
+  const closeReturn = () => {
+    setReturningId(null);
+    setReturnable(null);
+    setReturnError(null);
+    returnId.current = null;
+  };
+
+  const handleReturn = async (saleId: string, submission: ReturnSubmission) => {
+    const sale = sales.find((s) => s.id === saleId);
+    if (!sale || !returnId.current || submission.summary.items.length === 0) return;
+    const confirmed = await confirmDestructive(
+      t("returns.confirmTitle"),
+      t("returns.confirmMessage", {
+        amount: isolateLtr(formatMAD(submission.summary.totalCents)),
+        method: t(refundMethodKey(submission.method)),
+      }),
+      t("returns.confirm"),
+      t("common.cancel")
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setReturnError(null);
+    try {
+      await recordSaleReturn({
+        returnId: returnId.current,
+        saleId,
+        items: returnItemsPayload(submission.summary),
+        reasonCode: submission.reason,
+        note: submission.note,
+        refundMethod: submission.method,
+      });
+      closeReturn();
+      load();
+    } catch (failure) {
+      setReturnError(describeReturnError(failure, t));
     } finally {
       setSaving(false);
     }
@@ -244,6 +347,10 @@ export default function SalesHistory() {
   const renderSale = (sale: SaleSummary) => {
     const isOpen = openId === sale.id;
     const lines = linesBySale.get(sale.id);
+    const saleReturns = returnsBySale.get(sale.id) ?? [];
+    const hasReturns = saleReturns.length > 0;
+    const returnedLines = returnedByLine(saleReturns);
+    const nothingLeft = lines ? fullyReturned(lines, saleReturns) : false;
     const preview =
       lines && lines.length > 0
         ? itemsPreview(lines.map((line) => line.product_name ?? t("sell.historyUnknownProduct")))
@@ -271,6 +378,11 @@ export default function SalesHistory() {
                   ? ` ${t("sell.historyVoided", { reason: voidReasonDisplay(sale.void_reason, t, isolateBidi) })}`
                   : ""}
               </Text>
+              {hasReturns && !sale.voided_at ? (
+                <Text style={styles.meta}>
+                  {t("returns.badge", { count: returnedLineCount(saleReturns) })}
+                </Text>
+              ) : null}
               {sale.customer_name ? (
                 <Text style={styles.meta}>
                   {t("sell.historyCustomer", { name: sale.customer_name })}
@@ -300,9 +412,20 @@ export default function SalesHistory() {
                 </Text>
               ) : null}
             </View>
-            <Text style={[styles.total, sale.voided_at ? styles.totalVoided : null]}>
-              {formatMAD(sale.total_cents)}
-            </Text>
+            <View style={styles.totalColumn}>
+              <Text style={[styles.total, sale.voided_at ? styles.totalVoided : null]}>
+                {formatMAD(sale.total_cents)}
+              </Text>
+              {hasReturns && !sale.voided_at ? (
+                <Text style={styles.meta}>
+                  {t("returns.netTotal", {
+                    amount: isolateLtr(
+                      formatMAD(netAfterReturnsCents(sale.total_cents, saleReturns))
+                    ),
+                  })}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </Pressable>
 
@@ -332,6 +455,24 @@ export default function SalesHistory() {
                 </View>
               ))
             )}
+            {lines && hasReturns
+              ? [...returnedLines].map(([lineId, handedBack]) => {
+                  const line = lines.find((l) => l.id === lineId);
+                  const quantity =
+                    line?.unit === "kg"
+                      ? `${handedBack.quantity} ${unitLabel("kg", handedBack.quantity, t)}`
+                      : `${handedBack.quantity} ×`;
+                  return (
+                    <Text key={`returned-${lineId}`} style={styles.returnedLine}>
+                      {t("returns.returnedLine", {
+                        quantity,
+                        name: isolateBidi(line?.product_name ?? t("sell.historyUnknownProduct")),
+                        amount: isolateLtr(formatMAD(handedBack.refundCents)),
+                      })}
+                    </Text>
+                  );
+                })
+              : null}
           </View>
         ) : null}
 
@@ -347,8 +488,33 @@ export default function SalesHistory() {
           </Pressable>
         ) : null}
 
+        {!sale.voided_at && !nothingLeft ? (
+          <View style={styles.voidBox}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !isOwner || returnLoadingId === sale.id }}
+              disabled={!isOwner || returnLoadingId === sale.id}
+              style={[styles.returnButton, !isOwner && styles.returnButtonOff]}
+              onPress={() => openReturn(sale.id)}
+            >
+              <Text style={styles.returnButtonText}>
+                {returnLoadingId === sale.id ? t("returns.loading") : t("returns.action")}
+              </Text>
+            </Pressable>
+            {!isOwner ? <Text style={styles.meta}>{t("returns.askOwnerHint")}</Text> : null}
+            {returnNotice?.saleId === sale.id ? (
+              <Text style={styles.error}>{returnNotice.text}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {hasReturns && !sale.voided_at ? (
+          <Text style={styles.meta}>{t("returns.noVoid")}</Text>
+        ) : null}
+
         {isOwner &&
           !sale.voided_at &&
+          !hasReturns &&
           (voidingId === sale.id ? (
             <View style={styles.voidBox}>
               <Text style={styles.voidTitle}>{t("sell.voidReasonTitle")}</Text>
@@ -392,7 +558,10 @@ export default function SalesHistory() {
             </Pressable>
           ))}
 
-        {!isOwner && !sale.voided_at && (!sale.cashier_id || sale.cashier_id === profile?.id)
+        {!isOwner &&
+        !sale.voided_at &&
+        !hasReturns &&
+        (!sale.cashier_id || sale.cashier_id === profile?.id)
           ? renderAsk(sale.id)
           : null}
       </View>
@@ -522,6 +691,20 @@ export default function SalesHistory() {
 
       <ReceiptPanel receipt={receipt} timeZone={timeZone} onClose={() => setReceipt(null)} />
 
+      {returningId && returnable && (
+        <ReturnSheet
+          key={returningId}
+          visible
+          paymentMethod={sales.find((s) => s.id === returningId)?.payment_method ?? "cash"}
+          lines={linesBySale.get(returningId) ?? []}
+          returnable={returnable}
+          saving={saving}
+          error={returnError}
+          onSubmit={(submission) => handleReturn(returningId, submission)}
+          onClose={closeReturn}
+        />
+      )}
+
       {askingId && (
         <VoidRequestSheet
           key={askingId}
@@ -564,6 +747,19 @@ const styles = StyleSheet.create({
   rowVoided: { backgroundColor: colors.sunken, borderColor: colors.divider },
   rowTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   rowMain: { flex: 1, gap: 3 },
+  totalColumn: { alignItems: "flex-end", gap: 2 },
+  returnedLine: { fontSize: 14, color: colors.danger700 },
+  returnButton: {
+    minHeight: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.danger600,
+  },
+  returnButtonOff: { opacity: 0.4 },
+  returnButtonText: { color: colors.danger600, fontWeight: "700", fontSize: 14 },
   time: { fontSize: 15, fontWeight: "600" },
   meta: { fontSize: 15, color: colors.ink600 },
   total: { fontSize: 17, fontWeight: "700" },
