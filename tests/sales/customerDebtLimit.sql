@@ -236,14 +236,19 @@ begin
   ---------------------------------------------------------------- a cashier cannot change limits
   perform pg_temp.as_user(bb);
   execute 'set local role authenticated';
+  -- Cashiers have no UPDATE policy on customers, so RLS makes these touch no
+  -- row (no error); the guard trigger is the second line if a policy is ever
+  -- added. Either way nothing may change (checked after reset role below).
   begin
     update public.customers set credit_limit_cents = 999999 where id = ca;
-    raise exception 'cashier changed a customer credit limit';
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'cashier changed a customer credit limit'; end if;
   exception when insufficient_privilege then null;
   end;
   begin
     update public.customers set credit_limit_cents = null where id = higher;
-    raise exception 'cashier cleared a customer credit limit';
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'cashier cleared a customer credit limit'; end if;
   exception when insufficient_privilege then null;
   end;
   begin
@@ -272,6 +277,7 @@ begin
   execute 'reset role';
   if (select customer_credit_limit_cents from public.store_settings) <> 30000 then raise exception 'store limit changed by a cashier'; end if;
   if (select credit_limit_cents from public.customers where id = ca) is not null then raise exception 'customer limit changed by a cashier'; end if;
+  if (select credit_limit_cents from public.customers where id = higher) is null then raise exception 'customer limit cleared by a cashier'; end if;
   if not pg_temp.flagged('43100000-0000-0000-0000-000000000003') then raise exception 'flag cleared by a cashier'; end if;
 
   ---------------------------------------------------------------- the owner can
