@@ -296,6 +296,19 @@ export default function SalesHistory() {
       });
       closeReturn();
       load();
+      // The owner can print the updated receipt right away. If it cannot be
+      // read back, the receipt button works later.
+      try {
+        const [freshLines, freshReturns] = await Promise.all([
+          fetchSaleLines([saleId], isOwner),
+          fetchSaleReturns([saleId]),
+        ]);
+        setReceipt(
+          receiptFromHistorySale(sale, freshLines, t("receipt.unknownProduct"), freshReturns)
+        );
+      } catch {
+        // list already reloaded
+      }
     } catch (failure) {
       setReturnError(describeReturnError(failure, t));
     } finally {
@@ -486,7 +499,14 @@ export default function SalesHistory() {
             accessibilityRole="button"
             style={styles.receiptButton}
             onPress={() =>
-              setReceipt(receiptFromHistorySale(sale, lines, t("receipt.unknownProduct")))
+              setReceipt(
+                receiptFromHistorySale(
+                  sale,
+                  lines,
+                  t("receipt.unknownProduct"),
+                  returnsBySale.get(sale.id) ?? []
+                )
+              )
             }
           >
             <Text style={styles.receiptButtonText}>{t("receipt.action")}</Text>
