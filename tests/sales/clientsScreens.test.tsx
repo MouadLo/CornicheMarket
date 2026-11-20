@@ -17,6 +17,7 @@ const mockSales = jest.fn();
 const mockPayments = jest.fn();
 const mockLines = jest.fn();
 const mockPush = jest.fn();
+const mockUpdateLimit = jest.fn(async (..._a: unknown[]) => {});
 
 jest.mock("expo-crypto", () => ({ randomUUID: () => "pay-1" }));
 jest.mock("expo-router", () => ({
@@ -54,6 +55,8 @@ jest.mock("../../src/lib/sales/queries", () => ({
   fetchCustomerPayments: (...a: unknown[]) => mockPayments(...a),
   fetchSaleLines: (...a: unknown[]) => mockLines(...a),
   recordCustomerPayment: jest.fn(),
+  fetchStoreCreditLimit: async () => 30000,
+  updateCustomerCreditLimit: (...a: unknown[]) => mockUpdateLimit(...a),
 }));
 
 const bal = (id: string, name: string, balance: number, phone: string | null = null) => ({
@@ -63,6 +66,9 @@ const bal = (id: string, name: string, balance: number, phone: string | null = n
   credit_total_cents: Math.max(balance, 0),
   paid_total_cents: 0,
   balance_cents: balance,
+  credit_limit_cents: 30000,
+  credit_available_cents: 30000,
+  credit_limit_override_cents: null as number | null,
 });
 
 let tree: ReactTestRenderer;
@@ -73,9 +79,15 @@ const render = async (el: React.ReactElement) => {
 };
 beforeEach(() => {
   mockRole = "owner";
-  [mockBalances, mockBalance, mockSales, mockPayments, mockLines, mockPush].forEach((m) =>
-    m.mockReset()
-  );
+  [
+    mockBalances,
+    mockBalance,
+    mockSales,
+    mockPayments,
+    mockLines,
+    mockPush,
+    mockUpdateLimit,
+  ].forEach((m) => m.mockReset());
 });
 afterEach(() => act(() => tree.unmount()));
 
@@ -288,5 +300,67 @@ describe("customer history", () => {
     mockSales.mockResolvedValueOnce([]);
     await act(async () => pressableByText(tree.root, "credit.loadMore").props.onPress());
     expect(mockSales).toHaveBeenLastCalledWith("c1", 30, 30);
+  });
+});
+
+describe("customer credit limit editor", () => {
+  beforeEach(() => {
+    mockBalance.mockResolvedValue(bal("c1", "Hélène", 1000));
+    mockSales.mockResolvedValue([]);
+    mockPayments.mockResolvedValue([]);
+  });
+
+  it("the owner sees the editor with the store limit, a custom amount and no credit", async () => {
+    await render(<CustomerHistory />);
+    const shown = allTexts(tree.root).join("|");
+    expect(shown).toContain("credit.limitTitle");
+    expect(shown).toContain("credit.limitStoreOption");
+    expect(shown).toContain("credit.limitCustomOption");
+    expect(shown).toContain("credit.limitNoneOption");
+  });
+
+  it("a cashier never sees the editor", async () => {
+    mockRole = "cashier";
+    await render(<CustomerHistory />);
+    const shown = allTexts(tree.root).join("|");
+    expect(shown).not.toContain("credit.limitTitle");
+    expect(shown).not.toContain("credit.limitSave");
+  });
+
+  it("saves a custom limit in centimes", async () => {
+    await render(<CustomerHistory />);
+    await act(async () => pressableByText(tree.root, "credit.limitCustomOption").props.onPress());
+    const input = tree.root
+      .findAllByType(TextInput)
+      .find((n) => n.props.accessibilityLabel === "credit.limitAmount")!;
+    await act(async () => input.props.onChangeText("500"));
+    await act(async () => pressableByText(tree.root, "credit.limitSave").props.onPress());
+    expect(mockUpdateLimit).toHaveBeenCalledWith("c1", 50000);
+  });
+
+  it("saves 'no credit' as 0 and the store limit as null", async () => {
+    await render(<CustomerHistory />);
+    await act(async () => pressableByText(tree.root, "credit.limitNoneOption").props.onPress());
+    await act(async () => pressableByText(tree.root, "credit.limitSave").props.onPress());
+    expect(mockUpdateLimit).toHaveBeenLastCalledWith("c1", 0);
+    await act(async () =>
+      pressableByText(
+        tree.root,
+        'credit.limitStoreOption{"amount":"\u2066300.00 DH\u2069"}'
+      ).props.onPress()
+    );
+    await act(async () => pressableByText(tree.root, "credit.limitSave").props.onPress());
+    expect(mockUpdateLimit).toHaveBeenLastCalledWith("c1", null);
+  });
+
+  it("refuses an amount that is not a number", async () => {
+    await render(<CustomerHistory />);
+    await act(async () => pressableByText(tree.root, "credit.limitCustomOption").props.onPress());
+    const input = tree.root
+      .findAllByType(TextInput)
+      .find((n) => n.props.accessibilityLabel === "credit.limitAmount")!;
+    await act(async () => input.props.onChangeText("abc"));
+    await act(async () => pressableByText(tree.root, "credit.limitSave").props.onPress());
+    expect(mockUpdateLimit).not.toHaveBeenCalled();
   });
 });

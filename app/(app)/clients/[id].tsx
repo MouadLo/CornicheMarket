@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "reac
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { CreditLimitEditor } from "@/src/components/clients/CreditLimitEditor";
 import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
 import { Banner } from "@/src/components/ui/Banner";
 import { InlineError } from "@/src/components/ui/InlineError";
@@ -21,13 +22,16 @@ import {
   type LedgerPayment,
   type LedgerSale,
 } from "@/src/lib/sales/creditLedger";
+import { DEFAULT_CREDIT_LIMIT_CENTS } from "@/src/lib/sales/creditLimit";
 import { saleInstant, storeDayKey } from "@/src/lib/sales/historyView";
 import {
   fetchCustomerBalance,
   fetchCustomerCreditSales,
   fetchCustomerPayments,
   fetchSaleLines,
+  fetchStoreCreditLimit,
   recordCustomerPayment,
+  updateCustomerCreditLimit,
   type CustomerBalance,
   type CustomerCreditSale,
   type SaleLine,
@@ -65,6 +69,8 @@ export default function CustomerHistory() {
   const [paymentsMore, setPaymentsMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  // The store's default debt limit, for the owner's limit editor.
+  const [storeCreditLimit, setStoreCreditLimit] = useState(DEFAULT_CREDIT_LIMIT_CENTS);
   // Translation keys (see errorKey), never the server's text.
   const [error, setError] = useState<string | null>(null);
   const [moreError, setMoreError] = useState<string | null>(null);
@@ -82,6 +88,12 @@ export default function CustomerHistory() {
     Promise.resolve(fetchStoreTimezone())
       .then(setTimeZone)
       .catch(() => {});
+    if (isOwner) {
+      Promise.resolve()
+        .then(fetchStoreCreditLimit)
+        .then((cents) => typeof cents === "number" && setStoreCreditLimit(cents))
+        .catch(() => {});
+    }
     Promise.all([
       fetchCustomerBalance(id),
       fetchCustomerCreditSales(id, salesLimit, 0),
@@ -104,7 +116,7 @@ export default function CustomerHistory() {
       })
       .catch((failure) => setError(errorKey(failure)))
       .finally(() => setLoaded(true));
-  }, [id]);
+  }, [id, isOwner]);
 
   useFocusEffect(load);
 
@@ -304,6 +316,17 @@ export default function CustomerHistory() {
             recordCustomerPayment(paymentId, balance.id, cents, "cash")
           }
           onRecorded={load}
+        />
+      ) : null}
+
+      {isOwner ? (
+        <CreditLimitEditor
+          customerId={balance.id}
+          overrideCents={balance.credit_limit_override_cents ?? null}
+          effectiveCents={balance.credit_limit_cents ?? storeCreditLimit}
+          storeDefaultCents={storeCreditLimit}
+          onSave={(cents) => updateCustomerCreditLimit(balance.id, cents)}
+          onSaved={load}
         />
       ) : null}
 

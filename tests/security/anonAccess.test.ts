@@ -100,6 +100,8 @@ const FUNCTIONS: [string, Record<string, unknown>][] = [
   ["is_owner", {}],
   ["dismiss_price_review", { p_sale_id: NIL }],
   ["dismiss_discount_review", { p_sale_id: NIL }],
+  ["dismiss_credit_review", { p_sale_id: NIL }],
+  ["customer_credit_limit", { p_customer_id: NIL }],
   [
     "recover_sale",
     {

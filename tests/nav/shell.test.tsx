@@ -20,7 +20,7 @@ let mockSync = {
   syncing: false,
   lastError: null as string | null,
 };
-let mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
+let mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0, credit: 0 };
 const mockNavigate = jest.fn();
 const mockFetchReview = jest.fn();
 const mockDismiss = jest.fn();
@@ -73,7 +73,9 @@ jest.mock("../../src/lib/sales/useSaleSync", () => ({
 }));
 jest.mock("../../src/lib/alerts/useOwnerAlerts", () => ({
   useOwnerAlerts: (enabled: boolean) => ({
-    counts: enabled ? mockCounts : { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 },
+    counts: enabled
+      ? mockCounts
+      : { price: 0, discount: 0, negativeStock: 0, voidRequests: 0, credit: 0 },
     refresh: jest.fn(),
   }),
 }));
@@ -132,7 +134,7 @@ beforeEach(() => {
   mockLoading = false;
   mockProfile = cashier;
   mockSync = { online: true, pending: 0, stuck: 0, syncing: false, lastError: null };
-  mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
+  mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0, credit: 0 };
   mockNavigate.mockClear();
   mockFetchReview.mockReset();
   mockDismiss.mockReset();
@@ -345,7 +347,7 @@ describe("the top bar", () => {
     expect(byLabel(r, /^shell\.alertsLabel/)).toHaveLength(0);
 
     mockProfile = owner;
-    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0 };
+    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0, credit: 0 };
     mockSync = { ...mockSync, stuck: 1 };
     r = await render(
       <AppShell>
@@ -407,7 +409,7 @@ describe("the top bar", () => {
 describe("the owner's alerts", () => {
   beforeEach(() => {
     mockProfile = owner;
-    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0 };
+    mockCounts = { price: 2, discount: 1, negativeStock: 3, voidRequests: 0, credit: 0 };
     mockSync = { ...mockSync, stuck: 1 };
   });
 
@@ -437,15 +439,47 @@ describe("the owner's alerts", () => {
   });
 
   it("hides kinds with nothing to do, and says so when all are clear", async () => {
-    mockCounts = { price: 0, discount: 1, negativeStock: 0, voidRequests: 0 };
+    mockCounts = { price: 0, discount: 1, negativeStock: 0, voidRequests: 0, credit: 0 };
     mockSync = { ...mockSync, stuck: 0 };
     let r = await openAlerts();
     expect(texts(r.root)).not.toContain("shell.alertPrice");
     expect(texts(r.root)).toContain("shell.alertDiscount");
 
-    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
+    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0, credit: 0 };
     r = await openAlerts();
     expect(texts(r.root)).toContain("shell.alertsNone");
+  });
+
+  it("lists credit sales above a customer's limit and opens their review", async () => {
+    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0, credit: 2 };
+    mockSync = { ...mockSync, stuck: 0 };
+    mockFetchReview.mockResolvedValue([
+      {
+        saleId: "s7",
+        occurredAt: "2026-11-01T10:00:00",
+        totalCents: 12000,
+        cashierName: "Salma",
+        lines: [
+          {
+            type: "creditLimit",
+            customerName: "Fatima",
+            balanceCents: 25000,
+            saleCents: 12000,
+            limitCents: 30000,
+            overCents: 7000,
+          },
+        ],
+      },
+    ]);
+    const r = await openAlerts();
+    expect(texts(r.root)).toContain("shell.alertCredit");
+    const row = r.root.findAll(
+      (n) => typeof n.props.onPress === "function" && texts(n).includes("shell.alertCredit")
+    );
+    await act(async () => row[row.length - 1].props.onPress());
+    expect(mockFetchReview).toHaveBeenCalledWith("credit");
+    expect(texts(r.root)).toContain("shell.reviewCreditTitle");
+    expect(texts(r.root).join("|")).toContain("shell.creditLimitLine");
   });
 
   it("negative stock opens the negative-stock screen", async () => {
@@ -491,7 +525,7 @@ describe("the owner's alerts", () => {
   });
 
   it("pending void requests are listed, counted in the badge, and open their panel", async () => {
-    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 2 };
+    mockCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 2, credit: 0 };
     mockSync = { ...mockSync, stuck: 0 };
     mockFetchVoidRequests.mockResolvedValue([]);
     const r = await openAlerts();

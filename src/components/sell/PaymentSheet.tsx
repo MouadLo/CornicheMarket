@@ -5,6 +5,11 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import { filterCustomers, findCustomerByName, pressCashKey } from "@/src/lib/sales/cashEntry";
+import {
+  DEFAULT_CREDIT_LIMIT_CENTS,
+  creditLimitProblem,
+  customerCreditState,
+} from "@/src/lib/sales/creditLimit";
 import { paymentMethodKey } from "@/src/lib/sales/paymentMethod";
 import { changeDue, isShortPayment } from "@/src/lib/sales/totals";
 import { isScannerBurst, keyFromKeyboardEvent, type WeightKey } from "@/src/lib/sales/weightEntry";
@@ -25,6 +30,11 @@ type Props = {
   // change: what to hand back (cash only; 0 for an exact amount or any other method).
   onConfirm: (method: PaymentMethod, customerId: string | null, change: number) => void;
   onCreateCustomer: (name: string) => Promise<Customer | null>;
+  // The owner is not limited on customer debt: they see the same figures and a
+  // note, but Pay Later is never disabled for them.
+  isOwner?: boolean;
+  // The store's default debt limit, for a customer with no limit of their own.
+  storeCreditLimitCents?: number;
 };
 
 const METHODS: PaymentMethod[] = ["cash", "card", "credit"];
@@ -48,6 +58,8 @@ export function PaymentSheet({
   onClose,
   onConfirm,
   onCreateCustomer,
+  isOwner = false,
+  storeCreditLimitCents = DEFAULT_CREDIT_LIMIT_CENTS,
 }: Props) {
   const { t } = useTranslation();
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -81,6 +93,15 @@ export function PaymentSheet({
   const change = changeDue(tenderedCents, totalCents);
   const chosen = customers.find((customer) => customer.id === customerId) ?? null;
   const needsCustomer = method === "credit" && !chosen;
+  // What the customer already owes against their limit, and whether this sale
+  // would go over it. The device blocks a cashier here (it works offline); the
+  // server only flags a breach.
+  const credit =
+    method === "credit" && chosen ? customerCreditState(chosen, storeCreditLimitCents) : null;
+  const creditProblem = credit
+    ? creditLimitProblem(credit.balanceCents, totalCents, credit.limitCents)
+    : null;
+  const creditBlocked = !isOwner && creditProblem !== null;
 
   // Physical keyboard on web: digits, the decimal point and Backspace fill the
   // cash amount. Enter is left alone (a scanner ends with it), and keys that
@@ -272,6 +293,31 @@ export function PaymentSheet({
                   )}
                 </View>
 
+                {credit && (
+                  <View style={styles.block}>
+                    <Text style={styles.hint} testID="credit-standing">
+                      {t("sell.creditStanding", {
+                        owed: isolateLtr(formatMAD(Math.max(0, credit.balanceCents))),
+                        limit: isolateLtr(formatMAD(credit.limitCents)),
+                      })}
+                    </Text>
+                    {creditProblem && !isOwner && (
+                      <Text style={styles.error} testID="credit-blocked">
+                        {creditProblem.kind === "noCredit"
+                          ? t("sell.creditNone")
+                          : t("sell.creditOver", {
+                              amount: isolateLtr(formatMAD(creditProblem.availableCents)),
+                            })}
+                      </Text>
+                    )}
+                    {creditProblem && isOwner && (
+                      <Text style={styles.hint} testID="credit-owner-note">
+                        {t("sell.creditOwnerMayExceed")}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
                 <View style={styles.newCustomerRow}>
                   <TextInput
                     style={[styles.input, styles.flex]}
@@ -324,7 +370,9 @@ export function PaymentSheet({
                 variant="pay"
                 tall
                 onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
-                disabled={saving || needsCustomer || short}
+                disabled={
+                  saving || needsCustomer || short || (method === "credit" && creditBlocked)
+                }
               />
             )}
             <Pressable style={styles.back} onPress={onClose} accessibilityRole="button">

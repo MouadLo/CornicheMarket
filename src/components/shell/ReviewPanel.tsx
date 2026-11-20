@@ -51,6 +51,14 @@ export function describeReviewLine(line: ReviewLine, t: T): string {
         discount: m(line.discountCents),
         limit: m(line.limitCents),
       });
+    case "creditLimit":
+      return t("shell.creditLimitLine", {
+        name: isolateBidi(line.customerName),
+        balance: m(line.balanceCents),
+        sale: m(line.saleCents),
+        limit: m(line.limitCents),
+        over: m(line.overCents),
+      });
   }
 }
 
@@ -110,7 +118,13 @@ export function ReviewPanel({
   return (
     <Panel
       visible={kind !== null}
-      title={kind === "discount" ? t("shell.reviewDiscountTitle") : t("shell.reviewPriceTitle")}
+      title={
+        kind === "discount"
+          ? t("shell.reviewDiscountTitle")
+          : kind === "credit"
+            ? t("shell.reviewCreditTitle")
+            : t("shell.reviewPriceTitle")
+      }
       onClose={onClose}
     >
       {failed ? (

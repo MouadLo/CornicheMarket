@@ -40,13 +40,14 @@ import {
 } from "@/src/lib/products/queries";
 import { localizeCategoryName } from "@/src/lib/products/categoryCatalog";
 import { rankBySearch } from "@/src/lib/products/search";
-import { enqueueSale, type PendingSale } from "@/src/lib/sales/offlineQueue";
+import { enqueueSale, listPendingSales, type PendingSale } from "@/src/lib/sales/offlineQueue";
 import { receiptFromPendingSale, type ReceiptModel } from "@/src/lib/sales/receipt";
 import type { ScanOutcome } from "@/src/lib/sales/scanRules";
 import {
   createCustomer,
   fetchCustomers,
   fetchDiscountLimits,
+  fetchStoreCreditLimit,
   type Customer,
   type PaymentMethod,
 } from "@/src/lib/sales/queries";
@@ -69,6 +70,16 @@ import {
   cashierDiscountLimitCents,
 } from "@/src/lib/sales/discountLimit";
 import { useDiscountLimits } from "@/src/lib/sales/discountLimitCache";
+import {
+  creditLimitProblem,
+  customerCreditState,
+  withPendingCredit,
+} from "@/src/lib/sales/creditLimit";
+import {
+  loadCachedCustomers,
+  saveCachedCustomers,
+  useStoreCreditLimit,
+} from "@/src/lib/sales/creditLimitCache";
 import { restoreLine, restoreLines, restoreSaleDiscount } from "@/src/lib/sales/restoreLines";
 import { subscribeGridRefresh } from "@/src/lib/sellGrid/refresh";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
@@ -194,10 +205,28 @@ export default function SellScreen() {
   const discountInvalid = discountError !== null || cashierProblem !== null;
   const quantityInvalid = hasInvalidQuantity(lines);
 
+  // The store's default debt limit (cached, so it works offline).
+  const storeCreditLimit = useStoreCreditLimit(sync.online, fetchStoreCreditLimit);
+
+  // Customers come with what they owe and their limit. Offline (or on a failed
+  // read) the last list the server gave is used, so the debt limit still holds.
+  // Credit sales still waiting in the offline queue count against the balance:
+  // the server has not seen them yet.
   useEffect(() => {
+    const pendingCredit = () =>
+      Promise.resolve()
+        .then(() => listPendingSales())
+        .then((sales) => sales ?? [])
+        .catch(() => []);
     fetchCustomers()
-      .then(setCustomers)
-      .catch(() => setCustomers([]));
+      .then(async (rows) => {
+        void saveCachedCustomers(rows);
+        setCustomers(withPendingCredit(rows, await pendingCredit()));
+      })
+      .catch(async () => {
+        const cached = await loadCachedCustomers();
+        setCustomers(withPendingCredit(cached, await pendingCredit()));
+      });
   }, []);
 
   // Only the owner can act on the empty-store prompt (add/import products),
@@ -384,6 +413,27 @@ export default function SellScreen() {
       return;
     }
 
+    // The customer debt limit, the same way: checked on the device before
+    // anything is queued, for a cashier only. The server never refuses a sale
+    // for it; it only flags one that got past a device.
+    if (method === "credit" && !isOwner) {
+      const standing = customerCreditState(
+        customers.find((c) => c.id === customerId),
+        storeCreditLimit
+      );
+      const creditProblem = creditLimitProblem(standing.balanceCents, total, standing.limitCents);
+      if (creditProblem?.kind === "noCredit") {
+        setError(t("sell.creditNone"));
+        return;
+      }
+      if (creditProblem?.kind === "over") {
+        setError(
+          t("sell.creditOver", { amount: isolateLtr(formatMAD(creditProblem.availableCents)) })
+        );
+        return;
+      }
+    }
+
     accepting.current = true;
     setSaving(true);
     setError(null);
@@ -429,6 +479,15 @@ export default function SellScreen() {
       setSaleDiscount("");
       setDiscountOpen(false);
       setPaymentOpen(false);
+      // The sale is accepted: from now on this customer owes it, for the next
+      // sale's debt limit (the list is only read when the screen opens).
+      if (method === "credit" && customerId) {
+        setCustomers((current) =>
+          current.map((c) =>
+            c.id === customerId ? { ...c, balance_cents: (c.balance_cents ?? 0) + total } : c
+          )
+        );
+      }
       showFlash(t("sell.recorded", { amount: isolateLtr(formatMAD(total)) }));
       setChangeDue(method === "cash" && change > 0 ? change : null);
       setLastReceipt(
@@ -871,6 +930,8 @@ export default function SellScreen() {
         error={error}
         onClose={() => setPaymentOpen(false)}
         onConfirm={handleConfirm}
+        isOwner={isOwner}
+        storeCreditLimitCents={storeCreditLimit}
         onCreateCustomer={async (name) => {
           try {
             const created = await createCustomer(name, null);

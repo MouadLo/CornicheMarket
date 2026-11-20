@@ -2,18 +2,28 @@ import { productsSource } from "@/src/lib/products/queries";
 import { supabase } from "@/src/lib/supabase/client";
 
 import { DEFAULT_DISCOUNT_LIMITS, type DiscountLimits } from "@/src/lib/sales/discountLimit";
+import { DEFAULT_CREDIT_LIMIT_CENTS } from "@/src/lib/sales/creditLimit";
+import {
+  parseCreditLimitCents,
+  saveCachedStoreCreditLimit,
+} from "@/src/lib/sales/creditLimitCache";
 import { parseDiscountLimits, saveCachedDiscountLimits } from "@/src/lib/sales/discountLimitCache";
 import type { PendingSale } from "@/src/lib/sales/offlineQueue";
 
 export type PaymentMethod = "cash" | "card" | "credit";
 
 // balance_cents: what the customer owes (credit not yet repaid); absent on a
-// customer just created, who owes nothing.
+// customer just created, who owes nothing. credit_limit_cents: the customer's
+// effective debt limit (their own, else the store default) and
+// credit_available_cents the room left under it; both absent on a customer just
+// created or cached before the limit existed (the store default applies).
 export type Customer = {
   id: string;
   name: string;
   phone: string | null;
   balance_cents?: number;
+  credit_limit_cents?: number | null;
+  credit_available_cents?: number;
 };
 
 export type CustomerBalance = {
@@ -23,6 +33,11 @@ export type CustomerBalance = {
   credit_total_cents: number;
   paid_total_cents: number;
   balance_cents: number;
+  // The effective debt limit, the room left under it, and the customer's own
+  // limit (null = the store default applies).
+  credit_limit_cents: number;
+  credit_available_cents: number;
+  credit_limit_override_cents: number | null;
 };
 
 export type SaleSummary = {
@@ -118,7 +133,7 @@ export async function fetchCustomers(): Promise<Customer[]> {
   // The balances view (cashiers may read it) so the counter sees who owes what.
   const { data, error } = await supabase
     .from("customer_balances")
-    .select("id, name, phone, balance_cents")
+    .select("id, name, phone, balance_cents, credit_limit_cents, credit_available_cents")
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Customer[];
@@ -137,7 +152,9 @@ export async function createCustomer(name: string, phone: string | null): Promis
 export async function fetchCustomerBalances(): Promise<CustomerBalance[]> {
   const { data, error } = await supabase
     .from("customer_balances")
-    .select("id, name, phone, credit_total_cents, paid_total_cents, balance_cents")
+    .select(
+      "id, name, phone, credit_total_cents, paid_total_cents, balance_cents, credit_limit_cents, credit_available_cents, credit_limit_override_cents"
+    )
     .order("balance_cents", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as CustomerBalance[];
@@ -256,7 +273,9 @@ export type CustomerPayment = {
 export async function fetchCustomerBalance(customerId: string): Promise<CustomerBalance | null> {
   const { data, error } = await supabase
     .from("customer_balances")
-    .select("id, name, phone, credit_total_cents, paid_total_cents, balance_cents")
+    .select(
+      "id, name, phone, credit_total_cents, paid_total_cents, balance_cents, credit_limit_cents, credit_available_cents, credit_limit_override_cents"
+    )
     .eq("id", customerId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -349,4 +368,42 @@ export async function updateDiscountLimits(limits: DiscountLimits): Promise<void
     .eq("singleton", true);
   if (error) throw new Error(error.message);
   await saveCachedDiscountLimits(limits);
+}
+
+// --- customer debt limit (store_settings + customers) ------------------------
+// The store default is readable by every signed-in user (a cashier's device
+// needs it) and updated by the owner only (row-level security). A customer's
+// own limit is changed by the owner only: a database trigger refuses anyone
+// else, whatever the client sends.
+
+export async function fetchStoreCreditLimit(): Promise<number> {
+  const { data, error } = await supabase
+    .from("store_settings")
+    .select("customer_credit_limit_cents")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as { customer_credit_limit_cents: number | string | null } | null;
+  return parseCreditLimitCents(row?.customer_credit_limit_cents) ?? DEFAULT_CREDIT_LIMIT_CENTS;
+}
+
+export async function updateStoreCreditLimit(cents: number): Promise<void> {
+  const { error } = await supabase
+    .from("store_settings")
+    .update({ customer_credit_limit_cents: cents })
+    .eq("singleton", true);
+  if (error) throw new Error(error.message);
+  await saveCachedStoreCreditLimit(cents);
+}
+
+// null = back to the store default; 0 = no credit for this customer.
+export async function updateCustomerCreditLimit(
+  customerId: string,
+  cents: number | null
+): Promise<void> {
+  const { error } = await supabase
+    .from("customers")
+    .update({ credit_limit_cents: cents })
+    .eq("id", customerId);
+  if (error) throw new Error(error.message);
 }
