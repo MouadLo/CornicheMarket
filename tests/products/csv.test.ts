@@ -140,6 +140,49 @@ describe("validateRows", () => {
     expect(errors[0].issues[0].key).toBe("products.importIssue.barcodeInFile");
   });
 
+  it("rejects a barcode a spreadsheet turned into scientific notation", () => {
+    for (const damaged of ["6.11123E+12", "6,11123E+12", "6E12"]) {
+      const { rows, errors } = validateRows(
+        [{ name: "Coca", barcode: damaged, price: "7.00" }],
+        { name: "name", barcode: "barcode", selling_price: "price" },
+        emptyContext
+      );
+      expect(rows).toHaveLength(0);
+      expect(errors[0].issues[0]).toEqual({
+        key: "products.importIssue.barcodeScientific",
+        params: { value: damaged },
+      });
+    }
+  });
+
+  it("drops spaces inside a numeric barcode", () => {
+    const { rows } = validateRows(
+      [{ name: "Coca", barcode: "6 111245 100135", price: "7.00" }],
+      { name: "name", barcode: "barcode", selling_price: "price" },
+      emptyContext
+    );
+    expect(rows[0].product.barcode).toBe("6111245100135");
+  });
+
+  it("a UPC-A saved with 12 digits and the same code with a leading 0 are duplicates", () => {
+    const existing = validateRows(
+      [{ name: "Chips", barcode: "0036000291452", price: "15.00" }],
+      { name: "name", barcode: "barcode", selling_price: "price" },
+      { categories, existingBarcodes: new Set(["036000291452"]) }
+    );
+    expect(existing.errors[0].issues[0].key).toBe("products.importIssue.barcodeExists");
+
+    const inFile = validateRows(
+      [
+        { name: "Chips", barcode: "036000291452", price: "15.00" },
+        { name: "Chips again", barcode: "0036000291452", price: "15.00" },
+      ],
+      { name: "name", barcode: "barcode", selling_price: "price" },
+      emptyContext
+    );
+    expect(inFile.errors[0].issues[0].key).toBe("products.importIssue.barcodeInFile");
+  });
+
   it("rejects an unknown category rather than silently creating one", () => {
     const { errors } = validateRows(
       [{ name: "Coca", category: "Inexistante", price: "7.00" }],
@@ -280,6 +323,7 @@ describe("row issues carry what the person needs to fix the file", () => {
       "priceInvalid",
       "barcodeExists",
       "barcodeInFile",
+      "barcodeScientific",
       "unitInvalid",
       "categoryUnknown",
       "thresholdInvalid",

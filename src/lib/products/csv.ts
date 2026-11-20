@@ -2,6 +2,7 @@ import Papa from "papaparse";
 
 import { centsToDisplay, parseMoneyToCents, parseQuantity } from "@/src/lib/money";
 import type { Category, Product, ProductInput, ProductUnit } from "@/src/lib/products/queries";
+import { barcodeVariants, cleanScannedCode } from "@/src/lib/scanner/barcode";
 
 export type ImportFieldKey =
   | "name"
@@ -106,6 +107,12 @@ function cell(row: Record<string, string>, column: string | undefined): string {
   return (row[column] ?? "").trim();
 }
 
+// A spreadsheet that saved a long barcode as a number writes "6.11123E+12":
+// the digits are lost and the product could never be scanned.
+export function looksLikeSpreadsheetNumber(value: string): boolean {
+  return /^\d+(?:[.,]\d+)?e\+?\d+$/i.test(value);
+}
+
 export function validateRows(
   rows: Record<string, string>[],
   mapping: ColumnMapping,
@@ -135,11 +142,17 @@ export function validateRows(
       issues.push({ key: "products.importIssue.priceInvalid", params: { value: priceRaw } });
     }
 
-    const barcode = cell(row, mapping.barcode) || null;
-    if (barcode) {
-      if (context.existingBarcodes.has(barcode)) {
+    const barcodeRaw = cell(row, mapping.barcode);
+    // Spaces inside a numeric code are dropped ("6 111234 567890").
+    const barcode = (barcodeRaw && cleanScannedCode(barcodeRaw)) || null;
+    const isKnown = (known: Set<string>, code: string) =>
+      barcodeVariants(code).some((variant) => known.has(variant));
+    if (barcode && looksLikeSpreadsheetNumber(barcode)) {
+      issues.push({ key: "products.importIssue.barcodeScientific", params: { value: barcode } });
+    } else if (barcode) {
+      if (isKnown(context.existingBarcodes, barcode)) {
         issues.push({ key: "products.importIssue.barcodeExists", params: { value: barcode } });
-      } else if (barcodesInFile.has(barcode)) {
+      } else if (isKnown(barcodesInFile, barcode)) {
         issues.push({ key: "products.importIssue.barcodeInFile", params: { value: barcode } });
       }
     }

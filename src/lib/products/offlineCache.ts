@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/src/lib/supabase/client";
 import { productsSource, type ProductUnit } from "@/src/lib/products/queries";
 import { rankBySearch } from "@/src/lib/products/search";
+import { pickByBarcode } from "@/src/lib/scanner/barcode";
 import { fetchGridCategories, fetchGridLayout } from "@/src/lib/sellGrid/queries";
 import type { GridCategory, GridTab, GridTile } from "@/src/lib/sellGrid/layout";
 
@@ -102,7 +103,11 @@ export async function findCachedByBarcode(barcode: string): Promise<CachedProduc
     const cache = await readCache();
     if (!cache) return null;
     const { products } = cache;
-    return products.find((p) => p.barcode === barcode && p.active) ?? null;
+    // Same rule as fetchProductByBarcode: equivalent forms, exact text first.
+    return pickByBarcode(
+      barcode,
+      products.filter((p) => p.active)
+    );
   } catch {
     return null;
   }
