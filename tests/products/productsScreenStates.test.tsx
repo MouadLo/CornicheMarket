@@ -150,3 +150,19 @@ describe("on a phone", () => {
     expect(texts()).not.toContain("products.moreActions");
   });
 });
+
+it("offers recent price changes to the owner, never to a cashier", async () => {
+  mockFetchProducts.mockResolvedValue([]);
+  await render();
+  // On a narrow screen the actions sit behind "more".
+  await act(async () => {
+    pressableByText(tree.root, "products.moreActions").props.onPress();
+  });
+  expect(texts()).toContain("products.priceChangesRecent");
+  await act(() => tree.unmount());
+
+  mockRole = "cashier";
+  await render();
+  expect(texts()).not.toContain("products.moreActions");
+  expect(texts()).not.toContain("products.priceChangesRecent");
+});
