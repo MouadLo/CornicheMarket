@@ -2,6 +2,9 @@ import {
   cashDifferenceCents,
   cashierCashCents,
   expectedCashCents,
+  netCardCents,
+  netCashCents,
+  refundsTotalCents,
   shiftDay,
   sumCashiers,
   type CashierDay,
@@ -44,6 +47,36 @@ describe("day close math", () => {
 
   it("a cashier hands over cash sales plus the cash repayments they took", () => {
     expect(cashierCashCents(rows[1])).toBe(700);
+  });
+
+  it("cash refunds on returns come out of the expected cash and the hand-over", () => {
+    const withRefunds = [
+      ...rows,
+      row({ refunds_count: 2, cash_refunds_cents: 600, card_refunds_cents: 250 }),
+    ];
+    // 2000 + 1400 + 300 - 600: card refunds never touch the drawer.
+    expect(expectedCashCents(2000, withRefunds)).toBe(3100);
+    expect(cashierCashCents(withRefunds[2])).toBe(-600);
+    expect(sumCashiers(withRefunds).cash_refunds_cents).toBe(600);
+    expect(sumCashiers(withRefunds).refunds_count).toBe(2);
+  });
+
+  it("net sales by method lose the returns refunded the same way", () => {
+    const day = row({
+      cash_cents: 1000,
+      card_cents: 500,
+      cash_refunds_cents: 300,
+      card_refunds_cents: 500,
+      credit_refunds_cents: 100,
+    });
+    expect(netCashCents(day)).toBe(700);
+    expect(netCardCents(day)).toBe(0);
+    expect(refundsTotalCents(day)).toBe(900);
+  });
+
+  it("reads a server without returns as no returns", () => {
+    expect(expectedCashCents(100, rows)).toBe(1800);
+    expect(refundsTotalCents(rows[0])).toBe(0);
   });
 
   it("the difference is counted minus expected: short is negative", () => {

@@ -288,6 +288,13 @@ export default function ReportsScreen() {
                 onPress={() => openSales(range)}
                 hint={t("reports.openSalesHint")}
               />
+              {(summary.returns_cents ?? 0) > 0 ? (
+                <Metric
+                  label={t("reports.metricReturns")}
+                  value={isolateLtr(`−${formatMAD(summary.returns_cents ?? 0)}`)}
+                  negative
+                />
+              ) : null}
               <Metric label={t("reports.metricCogs")} value={formatMAD(summary.cogs_cents)} />
               <Metric
                 label={t("reports.metricGrossProfit")}

@@ -84,3 +84,45 @@ describe("Sales Day screen, failed load", () => {
     expect(allTexts(tree.root)).toContain("day.noActivity");
   });
 });
+
+describe("Sales Day screen, returns", () => {
+  const row = {
+    cashier_id: "c1",
+    cashier_name: "Sara",
+    sales_count: 3,
+    cash_cents: 3000,
+    card_cents: 1000,
+    credit_cents: 0,
+    discount_cents: 0,
+    voids_count: 0,
+    voids_cents: 0,
+    cash_payments_cents: 500,
+    card_payments_cents: 0,
+    refunds_count: 2,
+    cash_refunds_cents: 886,
+    card_refunds_cents: 200,
+    credit_refunds_cents: 0,
+  };
+
+  it("shows a Returns line and takes cash refunds off what the cashier hands over", async () => {
+    mockFetch.mockResolvedValue({ ...summary, cashiers: [row] });
+    await mount();
+    const texts = allTexts(tree.root);
+    expect(texts).toContain("day.refunds:2");
+    expect(texts).toContain("⁦−10.86 DH⁩");
+    // Cash 30.00 - 8.86 refunded, card 10.00 - 2.00 refunded.
+    expect(texts).toContain("21.14 DH");
+    expect(texts).toContain("8.00 DH");
+    // Hand over: 30.00 + 5.00 repayments - 8.86 = 26.14.
+    expect(texts).toContain("26.14 DH");
+  });
+
+  it("shows no Returns line on a day without returns", async () => {
+    mockFetch.mockResolvedValue({
+      ...summary,
+      cashiers: [{ ...row, refunds_count: 0, cash_refunds_cents: 0, card_refunds_cents: 0 }],
+    });
+    await mount();
+    expect(allTexts(tree.root).join("|")).not.toContain("day.refunds");
+  });
+});

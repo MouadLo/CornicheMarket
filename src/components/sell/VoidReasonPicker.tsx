@@ -7,19 +7,24 @@ import { colors, radius, spacing, touch } from "@/src/theme/tokens";
 
 // The preset reasons for voiding a sale, shared by the cashier's request sheet
 // and the owner's own void. Nothing is preselected. "Other" always needs a
-// note; with `noteAlways` the other reasons offer an optional one.
-export function VoidReasonPicker({
+// note; with `noteAlways` the other reasons offer an optional one. The return
+// sheet reuses it with its own presets (`reasons` + `labelKey`).
+export function VoidReasonPicker<R extends string = VoidReason>({
   reason,
   note,
   onReason,
   onNote,
   noteAlways = false,
+  reasons = VOID_REASONS as unknown as readonly R[],
+  labelKey = voidReasonKey as unknown as (code: R) => string,
 }: {
-  reason: VoidReason | null;
+  reason: R | null;
   note: string;
-  onReason: (next: VoidReason) => void;
+  onReason: (next: R) => void;
   onNote: (next: string) => void;
   noteAlways?: boolean;
+  reasons?: readonly R[];
+  labelKey?: (code: R) => string;
 }) {
   const { t } = useTranslation();
   const showNote = reason === "other" || (noteAlways && reason !== null);
@@ -27,10 +32,10 @@ export function VoidReasonPicker({
   return (
     <View style={styles.wrap}>
       <View style={styles.chips}>
-        {VOID_REASONS.map((code) => (
+        {reasons.map((code) => (
           <Chip
             key={code}
-            label={t(voidReasonKey(code))}
+            label={t(labelKey(code))}
             selected={reason === code}
             onPress={() => onReason(code)}
           />

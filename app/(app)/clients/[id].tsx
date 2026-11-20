@@ -20,12 +20,14 @@ import {
   mergeTimeline,
   type LedgerEntry,
   type LedgerPayment,
+  type LedgerReturn,
   type LedgerSale,
 } from "@/src/lib/sales/creditLedger";
 import { DEFAULT_CREDIT_LIMIT_CENTS } from "@/src/lib/sales/creditLimit";
 import { saleInstant, storeDayKey } from "@/src/lib/sales/historyView";
 import {
   fetchCustomerBalance,
+  fetchCustomerCreditReturns,
   fetchCustomerCreditSales,
   fetchCustomerPayments,
   fetchSaleLines,
@@ -33,6 +35,7 @@ import {
   recordCustomerPayment,
   updateCustomerCreditLimit,
   type CustomerBalance,
+  type CustomerCreditReturn,
   type CustomerCreditSale,
   type SaleLine,
 } from "@/src/lib/sales/queries";
@@ -54,6 +57,14 @@ const toLedgerSale = (sale: CustomerCreditSale): LedgerSale => ({
   is_own: sale.is_own,
 });
 
+const toLedgerReturn = (row: CustomerCreditReturn): LedgerReturn => ({
+  kind: "return",
+  id: row.id,
+  instant: row.created_at,
+  refund_cents: row.refund_cents,
+  item_count: row.item_count,
+});
+
 export default function CustomerHistory() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
@@ -65,6 +76,8 @@ export default function CustomerHistory() {
   const [loaded, setLoaded] = useState(false);
   const [sales, setSales] = useState<LedgerSale[]>([]);
   const [payments, setPayments] = useState<LedgerPayment[]>([]);
+  const [returns, setReturns] = useState<LedgerReturn[]>([]);
+  const [returnsMore, setReturnsMore] = useState(false);
   const [salesMore, setSalesMore] = useState(false);
   const [paymentsMore, setPaymentsMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -79,12 +92,13 @@ export default function CustomerHistory() {
   const [linesError, setLinesError] = useState(false);
 
   // Rows already loaded, so a reload keeps every page the cashier opened.
-  const counts = useRef({ sales: 0, payments: 0 });
-  counts.current = { sales: sales.length, payments: payments.length };
+  const counts = useRef({ sales: 0, payments: 0, returns: 0 });
+  counts.current = { sales: sales.length, payments: payments.length, returns: returns.length };
 
   const load = useCallback(() => {
     const salesLimit = Math.max(PAGE_SIZE, counts.current.sales);
     const paymentsLimit = Math.max(PAGE_SIZE, counts.current.payments);
+    const returnsLimit = Math.max(PAGE_SIZE, counts.current.returns);
     Promise.resolve(fetchStoreTimezone())
       .then(setTimeZone)
       .catch(() => {});
@@ -98,8 +112,9 @@ export default function CustomerHistory() {
       fetchCustomerBalance(id),
       fetchCustomerCreditSales(id, salesLimit, 0),
       fetchCustomerPayments(id, paymentsLimit, 0),
+      fetchCustomerCreditReturns(id, returnsLimit, 0),
     ])
-      .then(([row, saleRows, paymentRows]) => {
+      .then(([row, saleRows, paymentRows, returnRows]) => {
         setBalance(row);
         setSales(saleRows.map(toLedgerSale));
         setPayments(
@@ -110,6 +125,8 @@ export default function CustomerHistory() {
             amount_cents: payment.amount_cents,
           }))
         );
+        setReturns(returnRows.map(toLedgerReturn));
+        setReturnsMore(returnRows.length >= returnsLimit);
         setSalesMore(saleRows.length >= salesLimit);
         setPaymentsMore(paymentRows.length >= paymentsLimit);
         setError(null);
@@ -129,10 +146,14 @@ export default function CustomerHistory() {
     setLoadingMore(true);
     setMoreError(null);
     try {
-      const [saleRows, paymentRows] = await Promise.all([
+      const [saleRows, paymentRows, returnRows] = await Promise.all([
         salesMore ? fetchCustomerCreditSales(id, PAGE_SIZE, sales.length) : Promise.resolve([]),
         paymentsMore ? fetchCustomerPayments(id, PAGE_SIZE, payments.length) : Promise.resolve([]),
+        returnsMore
+          ? fetchCustomerCreditReturns(id, PAGE_SIZE, returns.length)
+          : Promise.resolve([]),
       ]);
+      setReturns((prev) => [...prev, ...returnRows.map(toLedgerReturn)]);
       setSales((prev) => [...prev, ...saleRows.map(toLedgerSale)]);
       setPayments((prev) => [
         ...prev,
@@ -145,6 +166,7 @@ export default function CustomerHistory() {
       ]);
       if (salesMore) setSalesMore(saleRows.length >= PAGE_SIZE);
       if (paymentsMore) setPaymentsMore(paymentRows.length >= PAGE_SIZE);
+      if (returnsMore) setReturnsMore(returnRows.length >= PAGE_SIZE);
     } catch (failure) {
       setMoreError(errorKeyOr(failure, "credit.historyLoadError"));
     } finally {
@@ -181,8 +203,8 @@ export default function CustomerHistory() {
     );
   }
 
-  const entries = mergeTimeline(sales, payments, salesMore, paymentsMore);
-  const hasMore = salesMore || paymentsMore;
+  const entries = mergeTimeline(sales, payments, salesMore, paymentsMore, returns, returnsMore);
+  const hasMore = salesMore || paymentsMore || returnsMore;
   const owes = balance.balance_cents > 0;
 
   const days: { key: string; instant: string; entries: LedgerEntry[] }[] = [];
@@ -230,6 +252,25 @@ export default function CustomerHistory() {
             </View>
             <Text style={styles.paymentAmount}>
               {isolateLtr(`+${formatMAD(entry.amount_cents)}`)}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    if (entry.kind === "return") {
+      return (
+        <View key={`r-${entry.id}`} style={styles.row}>
+          <View style={styles.rowTop}>
+            <View style={styles.rowMain}>
+              <Text style={styles.entryTitle}>{t("credit.timelineReturn")}</Text>
+              <Text style={styles.meta}>{time}</Text>
+              <Text style={styles.meta}>
+                {t("credit.returnItems", { count: entry.item_count })}
+              </Text>
+            </View>
+            {/* Lowers the debt like a payment, so it reads like one. */}
+            <Text style={styles.paymentAmount}>
+              {isolateLtr(`+${formatMAD(entry.refund_cents)}`)}
             </Text>
           </View>
         </View>

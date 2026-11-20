@@ -41,6 +41,7 @@ jest.mock("../../src/lib/reports/queries", () => {
     transaction_count: 4,
     average_basket_cents: 1250,
     loss_cents: 0,
+    returns_cents: 700,
   };
   return {
     fetchStoreTimezone: async () => "UTC",
@@ -106,6 +107,13 @@ describe("reports screen", () => {
     const all = texts();
     expect(all.filter((x) => x === "reports.byHour")).toHaveLength(1);
     expect(all).toContain("reports.dailySales");
+  });
+
+  it("shows what was refunded on returns, revenue and profit already net of it", async () => {
+    await render();
+    const all = texts();
+    expect(all).toContain("reports.metricReturns");
+    expect(all).toContain("⁦−7.00 DH⁩");
   });
 
   it("shows the whole category name", async () => {

@@ -8,6 +8,9 @@ export type ReportSummary = {
   transaction_count: number;
   average_basket_cents: number;
   loss_cents: number;
+  // What was refunded on returns in the range (migration 046). Revenue, cost
+  // and profit are already net of it. Absent from a server older than 046.
+  returns_cents?: number;
 };
 
 export type DailyPoint = {
@@ -100,6 +103,7 @@ export async function fetchSummary(from: Date, to: Date): Promise<ReportSummary>
       transaction_count: 0,
       average_basket_cents: 0,
       loss_cents: 0,
+      returns_cents: 0,
     }
   );
 }

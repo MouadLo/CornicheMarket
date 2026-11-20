@@ -45,7 +45,16 @@ export type LedgerPayment = {
   instant: string;
   amount_cents: number;
 };
-export type LedgerEntry = LedgerSale | LedgerPayment;
+// A return of items bought on credit, refunded on the account: lowers the debt
+// like a payment (migration 046).
+export type LedgerReturn = {
+  kind: "return";
+  id: string;
+  instant: string;
+  refund_cents: number;
+  item_count: number;
+};
+export type LedgerEntry = LedgerSale | LedgerPayment | LedgerReturn;
 
 // Newest first; ties broken by id so the order is stable.
 function newestFirst(a: LedgerEntry, b: LedgerEntry): number {
@@ -54,21 +63,27 @@ function newestFirst(a: LedgerEntry, b: LedgerEntry): number {
   return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
 }
 
-// Credit sales and payments come from two paged queries. Showing both lists
-// merged is only correct down to the older edge of any list that still has
-// more rows: below that edge the other list could be missing entries. So the
-// timeline stops at the NEWER of those edges, and loading more moves it down.
+// Credit sales, payments and credit returns come from three paged queries.
+// Showing them merged is only correct down to the older edge of any list that
+// still has more rows: below that edge another list could be missing entries.
+// So the timeline stops at the NEWEST of those edges, and loading more moves it
+// down. The returns arguments come last so older callers keep working.
 export function mergeTimeline(
   sales: LedgerSale[],
   payments: LedgerPayment[],
   salesHaveMore: boolean,
-  paymentsHaveMore: boolean
+  paymentsHaveMore: boolean,
+  returns: LedgerReturn[] = [],
+  returnsHaveMore = false
 ): LedgerEntry[] {
-  const merged = [...sales, ...payments].sort(newestFirst);
+  const merged = [...sales, ...payments, ...returns].sort(newestFirst);
   const edges: number[] = [];
   if (salesHaveMore && sales.length > 0) edges.push(Date.parse(sales[sales.length - 1].instant));
   if (paymentsHaveMore && payments.length > 0) {
     edges.push(Date.parse(payments[payments.length - 1].instant));
+  }
+  if (returnsHaveMore && returns.length > 0) {
+    edges.push(Date.parse(returns[returns.length - 1].instant));
   }
   if (edges.length === 0) return merged;
   const edge = Math.max(...edges);
@@ -76,14 +91,21 @@ export function mergeTimeline(
 }
 
 // What the screen shows next to the balance, recomputed from the loaded rows
-// only for tests: voided sales never count (customer_balances, migration 012,
-// sums credit sales with voided_at is null and every payment).
-export function ledgerTotals(entries: LedgerEntry[]): { tookCents: number; paidCents: number } {
+// only for tests: voided sales never count (customer_balances sums credit sales
+// with voided_at is null and every payment), and credit returns come off what
+// was taken on credit (migration 046), so
+// tookCents - paidCents is customer_balances.balance_cents.
+export function ledgerTotals(entries: LedgerEntry[]): {
+  tookCents: number;
+  paidCents: number;
+  balanceCents: number;
+} {
   let tookCents = 0;
   let paidCents = 0;
   for (const entry of entries) {
     if (entry.kind === "payment") paidCents += entry.amount_cents;
+    else if (entry.kind === "return") tookCents -= entry.refund_cents;
     else if (!entry.voided_at) tookCents += entry.total_cents;
   }
-  return { tookCents, paidCents };
+  return { tookCents, paidCents, balanceCents: tookCents - paidCents };
 }

@@ -4,6 +4,7 @@ import {
   ledgerTotals,
   mergeTimeline,
   type LedgerPayment,
+  type LedgerReturn,
   type LedgerSale,
 } from "../../src/lib/sales/creditLedger";
 
@@ -89,6 +90,70 @@ describe("ledgerTotals", () => {
       sale("b", "2026-11-17T09:00:00Z", 700, true),
       pay("c", "2026-11-17T11:00:00Z", 300),
     ]);
-    expect(totals).toEqual({ tookCents: 1000, paidCents: 300 });
+    expect(totals).toEqual({ tookCents: 1000, paidCents: 300, balanceCents: 700 });
+  });
+});
+
+describe("credit returns in the timeline", () => {
+  const ret = (id: string, at: string, cents: number): LedgerReturn => ({
+    kind: "return",
+    id,
+    instant: at,
+    refund_cents: cents,
+    item_count: 1,
+  });
+
+  it("adds up to customer_balances: returns come off what was taken on credit", () => {
+    // 1000 + 500 credit sales, a voided 700, 300 paid, 400 refunded on account.
+    const totals = ledgerTotals([
+      sale("a", "2026-11-10T10:00:00Z", 1000),
+      sale("b", "2026-11-11T10:00:00Z", 500),
+      sale("c", "2026-11-12T10:00:00Z", 700, true),
+      pay("p", "2026-11-13T10:00:00Z", 300),
+      ret("r", "2026-11-14T10:00:00Z", 400),
+    ]);
+    expect(totals).toEqual({ tookCents: 1100, paidCents: 300, balanceCents: 800 });
+  });
+
+  it("merges three sources newest first without duplicates", () => {
+    const merged = mergeTimeline(
+      [sale("s1", "2026-11-10T10:00:00Z", 100)],
+      [pay("p1", "2026-11-12T10:00:00Z", 100)],
+      false,
+      false,
+      [ret("r1", "2026-11-11T10:00:00Z", 100)],
+      false
+    );
+    expect(merged.map((e) => e.id)).toEqual(["p1", "r1", "s1"]);
+  });
+
+  it("stops at the newest edge of any list that has more, so paging leaves no gap", () => {
+    const sales = [
+      sale("s2", "2026-11-14T10:00:00Z", 100),
+      sale("s1", "2026-11-05T10:00:00Z", 100),
+    ];
+    const payments = [pay("p1", "2026-11-13T10:00:00Z", 100)];
+    const returns = [
+      ret("r2", "2026-11-12T10:00:00Z", 100),
+      ret("r1", "2026-11-09T10:00:00Z", 100),
+    ];
+    // Returns have more below 11-09: nothing older than that is shown, though
+    // sales already reached 11-05.
+    expect(mergeTimeline(sales, payments, false, false, returns, true).map((e) => e.id)).toEqual([
+      "s2",
+      "p1",
+      "r2",
+      "r1",
+    ]);
+    // Loading the next page of returns moves the edge down.
+    const more = [...returns, ret("r0", "2026-11-02T10:00:00Z", 100)];
+    expect(mergeTimeline(sales, payments, false, false, more, false).map((e) => e.id)).toEqual([
+      "s2",
+      "p1",
+      "r2",
+      "r1",
+      "s1",
+      "r0",
+    ]);
   });
 });

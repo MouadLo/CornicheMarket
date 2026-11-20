@@ -53,6 +53,7 @@ export function voidRequestErrorKey(message: string): string {
   if (m.includes("already pending")) return "sell.voidErrPending";
   if (m.includes("your own sales")) return "sell.voidErrNotYours";
   if (m.includes("already voided")) return "sell.voidErrAlreadyVoided";
+  if (m.includes("has returns")) return "sell.voidErrHasReturns";
   if (m.includes("already been decided")) return "sell.voidErrDecided";
   if (m.includes("note is required")) return "sell.voidErrNoteRequired";
   return "sell.voidErrGeneric";

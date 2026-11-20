@@ -107,3 +107,56 @@ export function compareByMetricThenName(
   if (diff !== 0) return diff;
   return a.name.localeCompare(b.name);
 }
+
+// ---- item returns (migration 046) ------------------------------------------
+// Mirrors sale_return_economics and the report functions that subtract it. A
+// return is booked on the day it is MADE (returned_at), whatever day the sale
+// was; its revenue is what was refunded, its cost the stamped cost of the
+// returned units.
+
+// round(unit_cost x quantity), half up, to the centime. Quantities are in
+// thousandths of a unit, so it is done on integers (no float drift).
+export function returnedCostCents(unitCostCents: number, quantity: number): number {
+  const milli = Math.round(quantity * 1000);
+  return Math.floor((2 * unitCostCents * milli + 1000) / 2000);
+}
+
+export type MoneyMove = { quantity: number; revenueCents: number; costCents: number };
+
+// Quantity, revenue and cost of what was sold in a range, minus what was
+// returned in it (report_by_category, report_product_performance). Profit is
+// revenue - cost, so it falls by the refund minus the cost taken back.
+export function netOfReturns(sold: MoneyMove[], returned: MoneyMove[]) {
+  const sum = (rows: MoneyMove[], pick: (row: MoneyMove) => number) =>
+    rows.reduce((total, row) => total + pick(row), 0);
+  const quantity =
+    (Math.round(sum(sold, (r) => r.quantity) * 1000) -
+      Math.round(sum(returned, (r) => r.quantity) * 1000)) /
+    1000;
+  const revenueCents = sum(sold, (r) => r.revenueCents) - sum(returned, (r) => r.revenueCents);
+  const costCents = sum(sold, (r) => r.costCents) - sum(returned, (r) => r.costCents);
+  return { quantity, revenueCents, costCents, profitCents: revenueCents - costCents };
+}
+
+// The headline figures of report_summary: revenue and cost of goods are net of
+// the returns made in the range; the transaction count and the average basket
+// are not (a sale that had an item returned is still one sale).
+export function summaryAfterReturns(input: {
+  salesRevenueCents: number;
+  cogsCents: number;
+  transactionCount: number;
+  refundedCents: number;
+  returnedCostCents: number;
+}) {
+  const revenueCents = input.salesRevenueCents - input.refundedCents;
+  const cogsCents = input.cogsCents - input.returnedCostCents;
+  return {
+    revenueCents,
+    cogsCents,
+    grossProfitCents: revenueCents - cogsCents,
+    marginPercent: grossMarginPercent(revenueCents, cogsCents),
+    // What a sale brought in, before returns (a return is not a sale).
+    averageBasketCents: averageBasketCents(input.salesRevenueCents, input.transactionCount),
+    returnsCents: input.refundedCents,
+  };
+}

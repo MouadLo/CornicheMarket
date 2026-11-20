@@ -15,6 +15,7 @@ const mockBalances = jest.fn();
 const mockBalance = jest.fn();
 const mockSales = jest.fn();
 const mockPayments = jest.fn();
+const mockReturns = jest.fn();
 const mockLines = jest.fn();
 const mockPush = jest.fn();
 const mockUpdateLimit = jest.fn(async (..._a: unknown[]) => {});
@@ -53,6 +54,7 @@ jest.mock("../../src/lib/sales/queries", () => ({
   fetchCustomerBalance: (...a: unknown[]) => mockBalance(...a),
   fetchCustomerCreditSales: (...a: unknown[]) => mockSales(...a),
   fetchCustomerPayments: (...a: unknown[]) => mockPayments(...a),
+  fetchCustomerCreditReturns: (...a: unknown[]) => mockReturns(...a),
   fetchSaleLines: (...a: unknown[]) => mockLines(...a),
   recordCustomerPayment: jest.fn(),
   fetchStoreCreditLimit: async () => 30000,
@@ -84,10 +86,12 @@ beforeEach(() => {
     mockBalance,
     mockSales,
     mockPayments,
+    mockReturns,
     mockLines,
     mockPush,
     mockUpdateLimit,
   ].forEach((m) => m.mockReset());
+  mockReturns.mockResolvedValue([]);
 });
 afterEach(() => act(() => tree.unmount()));
 
@@ -238,6 +242,45 @@ describe("customer history", () => {
     expect(texts).toContain("credit.voidedTag");
     // the balance comes from the view, not from adding up the rows
     expect(texts.some((x) => x.includes("10.00 DH"))).toBe(true);
+  });
+
+  it("shows a credit return between the payment and the sale, like a payment lowering the debt", async () => {
+    mockReturns.mockResolvedValue([
+      {
+        id: "r1",
+        created_at: "2026-11-16T12:00:00Z",
+        refund_cents: 400,
+        sale_id: "s1",
+        item_count: 2,
+        occurred_at: "2026-11-15T10:00:00Z",
+      },
+    ]);
+    await render(<CustomerHistory />);
+    expect(mockReturns).toHaveBeenCalledWith("c1", 30, 0);
+    const texts = allTexts(tree.root);
+    expect(texts).toContain("credit.timelineReturn");
+    expect(texts).toContain('credit.returnItems{"count":2}');
+    const order = ["7.00 DH", "⁦+4.00 DH⁩", "+5.00 DH", "15.00 DH"].map((v) =>
+      texts.findIndex((x) => x.includes(v))
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("pages the returns on their own offset", async () => {
+    const full = Array.from({ length: 30 }, (_, i) => ({
+      id: `r${i}`,
+      created_at: `2026-11-${String(28 - i).padStart(2, "0")}T12:00:00Z`,
+      refund_cents: 100,
+      sale_id: "s1",
+      item_count: 1,
+      occurred_at: "2026-11-01T10:00:00Z",
+    }));
+    mockReturns.mockResolvedValueOnce(full);
+    await render(<CustomerHistory />);
+    mockReturns.mockResolvedValueOnce([]);
+    await act(async () => pressableByText(tree.root, "credit.loadMore").props.onPress());
+    expect(mockReturns).toHaveBeenLastCalledWith("c1", 30, 30);
   });
 
   const showLinesRows = () =>
