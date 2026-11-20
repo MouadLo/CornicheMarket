@@ -20,6 +20,10 @@ import {
   cashDifferenceCents,
   cashierCashCents,
   expectedCashCents,
+  netCardCents,
+  netCashCents,
+  netCreditCents,
+  refundsTotalCents,
   shiftDay,
   sumCashiers,
   type CashierDay,
@@ -274,11 +278,17 @@ function CashierCard({ row, title }: { row: CashierDay; title: string }) {
   return (
     <Card title={title}>
       <Text style={styles.meta}>{t("day.sales", { count: row.sales_count })}</Text>
-      <Line label={t("day.cash")} value={formatMAD(row.cash_cents)} />
-      <Line label={t("day.card")} value={formatMAD(row.card_cents)} />
-      <Line label={t("day.credit")} value={formatMAD(row.credit_cents)} />
+      <Line label={t("day.cash")} value={formatMAD(netCashCents(row))} />
+      <Line label={t("day.card")} value={formatMAD(netCardCents(row))} />
+      <Line label={t("day.credit")} value={formatMAD(netCreditCents(row))} />
       <Line label={t("day.repayments")} value={formatMAD(row.cash_payments_cents)} />
       <Line label={t("day.discounts")} value={formatMAD(row.discount_cents)} />
+      {(row.refunds_count ?? 0) > 0 && (
+        <Line
+          label={t("day.refunds", { count: row.refunds_count })}
+          value={isolateLtr(`−${formatMAD(refundsTotalCents(row))}`)}
+        />
+      )}
       <Line label={t("day.handOver")} value={formatMAD(cashierCashCents(row))} strong />
       {row.voids_count > 0 && (
         <Text style={styles.meta}>

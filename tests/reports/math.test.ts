@@ -6,7 +6,10 @@ import {
   grossMarginPercent,
   inventoryPotentialProfitCents,
   netLineRevenue,
+  netOfReturns,
   oversoldValueCents,
+  returnedCostCents,
+  summaryAfterReturns,
 } from "../../src/lib/reports/math";
 
 // The worked example below was also run through the report SQL functions in
@@ -284,5 +287,86 @@ describe("compareByMetricThenName", () => {
     const second = [...rows].sort((a, b) => compareByMetricThenName(a, b, "desc"));
     expect(first.map((r) => r.name)).toEqual(["A", "B", "C"]);
     expect(second.map((r) => r.name)).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("item returns (migration 046)", () => {
+  it("takes the cost of returned units back out, rounded half up to the centime", () => {
+    expect(returnedCostCents(600, 1)).toBe(600);
+    expect(returnedCostCents(1200, 0.5)).toBe(600);
+    // 333 x 0.003 = 0.999 -> 1.
+    expect(returnedCostCents(333, 0.003)).toBe(1);
+    // 5 x 0.1 = 0.5 -> rounds up to 1, like the SQL round().
+    expect(returnedCostCents(5, 0.1)).toBe(1);
+    expect(returnedCostCents(4, 0.1)).toBe(0);
+  });
+
+  it("subtracts returned quantity, revenue and cost from what was sold", () => {
+    // The worked example of tests/sales/saleReturns.sql: 3 units sold for 2657
+    // (after the sale discount) at a cost of 600, all three handed back in
+    // three goes (886 + 885 + 886 = 2657).
+    const sold = [{ quantity: 3, revenueCents: 2657, costCents: 1800 }];
+    const returned = [
+      { quantity: 1, revenueCents: 886, costCents: returnedCostCents(600, 1) },
+      { quantity: 1, revenueCents: 885, costCents: returnedCostCents(600, 1) },
+      { quantity: 1, revenueCents: 886, costCents: returnedCostCents(600, 1) },
+    ];
+    expect(netOfReturns(sold, returned)).toEqual({
+      quantity: 0,
+      revenueCents: 0,
+      costCents: 0,
+      profitCents: 0,
+    });
+    expect(netOfReturns(sold, returned.slice(0, 1))).toEqual({
+      quantity: 2,
+      revenueCents: 1771,
+      costCents: 1200,
+      profitCents: 571,
+    });
+  });
+
+  it("keeps weighed quantities exact to the gram", () => {
+    const sold = [{ quantity: 1.25, revenueCents: 2500, costCents: 1500 }];
+    const returned = [{ quantity: 0.5, revenueCents: 1000, costCents: 600 }];
+    expect(netOfReturns(sold, returned).quantity).toBe(0.75);
+  });
+
+  it("a return made in a period with no sales shows as a negative", () => {
+    expect(netOfReturns([], [{ quantity: 1, revenueCents: 500, costCents: 300 }])).toEqual({
+      quantity: -1,
+      revenueCents: -500,
+      costCents: -300,
+      profitCents: -200,
+    });
+  });
+
+  it("report_summary: revenue and cost net of returns, transactions untouched", () => {
+    const summary = summaryAfterReturns({
+      salesRevenueCents: 10000,
+      cogsCents: 6000,
+      transactionCount: 4,
+      refundedCents: 2000,
+      returnedCostCents: 1200,
+    });
+    expect(summary).toEqual({
+      revenueCents: 8000,
+      cogsCents: 4800,
+      grossProfitCents: 3200,
+      marginPercent: 40,
+      averageBasketCents: 2000,
+      returnsCents: 2000,
+    });
+  });
+
+  it("has no margin when the returns wipe the revenue out", () => {
+    const summary = summaryAfterReturns({
+      salesRevenueCents: 500,
+      cogsCents: 300,
+      transactionCount: 1,
+      refundedCents: 500,
+      returnedCostCents: 300,
+    });
+    expect(summary.revenueCents).toBe(0);
+    expect(summary.marginPercent).toBeNull();
   });
 });

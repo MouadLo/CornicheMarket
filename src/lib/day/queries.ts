@@ -7,6 +7,9 @@ export type DayClose = {
   expected_cash_cents: number;
   counted_cash_cents: number;
   leave_in_drawer_cents: number;
+  cash_refunds_cents?: number;
+  card_refunds_cents?: number;
+  credit_refunds_cents?: number;
   note: string | null;
   closed_at: string;
 };
