@@ -136,7 +136,15 @@ export type ReceiptLabels = {
   unit: (unit: string, quantity: number) => string;
 };
 
-export type ReceiptRenderOptions = { language: string; timeZone?: string };
+export type ReceiptRenderOptions = {
+  language: string;
+  timeZone?: string;
+  // Large box at the top (the shared printer prints the cashier's name there,
+  // so each paper reaches the right customer). HTML only.
+  banner?: string;
+  // "80mm": size the page for a thermal roll. HTML only.
+  paper?: "80mm";
+};
 
 // Quantities are numeric(12,3): at most three decimals, no trailing zeros.
 export function formatReceiptQuantity(quantity: number): string {
@@ -210,6 +218,12 @@ export function receiptToHtml(
     totals.push(row(labels.change, num(formatMAD(model.changeCents))));
   }
 
+  const banner = options.banner?.trim()
+    ? `<div class="banner">${name(options.banner.trim())}</div>\n`
+    : "";
+  const page =
+    options.paper === "80mm" ? "@page { size: 80mm auto; margin: 4mm; }" : "@page { margin: 4mm; }";
+
   return `<!doctype html>
 <html lang="${escapeHtml(options.language)}" dir="${dir}">
 <head>
@@ -217,7 +231,7 @@ export function receiptToHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(model.shopName)} ${escapeHtml(model.receiptNumber)}</title>
 <style>
-  @page { margin: 4mm; }
+  ${page}
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Helvetica, Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; }
   .receipt { width: 72mm; max-width: 100%; margin: 0 auto; }
@@ -230,12 +244,16 @@ export function receiptToHtml(
   .name { font-weight: 600; }
   .sub { font-size: 11px; }
   tr.total td { font-size: 15px; font-weight: 700; border-top: 1px solid #000; padding-top: 5px; }
-  .thanks { text-align: center; margin-top: 10px; }
+  .thanks { text-align: center; margin-top: 10px; }${
+    banner
+      ? "\n  .banner { font-size: 22px; font-weight: 700; text-align: center; border: 3px solid #000; padding: 6px 4px; margin: 0 0 8px; overflow-wrap: anywhere; }"
+      : ""
+  }
 </style>
 </head>
 <body>
 <div class="receipt">
-<h1>${escapeHtml(model.shopName)}</h1>
+${banner}<h1>${escapeHtml(model.shopName)}</h1>
 <div class="meta">${meta.join("")}</div>
 <table class="items"><tbody>${lineRows}</tbody></table>
 <table><tbody>${totals.join("")}</tbody></table>

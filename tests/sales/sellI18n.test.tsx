@@ -133,7 +133,7 @@ describe("no hardcoded English in the Sell flow", () => {
     expect(hardcodedTexts(tree.root)).toEqual([]);
   });
 
-  it("stack titles for the sales history and the day close (credit moved to Clients, stuck sales to the shell)", () => {
+  it("stack titles for the sales history, the day close and the print station (credit moved to Clients, stuck sales to the shell)", () => {
     act(() => {
       tree = create(<SellLayout />);
     });
@@ -141,7 +141,7 @@ describe("no hardcoded English in the Sell flow", () => {
       .findAll((node) => node.props.name && node.props.options)
       .map((node) => node.props.options.title)
       .filter(Boolean);
-    expect(titles).toHaveLength(2);
+    expect(titles).toHaveLength(3); // history, day close, print station
     for (const title of titles) expect(title).toContain("⟦");
   });
 });
