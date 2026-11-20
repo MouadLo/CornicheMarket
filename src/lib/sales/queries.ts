@@ -9,6 +9,12 @@ import {
 } from "@/src/lib/sales/creditLimitCache";
 import { parseDiscountLimits, saveCachedDiscountLimits } from "@/src/lib/sales/discountLimitCache";
 import type { PendingSale } from "@/src/lib/sales/offlineQueue";
+import type {
+  RefundMethod,
+  ReturnableLine,
+  ReturnReason,
+  SaleReturnRecord,
+} from "@/src/lib/sales/returns";
 
 export type PaymentMethod = "cash" | "card" | "credit";
 
@@ -259,6 +265,85 @@ export async function voidSale(saleId: string, reason: string): Promise<void> {
     p_reason: reason,
   });
   if (error) throw new Error(error.message);
+}
+
+// --- item returns (migration 046) -----------------------------------------
+// Owner only, online only: nothing is queued. The caller generates `returnId`
+// once per attempt and reuses it on a retry, so a lost response can't refund
+// twice (the database ignores a second call with the same id).
+export async function recordSaleReturn(input: {
+  returnId: string;
+  saleId: string;
+  items: { sale_item_id: string; quantity: number }[];
+  reasonCode: ReturnReason;
+  note: string;
+  refundMethod: RefundMethod;
+}): Promise<void> {
+  const { error } = await supabase.rpc("record_sale_return", {
+    p_return_id: input.returnId,
+    p_sale_id: input.saleId,
+    p_items: input.items,
+    p_reason_code: input.reasonCode,
+    p_note: input.note.trim() ? input.note.trim() : null,
+    p_refund_method: input.refundMethod,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// What can still be returned on each line of a sale, with what was paid for it
+// (the server works out the sale-discount share; a device cannot).
+export async function fetchReturnableLines(saleId: string): Promise<ReturnableLine[]> {
+  const { data, error } = await supabase.rpc("returnable_sale_lines", { p_sale_id: saleId });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    saleItemId: String(row.sale_item_id),
+    quantity: Number(row.quantity),
+    returnedQuantity: Number(row.returned_quantity),
+    paidCents: Number(row.paid_cents),
+    refundedCents: Number(row.refunded_cents),
+  }));
+}
+
+// The returns of a batch of sales (one query per table for the whole page).
+// Both roles read the cost-free item view: a cashier sees the returns of their
+// own sales, the owner all of them; no cost column is ever selected.
+export async function fetchSaleReturns(saleIds: string[]): Promise<SaleReturnRecord[]> {
+  if (saleIds.length === 0) return [];
+  const { data: headers, error } = await supabase
+    .from("sale_returns")
+    .select("id, sale_id, created_at, reason_code, note, refund_method, refund_cents")
+    .in("sale_id", saleIds)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  const rows = (headers ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+
+  const { data: items, error: itemsError } = await supabase
+    .from("sale_return_items_cashier_view")
+    .select("return_id, sale_item_id, quantity, refund_cents")
+    .in("sale_id", saleIds);
+  if (itemsError) throw new Error(itemsError.message);
+
+  const byReturn = new Map<string, SaleReturnRecord["items"]>();
+  for (const item of (items ?? []) as Record<string, unknown>[]) {
+    const list = byReturn.get(String(item.return_id)) ?? [];
+    list.push({
+      saleItemId: String(item.sale_item_id),
+      quantity: Number(item.quantity),
+      refundCents: Number(item.refund_cents),
+    });
+    byReturn.set(String(item.return_id), list);
+  }
+  return rows.map((row) => ({
+    id: String(row.id),
+    saleId: String(row.sale_id),
+    createdAt: String(row.created_at),
+    reasonCode: row.reason_code as ReturnReason,
+    note: (row.note as string | null) ?? null,
+    refundMethod: row.refund_method as RefundMethod,
+    refundCents: Number(row.refund_cents),
+    items: byReturn.get(String(row.id)) ?? [],
+  }));
 }
 
 export type CustomerPayment = {
