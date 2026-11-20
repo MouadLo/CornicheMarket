@@ -81,6 +81,8 @@ const draft = {
     },
   ],
 };
+// The first test also pays for loading the whole invoice screen, which on a
+// busy CI runner went past Jest's 5 s default (it runs in ~0.2 s locally).
 it("submits the corrected quantities and costs only after the owner reconfirms", async () => {
   jest.mocked(fetchInvoiceDraft).mockResolvedValue(draft);
   jest.mocked(approveInvoiceDraft).mockResolvedValue("purchase-1");
@@ -130,7 +132,7 @@ it("submits the corrected quantities and costs only after the owner reconfirms",
     },
   ]);
   act(() => tree.unmount());
-});
+}, 20_000);
 
 describe("deleting a draft", () => {
   beforeEach(() => {
