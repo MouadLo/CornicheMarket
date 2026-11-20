@@ -4,35 +4,58 @@
 // rows, so the shell does not even ask.
 import { supabase } from "@/src/lib/supabase/client";
 
-export type ReviewKind = "price" | "discount";
+export type ReviewKind = "price" | "discount" | "credit";
 
-const FLAG_COLUMN: Record<ReviewKind, "needs_price_review" | "needs_discount_review"> = {
+const FLAG_COLUMN: Record<
+  ReviewKind,
+  "needs_price_review" | "needs_discount_review" | "needs_credit_review"
+> = {
   price: "needs_price_review",
   discount: "needs_discount_review",
+  credit: "needs_credit_review",
 };
 // A flagged discount sale carries either log row (or both): a discount above
 // the owner's threshold, or one above what a cashier may give.
 const CASHIER_LIMIT_ACTION = "discount_over_cashier_limit";
+const CREDIT_LIMIT_ACTION = "credit_over_customer_limit";
 const LOG_ACTIONS: Record<ReviewKind, string[]> = {
   price: ["price_mismatch"],
   discount: ["discount_over_threshold", CASHIER_LIMIT_ACTION],
+  // A credit sale that took a customer above their debt limit (migration 043).
+  credit: [CREDIT_LIMIT_ACTION],
 };
 const DISMISS_RPC: Record<ReviewKind, string> = {
   price: "dismiss_price_review",
   discount: "dismiss_discount_review",
+  credit: "dismiss_credit_review",
 };
 
 export type AlertCounts = {
   price: number;
   discount: number;
+  // Credit sales above a customer's debt limit, waiting for the owner.
+  credit: number;
   negativeStock: number;
   // Cashiers' requests to void a sale, waiting for the owner (migration 038).
   voidRequests: number;
 };
-export const NO_ALERTS: AlertCounts = { price: 0, discount: 0, negativeStock: 0, voidRequests: 0 };
+export const NO_ALERTS: AlertCounts = {
+  price: 0,
+  discount: 0,
+  credit: 0,
+  negativeStock: 0,
+  voidRequests: 0,
+};
 
 export function totalAlerts(counts: AlertCounts, stuck: number): number {
-  return counts.price + counts.discount + counts.negativeStock + counts.voidRequests + stuck;
+  return (
+    counts.price +
+    counts.discount +
+    counts.credit +
+    counts.negativeStock +
+    counts.voidRequests +
+    stuck
+  );
 }
 
 async function countOf(
@@ -44,7 +67,7 @@ async function countOf(
 }
 
 export async function fetchAlertCounts(): Promise<AlertCounts> {
-  const [price, discount, negativeStock, voidRequests] = await Promise.all([
+  const [price, discount, credit, negativeStock, voidRequests] = await Promise.all([
     countOf(
       supabase
         .from("sales")
@@ -58,6 +81,12 @@ export async function fetchAlertCounts(): Promise<AlertCounts> {
         .eq("needs_discount_review", true)
     ),
     countOf(
+      supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .eq("needs_credit_review", true)
+    ),
+    countOf(
       supabase.from("negative_stock_products").select("product_id", { count: "exact", head: true })
     ),
     countOf(
@@ -67,7 +96,7 @@ export async function fetchAlertCounts(): Promise<AlertCounts> {
         .eq("status", "pending")
     ),
   ]);
-  return { price, discount, negativeStock, voidRequests };
+  return { price, discount, credit, negativeStock, voidRequests };
 }
 
 // --- review lists ----------------------------------------------------------
@@ -78,7 +107,16 @@ export type ReviewLine =
   | { type: "saleDiscount"; amountCents: number; discountCents: number; percent: number }
   // A cashier gave more discount than the limit allows (which the device
   // enforces, so this is a device that was not up to date or was tampered with).
-  | { type: "cashierLimit"; discountCents: number; limitCents: number };
+  | { type: "cashierLimit"; discountCents: number; limitCents: number }
+  // A cashier put a sale on a customer's account above their debt limit.
+  | {
+      type: "creditLimit";
+      customerName: string;
+      balanceCents: number;
+      saleCents: number;
+      limitCents: number;
+      overCents: number;
+    };
 
 export type ReviewItem = {
   saleId: string;
@@ -94,6 +132,10 @@ type LogDetails = {
   // discount_over_cashier_limit rows
   limit_cents?: number;
   total_discount_cents?: number;
+  // credit_over_customer_limit rows
+  customer_name?: string | null;
+  balance_before_cents?: number;
+  sale_total_cents?: number;
 };
 
 // Turns one activity-log row into the lines the owner reads. Pure, so the two
@@ -104,6 +146,21 @@ export function reviewLinesFrom(
   action?: string
 ): ReviewLine[] {
   if (!details) return [];
+  if (action === CREDIT_LIMIT_ACTION) {
+    const balanceCents = Number(details.balance_before_cents);
+    const saleCents = Number(details.sale_total_cents);
+    const limitCents = Number(details.limit_cents);
+    return [
+      {
+        type: "creditLimit",
+        customerName: String(details.customer_name ?? ""),
+        balanceCents,
+        saleCents,
+        limitCents,
+        overCents: balanceCents + saleCents - limitCents,
+      },
+    ];
+  }
   if (action === CASHIER_LIMIT_ACTION) {
     return [
       {

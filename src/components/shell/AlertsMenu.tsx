@@ -54,6 +54,13 @@ export function AlertsMenu({
       onPress: () => onReview("discount"),
     },
     {
+      key: "credit",
+      icon: "alert",
+      label: t("shell.alertCredit"),
+      count: counts.credit,
+      onPress: () => onReview("credit"),
+    },
+    {
       key: "negative",
       icon: "package",
       label: t("shell.alertNegative"),

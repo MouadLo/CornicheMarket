@@ -94,6 +94,27 @@ describe("review sentences read correctly in Arabic", () => {
     ).toContain("shell.priceLineStale");
   });
 
+  it("credit limit lines isolate the customer and every amount", () => {
+    const out = describeReviewLine(
+      {
+        type: "creditLimit",
+        customerName: "فاطمة",
+        balanceCents: 25000,
+        saleCents: 12000,
+        limitCents: 30000,
+        overCents: 7000,
+      },
+      t
+    );
+    expect(out).toContain("shell.creditLimitLine");
+    const options = JSON.parse(out.split("|")[1]);
+    expect(options.name).toBe("⁨فاطمة⁩");
+    expect(options.balance).toBe("⁦250.00 DH⁩");
+    expect(options.sale).toBe("⁦120.00 DH⁩");
+    expect(options.limit).toBe("⁦300.00 DH⁩");
+    expect(options.over).toBe("⁦70.00 DH⁩");
+  });
+
   it("discount lines isolate the percent too, and use grouped thousands", () => {
     const out = describeReviewLine(
       { type: "discount", name: "Thé", amountCents: 348250, discountCents: 50000, percent: 14.36 },

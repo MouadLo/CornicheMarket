@@ -56,17 +56,20 @@ describe("alert mockCounts", () => {
     mockCounts = {
       needs_price_review: 3,
       needs_discount_review: 2,
+      needs_credit_review: 5,
       negative_stock_products: 1,
       void_requests: 4,
     };
     await expect(fetchAlertCounts()).resolves.toEqual({
       price: 3,
       discount: 2,
+      credit: 5,
       negativeStock: 1,
       voidRequests: 4,
     });
     expect(mockCalls.map((c) => c.table).sort()).toEqual([
       "negative_stock_products",
+      "sales",
       "sales",
       "sales",
       "void_requests",
@@ -79,9 +82,15 @@ describe("alert mockCounts", () => {
   });
 
   it("totals alerts with the stuck sales that live on the device", () => {
-    expect(totalAlerts({ price: 3, discount: 2, negativeStock: 1, voidRequests: 0 }, 4)).toBe(10);
+    expect(
+      totalAlerts({ price: 3, discount: 2, credit: 0, negativeStock: 1, voidRequests: 0 }, 4)
+    ).toBe(10);
     // Pending void requests count toward the bell badge.
-    expect(totalAlerts({ price: 0, discount: 0, negativeStock: 0, voidRequests: 2 }, 1)).toBe(3);
+    expect(
+      totalAlerts({ price: 0, discount: 0, credit: 0, negativeStock: 0, voidRequests: 2 }, 1)
+    ).toBe(3);
+    // Credit sales above a customer's limit count too.
+    expect(totalAlerts({ ...NO_ALERTS, credit: 2 }, 1)).toBe(3);
     expect(totalAlerts(NO_ALERTS, 0)).toBe(0);
   });
 });
@@ -120,6 +129,30 @@ describe("review lines from the activity log", () => {
     ).toEqual([
       { type: "discount", name: "Thé", amountCents: 2000, discountCents: 500, percent: 25 },
       { type: "saleDiscount", amountCents: 4500, discountCents: 451, percent: 10.02 },
+    ]);
+  });
+
+  it("credit: the customer, what they owed, the sale, the limit and the excess", () => {
+    expect(
+      reviewLinesFrom(
+        "credit",
+        {
+          customer_name: "Fatima",
+          limit_cents: 30000,
+          balance_before_cents: 25000,
+          sale_total_cents: 12000,
+        },
+        "credit_over_customer_limit"
+      )
+    ).toEqual([
+      {
+        type: "creditLimit",
+        customerName: "Fatima",
+        balanceCents: 25000,
+        saleCents: 12000,
+        limitCents: 30000,
+        overCents: 7000,
+      },
     ]);
   });
 
@@ -171,6 +204,43 @@ describe("review lists", () => {
     ]);
   });
 
+  it("asks for the credit flag and its log action for credit reviews", async () => {
+    mockTableData = {
+      sales: [
+        { id: "s9", occurred_at: "2026-11-01T10:00:00Z", total_cents: 12000, cashier_id: "u1" },
+      ],
+      activity_log: [
+        {
+          entity_id: "s9",
+          action: "credit_over_customer_limit",
+          details: {
+            customer_name: "Fatima",
+            limit_cents: 0,
+            balance_before_cents: 0,
+            sale_total_cents: 12000,
+          },
+        },
+      ],
+      profiles: [{ id: "u1", full_name: "Salma" }],
+    };
+    const items = await fetchReviewSales("credit");
+    expect(items[0].lines).toEqual([
+      {
+        type: "creditLimit",
+        customerName: "Fatima",
+        balanceCents: 0,
+        saleCents: 12000,
+        limitCents: 0,
+        overCents: 12000,
+      },
+    ]);
+    expect(mockCalls[0].filters).toContainEqual(["needs_credit_review", true]);
+    expect(mockCalls.find((c) => c.table === "activity_log")?.filters).toContainEqual([
+      "action",
+      "credit_over_customer_limit",
+    ]);
+  });
+
   it("asks for the discount flag and log action for discounts, and nothing more when the list is empty", async () => {
     mockTableData = { sales: [] };
     await expect(fetchReviewSales("discount")).resolves.toEqual([]);
@@ -183,6 +253,7 @@ describe("dismissing a review", () => {
   it.each([
     ["price", "dismiss_price_review"],
     ["discount", "dismiss_discount_review"],
+    ["credit", "dismiss_credit_review"],
   ] as const)("%s goes through %s, never a direct update", async (kind, fn) => {
     await dismissReview(kind, "s1");
     expect(mockRpc).toHaveBeenCalledWith(fn, { p_sale_id: "s1" });
