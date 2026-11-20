@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -30,6 +30,7 @@ import { toCsv } from "@/src/lib/products/csv";
 import {
   fetchAllProducts,
   fetchCategories,
+  fetchProduct,
   fetchProducts,
   PAGE_SIZE,
   type Category,
@@ -39,6 +40,16 @@ import {
 } from "@/src/lib/products/queries";
 import { categoryLabel } from "@/src/lib/products/categoryCatalog";
 import { familyIds, mainCategories, subCategoriesOf } from "@/src/lib/products/categories";
+import {
+  clampIndex,
+  clearPlace,
+  filtersKeyOf,
+  peekPlace,
+  placeApplies,
+  rememberPlace,
+  takePlace,
+  type ListPlace,
+} from "@/src/lib/products/listPlace";
 import { activeFilterCount, isCompactProductsList } from "@/src/lib/products/listFilters";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
 import { Text } from "@/src/theme/Text";
@@ -50,13 +61,31 @@ export default function ProductsScreen() {
   const isOwner = profile?.role === "owner";
   const compact = isCompactProductsList(useWindowDimensions().width);
 
-  const [search, setSearch] = useState("");
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [subCategoryId, setSubCategoryId] = useState<string | null>(null);
-  const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [status, setStatus] = useState<ProductStatusFilter>("active");
+  // A remembered place at mount means this screen was REMOUNTED after the owner
+  // went to edit a product (web does this): start from the filters they had,
+  // then re-load down to where they were. If the screen stayed mounted (native)
+  // there is no place yet at mount; the focus effect below handles that case.
+  const [restore] = useState<ListPlace | null>(() => peekPlace());
+  const restoreRef = useRef<ListPlace | null>(restore);
+
+  const [search, setSearch] = useState(restore?.filters.search ?? "");
+  const [categoryId, setCategoryId] = useState<string | null>(restore?.filters.categoryId ?? null);
+  const [subCategoryId, setSubCategoryId] = useState<string | null>(
+    restore?.filters.subCategoryId ?? null
+  );
+  const [lowStockOnly, setLowStockOnly] = useState(restore?.filters.lowStockOnly ?? false);
+  const [status, setStatus] = useState<ProductStatusFilter>(restore?.filters.status ?? "active");
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const listRef = useRef<FlatList<Product>>(null);
+  const scrollOffset = useRef(0);
+  const seenFirstFocus = useRef(false);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<{ index: number; viewPosition: number } | null>(
+    null
+  );
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -77,7 +106,7 @@ export default function ProductsScreen() {
   const filtered =
     debouncedSearch.trim() !== "" || categoryId !== null || lowStockOnly || status !== "active";
 
-  const filters = useMemo<ProductFilters>(
+  const rawFilters = useMemo<ProductFilters>(
     () => ({
       search: debouncedSearch,
       categoryId,
@@ -91,15 +120,81 @@ export default function ProductsScreen() {
     }),
     [debouncedSearch, categoryId, subCategoryId, categories, lowStockOnly, status]
   );
+  // Same filters, same object: a categories re-read that returns equal data must
+  // not trigger a reload (it would also undo a restored scroll position).
+  const filterSignature = JSON.stringify(rawFilters);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filters = useMemo(() => rawFilters, [filterSignature]);
+
+  const flashRow = useCallback((id: string) => {
+    setHighlightId(id);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightId(null), 1500);
+  }, []);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    []
+  );
+
+  const currentFilters = { search, categoryId, subCategoryId, lowStockOnly, status };
+  const latest = useRef({ isOwner, key: filtersKeyOf(currentFilters) });
+  latest.current = { isOwner, key: filtersKeyOf(currentFilters) };
+
+  // Kept-mounted return (native): re-read just the edited product and swap it
+  // in place, so the scroll position is untouched.
+  const refreshEdited = useCallback(
+    async (place: ListPlace) => {
+      if (!placeApplies(place, latest.current.key) || !place.productId) return;
+      const id = place.productId;
+      let fresh: Product | null;
+      try {
+        fresh = await fetchProduct(id, latest.current.isOwner);
+      } catch {
+        return;
+      }
+      const f = place.filters;
+      const matches =
+        fresh !== null &&
+        !(f.status === "active" && !fresh.active) &&
+        !(f.status === "inactive" && fresh.active) &&
+        !(f.lowStockOnly && !fresh.is_low_stock);
+      setProducts((current) => {
+        const at = current.findIndex((p) => p.id === id);
+        if (at < 0) return current;
+        const next = current.slice();
+        if (fresh && matches) next[at] = fresh;
+        else next.splice(at, 1);
+        return next;
+      });
+      if (fresh && matches) flashRow(id);
+    },
+    [flashRow]
+  );
 
   // Re-read on every return to this screen: a category may have been created
   // in the product form since.
   useFocusEffect(
     useCallback(() => {
       fetchCategories()
-        .then(setCategories)
-        .catch(() => setCategories([]));
-    }, [])
+        .then((rows) => {
+          setCategories(rows);
+          setCategoriesLoaded(true);
+        })
+        .catch(() => {
+          setCategories([]);
+          setCategoriesLoaded(true);
+        });
+      // The first focus is the mount; only later ones are a return.
+      if (!seenFirstFocus.current) {
+        seenFirstFocus.current = true;
+        return;
+      }
+      if (restoreRef.current) return;
+      const place = takePlace();
+      if (place) void refreshEdited(place);
+    }, [refreshEdited])
   );
 
   const load = useCallback(async () => {
@@ -117,9 +212,79 @@ export default function ProductsScreen() {
     }
   }, [filters, isOwner]);
 
+  // Remount with a remembered place: load pages 0..loadedPages, then land on it.
+  const restoreLoad = useCallback(
+    async (place: ListPlace) => {
+      setLoading(true);
+      setLoadError(null);
+      let rows: Product[] = [];
+      let reached = 0;
+      let more = true;
+      try {
+        for (let p = 0; p <= place.loadedPages && more; p++) {
+          const batch = await fetchProducts(filters, p, isOwner);
+          rows = rows.concat(batch);
+          reached = p;
+          more = batch.length === PAGE_SIZE;
+        }
+      } catch {
+        await load();
+        return;
+      }
+      setProducts(rows);
+      setPage(reached);
+      setHasMore(more);
+      const at = place.productId ? rows.findIndex((r) => r.id === place.productId) : -1;
+      // Gone from the pages (renamed, filtered out): keep the same position.
+      const index = at >= 0 ? at : clampIndex(place.index, rows.length);
+      setScrollTarget({ index, viewPosition: place.productId ? 0.2 : 0 });
+      if (at >= 0 && place.productId) flashRow(place.productId);
+      setLoading(false);
+    },
+    [filters, isOwner, load, flashRow]
+  );
+
+  // Category filters resolve to ids only once categories are known.
+  const restoreReady = !restore?.filters.categoryId || categoriesLoaded;
   useEffect(() => {
+    const pending = restoreRef.current;
+    if (pending) {
+      if (!restoreReady) return;
+      restoreRef.current = null;
+      clearPlace();
+      void restoreLoad(pending);
+      return;
+    }
     load();
-  }, [load]);
+  }, [load, restoreLoad, restoreReady]);
+
+  useEffect(() => {
+    if (!scrollTarget || loading) return;
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ ...scrollTarget, animated: false });
+      setScrollTarget(null);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [scrollTarget, loading]);
+
+  const openProduct = (item: Product) => {
+    rememberPlace({
+      productId: item.id,
+      index: products.findIndex((p) => p.id === item.id),
+      loadedPages: page,
+      filters: currentFilters,
+    });
+    router.push(`/(app)/products/${item.id}`);
+  };
+  const openNew = () => {
+    rememberPlace({
+      productId: null,
+      index: Math.floor(scrollOffset.current / PRODUCT_ROW_HEIGHT),
+      loadedPages: page,
+      filters: currentFilters,
+    });
+    router.push("/(app)/products/new");
+  };
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loading || !hasMore) return;
@@ -290,7 +455,7 @@ export default function ProductsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     style={[styles.action, styles.toolbarAction]}
-                    onPress={() => router.push("/(app)/products/new")}
+                    onPress={() => openNew()}
                   >
                     <Text style={styles.actionText} numberOfLines={1}>
                       {t("products.addNew")}
@@ -326,10 +491,7 @@ export default function ProductsScreen() {
             {statusChips}
             {isOwner && (
               <View style={styles.actionRow}>
-                <ActionButton
-                  label={t("products.addNew")}
-                  onPress={() => router.push("/(app)/products/new")}
-                />
+                <ActionButton label={t("products.addNew")} onPress={() => openNew()} />
                 {secondaryActions.map((action) => (
                   <ActionButton key={action.icon} label={action.label} onPress={action.onPress} />
                 ))}
@@ -348,13 +510,26 @@ export default function ProductsScreen() {
         <LoadError title={t("products.loadError")} reasonKey={loadError} onRetry={load} />
       ) : (
         <FlatList
+          ref={listRef}
           data={products}
+          extraData={highlightId}
+          onScroll={(e) => {
+            scrollOffset.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={100}
+          onScrollToIndexFailed={(info) =>
+            listRef.current?.scrollToOffset({
+              offset: info.index * PRODUCT_ROW_HEIGHT,
+              animated: false,
+            })
+          }
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ProductRow
               product={item}
               showCost={isOwner}
-              onPress={isOwner ? () => router.push(`/(app)/products/${item.id}`) : undefined}
+              highlighted={item.id === highlightId}
+              onPress={isOwner ? () => openProduct(item) : undefined}
             />
           )}
           getItemLayout={(_, index) => ({
@@ -374,10 +549,7 @@ export default function ProductsScreen() {
                 message={t(isOwner ? "products.emptyHintOwner" : "products.emptyHintCashier")}
                 action={
                   isOwner ? (
-                    <BigButton
-                      label={t("products.emptyAddFirst")}
-                      onPress={() => router.push("/(app)/products/new")}
-                    />
+                    <BigButton label={t("products.emptyAddFirst")} onPress={() => openNew()} />
                   ) : undefined
                 }
               />

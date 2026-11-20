@@ -15,9 +15,11 @@ type Props = {
   product: Product;
   showCost: boolean;
   onPress?: () => void;
+  /** Soft flash on the row the owner just came back from. */
+  highlighted?: boolean;
 };
 
-function ProductRowComponent({ product, showCost, onPress }: Props) {
+function ProductRowComponent({ product, showCost, onPress, highlighted }: Props) {
   const { t, i18n } = useTranslation();
   // A product name must not flip its own row based on its script -- see
   // src/lib/text/bidi.ts.
@@ -36,6 +38,7 @@ function ProductRowComponent({ product, showCost, onPress }: Props) {
       style={({ pressed }) => [
         styles.row,
         { direction: dir },
+        highlighted ? styles.highlighted : null,
         pressed && onPress ? styles.pressed : null,
       ]}
       onPress={onPress}
@@ -89,6 +92,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.surface,
   },
+  highlighted: { backgroundColor: colors.brand100 },
   pressed: { backgroundColor: colors.sunken },
   main: { flex: 1, gap: 4 },
   name: { fontSize: 16, fontWeight: "600" },
