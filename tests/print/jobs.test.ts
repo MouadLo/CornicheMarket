@@ -94,6 +94,43 @@ describe("parseReceiptJob", () => {
   });
 });
 
+describe("parseReceiptJob: receipt after returns", () => {
+  const after = () => ({
+    originalTotalCents: 2900,
+    refundedCents: 1200,
+    refundMethods: ["cash", "credit"],
+    lastReturnAt: "2026-11-18T09:30:00.000Z",
+  });
+
+  it("keeps a valid afterReturns footer, copying only its known fields", () => {
+    const model = parseReceiptJob({ ...valid(), afterReturns: { ...after(), note: "x" } });
+    expect(model?.afterReturns).toEqual(after());
+  });
+
+  it("an updated receipt where everything was returned has no lines", () => {
+    const r = { ...valid(), lines: [], subtotalCents: 0, discountCents: 0, totalCents: 0 };
+    expect(parseReceiptJob({ ...r, afterReturns: after() })?.lines).toEqual([]);
+  });
+
+  it("treats a missing or null afterReturns as a plain receipt", () => {
+    expect(parseReceiptJob(valid())).not.toHaveProperty("afterReturns");
+    expect(parseReceiptJob({ ...valid(), afterReturns: null })).not.toHaveProperty("afterReturns");
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["not an object", { afterReturns: "yes" }],
+    ["float refund", { afterReturns: { ...after(), refundedCents: 1.5 } }],
+    ["negative original", { afterReturns: { ...after(), originalTotalCents: -1 } }],
+    ["refund above the original", { afterReturns: { ...after(), refundedCents: 3000 } }],
+    ["unknown refund method", { afterReturns: { ...after(), refundMethods: ["bitcoin"] } }],
+    ["repeated refund method", { afterReturns: { ...after(), refundMethods: ["cash", "cash"] } }],
+    ["methods not an array", { afterReturns: { ...after(), refundMethods: "cash" } }],
+    ["bad return date", { afterReturns: { ...after(), lastReturnAt: "soon" } }],
+  ])("rejects the whole job when afterReturns is %s", (_name, patch) => {
+    expect(parseReceiptJob({ ...valid(), ...patch })).toBeNull();
+  });
+});
+
 describe("staleness and manual actions", () => {
   const now = Date.parse("2026-11-17T10:10:00.000Z");
   it("is stale after 2 minutes", () => {
