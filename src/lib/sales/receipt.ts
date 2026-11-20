@@ -1,6 +1,8 @@
 import { formatMAD } from "@/src/lib/money";
 import type { PendingSale } from "@/src/lib/sales/offlineQueue";
 import type { PaymentMethod, SaleLine, SaleSummary } from "@/src/lib/sales/queries";
+import { receiptAfterReturns } from "@/src/lib/sales/receiptAfterReturns";
+import type { RefundMethod, SaleReturnRecord } from "@/src/lib/sales/returns";
 import { lineTotal } from "@/src/lib/sales/totals";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { formatLocaleDateTime } from "@/src/lib/text/dates";
@@ -36,6 +38,13 @@ export type ReceiptModel = {
   // Only set when they were known at the moment of the sale.
   cashReceivedCents: number | null;
   changeCents: number | null;
+  // Set when items of the sale were returned: the receipt then lists only what the customer kept.
+  afterReturns?: {
+    originalTotalCents: number; // the sale's total before any return
+    refundedCents: number; // sum of every return's refund
+    refundMethods: RefundMethod[]; // distinct, in order of first use
+    lastReturnAt: string; // ISO instant of the latest return
+  } | null;
 };
 
 export function receiptNumberOf(saleId: string): string {
@@ -88,10 +97,11 @@ export function receiptFromPendingSale(
 export function receiptFromHistorySale(
   sale: SaleSummary,
   lines: SaleLine[],
-  unknownProductName: string
+  unknownProductName: string,
+  returns: SaleReturnRecord[] = []
 ): ReceiptModel | null {
   if (sale.voided_at) return null;
-  return {
+  const base: ReceiptModel = {
     shopName: RECEIPT_SHOP_NAME,
     receiptNumber: receiptNumberOf(sale.id),
     occurredAt: sale.occurred_at ?? sale.created_at,
@@ -112,6 +122,9 @@ export function receiptFromHistorySale(
     cashReceivedCents: null,
     changeCents: null,
   };
+  return returns.length > 0
+    ? receiptAfterReturns(base, sale, lines, returns, unknownProductName)
+    : base;
 }
 
 // Whether the history can offer a receipt for this sale.
@@ -132,6 +145,12 @@ export type ReceiptLabels = {
   cashReceived: string;
   change: string;
   thanks: string;
+  updatedAfterReturn: string;
+  returnedOn: (date: string) => string;
+  originalTotal: string;
+  refunded: string;
+  refundMethod: (method: RefundMethod) => string;
+  allReturned: string;
   lineDiscount: (amount: string) => string;
   unit: (unit: string, quantity: number) => string;
 };
@@ -161,6 +180,23 @@ export function receiptDateText(model: ReceiptModel, options: ReceiptRenderOptio
   return formatLocaleDateTime(new Date(model.occurredAt), options.language, options.timeZone);
 }
 
+// "Total initial" / "Remboursé" lines shown after the total of an updated receipt.
+export function refundMethodsText(
+  model: ReceiptModel,
+  labels: ReceiptLabels,
+  separator = " / "
+): string {
+  return (model.afterReturns?.refundMethods ?? []).map(labels.refundMethod).join(separator);
+}
+
+export function returnDateText(model: ReceiptModel, options: ReceiptRenderOptions): string {
+  return formatLocaleDateTime(
+    new Date(model.afterReturns?.lastReturnAt ?? model.occurredAt),
+    options.language,
+    options.timeZone
+  );
+}
+
 export function receiptToHtml(
   model: ReceiptModel,
   labels: ReceiptLabels,
@@ -187,10 +223,17 @@ export function receiptToHtml(
     })
     .join("");
 
+  const allReturned = !!model.afterReturns && model.lines.length === 0;
   const meta: string[] = [
     `<div>${num(receiptDateText(model, options))}</div>`,
     `<div>${escapeHtml(labels.number)} ${num(model.receiptNumber)}</div>`,
   ];
+  if (model.afterReturns) {
+    meta.push(`<div><strong>${escapeHtml(labels.updatedAfterReturn)}</strong></div>`);
+    meta.push(
+      `<div>${escapeHtml(labels.returnedOn(rtl ? isolateLtr(returnDateText(model, options)) : returnDateText(model, options)))}</div>`
+    );
+  }
   if (model.cashierName) {
     meta.push(`<div>${escapeHtml(labels.cashier)}: ${name(model.cashierName)}</div>`);
   }
@@ -204,6 +247,15 @@ export function receiptToHtml(
     totals.push(row(labels.discount, num(`-${formatMAD(model.discountCents)}`)));
   }
   totals.push(row(labels.total, num(formatMAD(model.totalCents)), "total"));
+  if (model.afterReturns) {
+    totals.push(row(labels.originalTotal, num(formatMAD(model.afterReturns.originalTotalCents))));
+    totals.push(
+      row(
+        `${labels.refunded} (${refundMethodsText(model, labels)})`,
+        num(`-${formatMAD(model.afterReturns.refundedCents)}`)
+      )
+    );
+  }
   totals.push(row(labels.payment, escapeHtml(labels.paymentMethod)));
   if (model.cashReceivedCents !== null && model.changeCents !== null) {
     totals.push(row(labels.cashReceived, num(formatMAD(model.cashReceivedCents))));
@@ -237,7 +289,7 @@ export function receiptToHtml(
 <div class="receipt">
 <h1>${escapeHtml(model.shopName)}</h1>
 <div class="meta">${meta.join("")}</div>
-<table class="items"><tbody>${lineRows}</tbody></table>
+<table class="items"><tbody>${lineRows}</tbody></table>${allReturned ? `<div class="meta">${escapeHtml(labels.allReturned)}</div>` : ""}
 <table><tbody>${totals.join("")}</tbody></table>
 <div class="thanks">${escapeHtml(labels.thanks)}</div>
 </div>
@@ -256,9 +308,14 @@ export function receiptToText(
     receiptDateText(model, options),
     `${labels.number} ${model.receiptNumber}`,
   ];
+  if (model.afterReturns) {
+    out.push(labels.updatedAfterReturn);
+    out.push(labels.returnedOn(returnDateText(model, options)));
+  }
   if (model.cashierName) out.push(`${labels.cashier}: ${model.cashierName}`);
   if (model.customerName) out.push(`${labels.customer}: ${model.customerName}`);
   out.push("");
+  if (model.afterReturns && model.lines.length === 0) out.push(labels.allReturned);
   for (const line of model.lines) {
     out.push(line.name);
     out.push(
@@ -272,6 +329,12 @@ export function receiptToText(
     out.push(`${labels.discount}: -${formatMAD(model.discountCents)}`);
   }
   out.push(`${labels.total}: ${formatMAD(model.totalCents)}`);
+  if (model.afterReturns) {
+    out.push(`${labels.originalTotal}: ${formatMAD(model.afterReturns.originalTotalCents)}`);
+    out.push(
+      `${labels.refunded} (${refundMethodsText(model, labels)}): -${formatMAD(model.afterReturns.refundedCents)}`
+    );
+  }
   out.push(`${labels.payment}: ${labels.paymentMethod}`);
   if (model.cashReceivedCents !== null && model.changeCents !== null) {
     out.push(`${labels.cashReceived}: ${formatMAD(model.cashReceivedCents)}`);

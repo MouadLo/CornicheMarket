@@ -1,5 +1,6 @@
 import type { PendingSale } from "../../src/lib/sales/offlineQueue";
 import type { SaleLine, SaleSummary } from "../../src/lib/sales/queries";
+import type { SaleReturnRecord } from "../../src/lib/sales/returns";
 import {
   canOfferReceipt,
   escapeHtml,
@@ -25,6 +26,12 @@ const labels: ReceiptLabels = {
   cashReceived: "Cash received",
   change: "Change",
   thanks: "Thank you!",
+  updatedAfterReturn: "Updated after return",
+  returnedOn: (date) => `Returned on ${date}`,
+  originalTotal: "Original total",
+  refunded: "Refunded",
+  refundMethod: (method) => ({ cash: "cash", card: "card", credit: "credit" })[method],
+  allReturned: "All items were returned",
   lineDiscount: (amount) => `Discount ${amount}`,
   unit: (unit, quantity) => `${unit}${quantity === 1 ? "" : "s"}`,
 };
@@ -274,5 +281,233 @@ describe("receipt text and quantities", () => {
     expect(text).toContain("Total: 21.50 DH");
     expect(text).toContain("Subtotal: 22.50 DH");
     expect(text).toContain("Thank you!");
+  });
+});
+
+describe("receipt after item returns", () => {
+  const ret = (
+    id: string,
+    method: "cash" | "card" | "credit",
+    items: { saleItemId: string; quantity: number; refundCents: number }[],
+    createdAt = "2026-11-17T12:00:00Z"
+  ): SaleReturnRecord => ({
+    id,
+    saleId: "s",
+    createdAt,
+    reasonCode: "damaged",
+    note: null,
+    refundMethod: method,
+    refundCents: items.reduce((sum, item) => sum + item.refundCents, 0),
+    items,
+  });
+  const line = (
+    id: string,
+    name: string,
+    quantity: number,
+    unitPrice: number,
+    discount: number,
+    unit: string | null = "piece"
+  ): SaleLine => ({
+    id,
+    sale_id: "s",
+    product_name: name,
+    unit,
+    quantity,
+    unit_price_cents: unitPrice,
+    discount_cents: discount,
+    line_total_cents: Math.round(quantity * unitPrice) - discount,
+  });
+  const build = (sale: Partial<SaleSummary>, lines: SaleLine[], returns: SaleReturnRecord[]) =>
+    receiptFromHistorySale(historySale(sale), lines, "Unknown", returns)!;
+
+  it("is unchanged with no returns", () => {
+    const plain = receiptFromHistorySale(historySale(), historyLines, "Unknown");
+    expect(receiptFromHistorySale(historySale(), historyLines, "Unknown", [])).toEqual(plain);
+    expect(plain?.afterReturns ?? null).toBeNull();
+  });
+
+  it("keeps the rest of a partly returned line (3 x 7, one returned)", () => {
+    const model = build(
+      { total_cents: 2100, discount_cents: 0 },
+      [line("a", "Milk", 3, 700, 0)],
+      [ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 700 }])]
+    );
+    expect(model.lines).toHaveLength(1);
+    expect(model.lines[0]).toMatchObject({
+      quantity: 2,
+      unitPriceCents: 700,
+      discountCents: 0,
+      totalCents: 1400,
+    });
+    expect(model.totalCents).toBe(1400);
+    expect(model.subtotalCents).toBe(1400);
+    expect(model.discountCents).toBe(0);
+    expect(model.afterReturns).toEqual({
+      originalTotalCents: 2100,
+      refundedCents: 700,
+      refundMethods: ["cash"],
+      lastReturnAt: "2026-11-17T12:00:00Z",
+    });
+  });
+
+  it("drops a line returned in full", () => {
+    const model = build(
+      { total_cents: 1500, discount_cents: 0 },
+      [line("a", "Milk", 1, 1000, 0), line("b", "Tea", 1, 500, 0)],
+      [ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 1000 }])]
+    );
+    expect(model.lines.map((l) => l.name)).toEqual(["Tea"]);
+    expect(model.totalCents).toBe(500);
+  });
+
+  it("adds up exactly with a sale-level discount", () => {
+    // 2 x 5.00 and 1 x 10.00, 2.00 off the sale: each line paid 9.00.
+    const lines = [line("a", "A", 2, 500, 0), line("b", "B", 1, 1000, 0)];
+    const sale = { total_cents: 1800, discount_cents: 200 };
+
+    const part = build(sale, lines, [
+      ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 450 }]),
+    ]);
+    expect(part.totalCents).toBe(1350);
+    // The kept unit shows its own price, not price + the refunded discount share.
+    expect(part.lines[0]).toMatchObject({ quantity: 1, totalCents: 500, discountCents: 0 });
+    expect(part.subtotalCents).toBe(1500);
+    expect(part.discountCents).toBe(150);
+    expect(part.subtotalCents - part.discountCents).toBe(part.totalCents);
+
+    const full = build(sale, lines, [
+      ret("r1", "cash", [{ saleItemId: "a", quantity: 2, refundCents: 900 }]),
+    ]);
+    expect(full.lines.map((l) => l.name)).toEqual(["B"]);
+    expect(full.totalCents).toBe(900);
+    expect(full.subtotalCents).toBe(1000);
+    expect(full.discountCents).toBe(100);
+    expect(full.subtotalCents - full.discountCents).toBe(full.totalCents);
+  });
+
+  it("never prints a negative discount when rounding leaves the lines short", () => {
+    // A refund smaller than the kept share would leave the lines below the new
+    // total: the largest kept line takes the difference.
+    const model = build(
+      { total_cents: 1000, discount_cents: 100 },
+      [line("a", "A", 2, 550, 0)],
+      [ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 400 }])]
+    );
+    expect(model.totalCents).toBe(600);
+    expect(model.discountCents).toBe(0);
+    expect(model.lines[0].totalCents).toBe(600);
+    expect(model.subtotalCents).toBe(600);
+  });
+
+  it("shows the line discount that remains on a kept quantity", () => {
+    // 3 x 7.00 with 1.00 line discount: paid 20.00; one returned refunds 6.67.
+    const model = build(
+      { total_cents: 2000, discount_cents: 0 },
+      [line("a", "Milk", 3, 700, 100)],
+      [ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 667 }])]
+    );
+    expect(model.lines[0]).toMatchObject({ quantity: 2, totalCents: 1333, discountCents: 67 });
+    expect(model.totalCents).toBe(1333);
+  });
+
+  it("handles a weighed product (1.250 kg, 0.500 returned)", () => {
+    const model = build(
+      { total_cents: 1000, discount_cents: 0 },
+      [line("a", "Cheese", 1.25, 800, 0, "kg")],
+      [ret("r1", "card", [{ saleItemId: "a", quantity: 0.5, refundCents: 400 }])]
+    );
+    expect(model.lines[0]).toMatchObject({ quantity: 0.75, totalCents: 600, discountCents: 0 });
+    expect(model.totalCents).toBe(600);
+  });
+
+  it("accumulates several returns, with distinct refund methods in order", () => {
+    const model = build(
+      { total_cents: 3000, discount_cents: 0 },
+      [line("a", "Milk", 3, 1000, 0)],
+      [
+        ret(
+          "r1",
+          "card",
+          [{ saleItemId: "a", quantity: 1, refundCents: 1000 }],
+          "2026-11-17T11:00:00Z"
+        ),
+        ret(
+          "r2",
+          "cash",
+          [{ saleItemId: "a", quantity: 0.5, refundCents: 500 }],
+          "2026-11-17T13:00:00Z"
+        ),
+        ret(
+          "r3",
+          "card",
+          [{ saleItemId: "a", quantity: 0.5, refundCents: 500 }],
+          "2026-11-17T12:00:00Z"
+        ),
+      ]
+    );
+    expect(model.lines[0]).toMatchObject({ quantity: 1, totalCents: 1000 });
+    expect(model.totalCents).toBe(1000);
+    expect(model.afterReturns).toMatchObject({
+      originalTotalCents: 3000,
+      refundedCents: 2000,
+      refundMethods: ["card", "cash"],
+      lastReturnAt: "2026-11-17T13:00:00Z",
+    });
+  });
+
+  it("has no lines and a zero total when everything is returned", () => {
+    const model = build(
+      { total_cents: 1000, discount_cents: 0 },
+      [line("a", "Milk", 1, 1000, 0)],
+      [ret("r1", "credit", [{ saleItemId: "a", quantity: 1, refundCents: 1000 }])]
+    );
+    expect(model.lines).toEqual([]);
+    expect(model.totalCents).toBe(0);
+    expect(model.subtotalCents).toBe(0);
+    expect(model.discountCents).toBe(0);
+    expect(receiptToText(model, labels, opts)).toContain("All items were returned");
+    expect(receiptToHtml(model, labels, opts)).toContain("All items were returned");
+  });
+
+  it("ignores a returned item whose line is not on the sale", () => {
+    const model = build(
+      { total_cents: 1000, discount_cents: 0 },
+      [line("a", "Milk", 1, 1000, 0)],
+      [ret("r1", "cash", [{ saleItemId: "ghost", quantity: 1, refundCents: 0 }])]
+    );
+    expect(model.lines).toHaveLength(1);
+    expect(model.lines[0].totalCents).toBe(1000);
+    expect(model.totalCents).toBe(1000);
+  });
+
+  it("renders the update note, return date, original total and refund in html and text", () => {
+    const model = build(
+      { total_cents: 2100, discount_cents: 0 },
+      [line("a", "Milk <b>", 3, 700, 0)],
+      [
+        ret("r1", "cash", [{ saleItemId: "a", quantity: 1, refundCents: 700 }]),
+        ret("r2", "credit", [{ saleItemId: "a", quantity: 0.5, refundCents: 350 }]),
+      ]
+    );
+    const html = receiptToHtml(model, labels, opts);
+    expect(html).toContain("Updated after return");
+    expect(html).toContain("Returned on");
+    expect(html).toContain("Original total");
+    expect(html).toContain("21.00 DH");
+    expect(html).toContain("Refunded (cash / credit)");
+    expect(html).toContain("-10.50 DH");
+    expect(html).not.toContain("<b>");
+    const text = receiptToText(model, labels, opts);
+    expect(text).toContain("Updated after return");
+    expect(text).toContain("Original total: 21.00 DH");
+    expect(text).toContain("Refunded (cash / credit): -10.50 DH");
+    expect(text).toContain("Total: 10.50 DH");
+    // A plain receipt shows none of it.
+    const plain = receiptToText(
+      receiptFromHistorySale(historySale(), historyLines, "U")!,
+      labels,
+      opts
+    );
+    expect(plain).not.toContain("Original total");
   });
 });

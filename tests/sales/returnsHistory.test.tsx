@@ -8,6 +8,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from "rea
 import { TextInput } from "react-native";
 
 import SalesHistory from "../../app/(app)/sell/history";
+import { ReceiptPanel } from "../../src/components/sell/ReceiptPanel";
 import { allTexts, pressableByText } from "./sellTestUtils";
 
 const mockFetchRecent = jest.fn();
@@ -276,5 +277,72 @@ describe("returns in the history", () => {
     expect(joined()).toContain("returns.badge");
     expect(buttons("sell.askVoid")).toHaveLength(1);
     expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+  });
+});
+
+describe("updated receipt after returns", () => {
+  const panel = () => tree.root.findByType(ReceiptPanel).props.receipt;
+  const openSale = async (index: number) => {
+    const rows = outermost(
+      tree.root.findAll(
+        (n) =>
+          n.props.accessibilityLabel === "sell.historyOpen" && typeof n.props.onPress === "function"
+      )
+    );
+    await act(async () => rows[index].props.onPress());
+  };
+
+  it("the receipt button of a sale with returns shows what was kept", async () => {
+    await render();
+    await openSale(1); // "part": Pain 2 x 10.00, one returned for 9.00
+    await act(async () => pressableByText(tree.root, "receipt.action").props.onPress());
+    const model = panel();
+    expect(model.lines).toHaveLength(1);
+    expect(model.lines[0]).toMatchObject({ name: "Pain", quantity: 1 });
+    expect(model.totalCents).toBe(1100);
+    expect(model.afterReturns).toMatchObject({ originalTotalCents: 2000, refundedCents: 900 });
+  });
+
+  it("opens the updated receipt after a successful return", async () => {
+    mockFetchReturns
+      .mockReset()
+      .mockResolvedValueOnce([]) // page load
+      .mockResolvedValue([returnRecord("fresh", "f1", 1, 886)]); // after the return
+    await render();
+    expect(tree.root.findByType(ReceiptPanel).props.receipt).toBeNull();
+    await act(async () => returnButtons()[0].props.onPress());
+    const more = tree.root.find(
+      (n) =>
+        typeof n.props.onPress === "function" &&
+        String(n.props.accessibilityLabel).startsWith("returns.more")
+    );
+    await act(async () => more.props.onPress());
+    await act(async () => pressableByText(tree.root, "returns.reasonDamaged").props.onPress());
+    await act(async () => pressableByText(tree.root, "returns.confirm").props.onPress());
+
+    expect(mockFetchLines).toHaveBeenCalledWith(["fresh"], true);
+    const model = panel();
+    expect(model.lines[0]).toMatchObject({ name: "Lait", quantity: 2, totalCents: 2114 });
+    expect(model.totalCents).toBe(2114);
+    expect(model.afterReturns.refundedCents).toBe(886);
+  });
+
+  it("does not open it when the re-fetch fails, but the return is still recorded", async () => {
+    mockFetchReturns
+      .mockReset()
+      .mockResolvedValueOnce([])
+      .mockRejectedValue(new Error("Failed to fetch"));
+    await render();
+    await act(async () => returnButtons()[0].props.onPress());
+    const more = tree.root.find(
+      (n) =>
+        typeof n.props.onPress === "function" &&
+        String(n.props.accessibilityLabel).startsWith("returns.more")
+    );
+    await act(async () => more.props.onPress());
+    await act(async () => pressableByText(tree.root, "returns.reasonDamaged").props.onPress());
+    await act(async () => pressableByText(tree.root, "returns.confirm").props.onPress());
+    expect(mockRecordReturn).toHaveBeenCalledTimes(1);
+    expect(panel()).toBeNull();
   });
 });

@@ -17,6 +17,8 @@ import {
   receiptDateText,
   receiptToHtml,
   receiptToText,
+  refundMethodsText,
+  returnDateText,
   type ReceiptLabels,
   type ReceiptModel,
 } from "@/src/lib/sales/receipt";
@@ -25,6 +27,12 @@ import { Text } from "@/src/theme/Text";
 import { colors, radius, spacing } from "@/src/theme/tokens";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+const REFUND_KEYS = {
+  cash: "receipt.refundCash",
+  card: "receipt.refundCard",
+  credit: "receipt.refundCredit",
+} as const;
 
 const PAYMENT_KEYS = {
   cash: "receipt.payCash",
@@ -46,6 +54,12 @@ export function receiptLabels(t: Translate, model: ReceiptModel): ReceiptLabels 
     cashReceived: t("receipt.cashReceived"),
     change: t("receipt.change"),
     thanks: t("receipt.thanks"),
+    updatedAfterReturn: t("receipt.updatedAfterReturn"),
+    returnedOn: (date) => t("receipt.returnedOn", { date }),
+    originalTotal: t("receipt.originalTotal"),
+    refunded: t("receipt.refunded"),
+    refundMethod: (method) => t(REFUND_KEYS[method]),
+    allReturned: t("receipt.allReturned"),
     lineDiscount: (amount) => t("receipt.lineDiscount", { amount }),
     unit: (unit, quantity) =>
       unitLabel(unit, quantity, (key, options) => t(key, options as Record<string, unknown>)),
@@ -118,6 +132,14 @@ export function ReceiptPanel({
           <Text style={styles.shop}>{receipt.shopName}</Text>
           <Text style={styles.meta}>{receiptDateText(receipt, options)}</Text>
           <Text style={styles.meta}>{`${labels.number} ${receipt.receiptNumber}`}</Text>
+          {receipt.afterReturns ? (
+            <>
+              <Text style={[styles.meta, styles.strong]}>{labels.updatedAfterReturn}</Text>
+              <Text style={styles.meta}>
+                {labels.returnedOn(isolateLtr(returnDateText(receipt, options)))}
+              </Text>
+            </>
+          ) : null}
           {receipt.cashierName ? (
             <Text style={styles.meta}>
               {`${labels.cashier}: ${isolateBidi(receipt.cashierName)}`}
@@ -129,6 +151,9 @@ export function ReceiptPanel({
             </Text>
           ) : null}
           <View style={styles.rule} />
+          {receipt.afterReturns && receipt.lines.length === 0 ? (
+            <Text style={styles.meta}>{labels.allReturned}</Text>
+          ) : null}
           {receipt.lines.map((line, index) => (
             <View key={`${index}-${line.name}`} style={styles.row}>
               <View style={styles.lineMain}>
@@ -155,6 +180,15 @@ export function ReceiptPanel({
             </>
           ) : null}
           {amountRow(labels.total, formatMAD(receipt.totalCents), true)}
+          {receipt.afterReturns ? (
+            <>
+              {amountRow(labels.originalTotal, formatMAD(receipt.afterReturns.originalTotalCents))}
+              {amountRow(
+                `${labels.refunded} (${refundMethodsText(receipt, labels)})`,
+                `-${formatMAD(receipt.afterReturns.refundedCents)}`
+              )}
+            </>
+          ) : null}
           {amountRow(labels.payment, labels.paymentMethod)}
           {receipt.cashReceivedCents !== null && receipt.changeCents !== null ? (
             <>
