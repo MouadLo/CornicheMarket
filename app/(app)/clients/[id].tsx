@@ -268,8 +268,9 @@ export default function CustomerHistory() {
                 {t("credit.returnItems", { count: entry.item_count })}
               </Text>
             </View>
+            {/* Lowers the debt like a payment, so it reads like one. */}
             <Text style={styles.paymentAmount}>
-              {isolateLtr(`−${formatMAD(entry.refund_cents)}`)}
+              {isolateLtr(`+${formatMAD(entry.refund_cents)}`)}
             </Text>
           </View>
         </View>

@@ -474,7 +474,9 @@ begin
       else null
     end,
     t.txn,
-    case when t.txn > 0 then round(t.revenue::numeric / t.txn)::bigint else 0 end,
+    -- The average basket is what a sale brought in, before returns: a return
+    -- is not a sale and must not drag the average down (or below zero).
+    case when t.txn > 0 then round((t.revenue + rt.refunded)::numeric / t.txn)::bigint else 0 end,
     round(l.lost)::bigint,
     rt.refunded::bigint
   from totals t, costs c, returned rt, losses l;

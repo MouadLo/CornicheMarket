@@ -2,6 +2,11 @@
 -- Every write is rolled back.
 begin;
 
+-- Several checks count every return in the table. Start from none, whatever a
+-- local database already holds (rolled back with the rest at the end).
+delete from public.sale_return_items;
+delete from public.sale_returns;
+
 -- Start from no closed day (a developer's local database may have one).
 delete from public.day_closes;
 

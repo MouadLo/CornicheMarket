@@ -260,7 +260,7 @@ describe("customer history", () => {
     const texts = allTexts(tree.root);
     expect(texts).toContain("credit.timelineReturn");
     expect(texts).toContain('credit.returnItems{"count":2}');
-    const order = ["7.00 DH", "⁦−4.00 DH⁩", "+5.00 DH", "15.00 DH"].map((v) =>
+    const order = ["7.00 DH", "⁦+4.00 DH⁩", "+5.00 DH", "15.00 DH"].map((v) =>
       texts.findIndex((x) => x.includes(v))
     );
     expect(order.every((i) => i >= 0)).toBe(true);

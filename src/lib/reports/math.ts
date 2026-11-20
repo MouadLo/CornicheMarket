@@ -139,8 +139,8 @@ export function netOfReturns(sold: MoneyMove[], returned: MoneyMove[]) {
 }
 
 // The headline figures of report_summary: revenue and cost of goods are net of
-// the returns made in the range, the transaction count is not (a sale that had
-// an item returned is still one sale).
+// the returns made in the range; the transaction count and the average basket
+// are not (a sale that had an item returned is still one sale).
 export function summaryAfterReturns(input: {
   salesRevenueCents: number;
   cogsCents: number;
@@ -155,7 +155,8 @@ export function summaryAfterReturns(input: {
     cogsCents,
     grossProfitCents: revenueCents - cogsCents,
     marginPercent: grossMarginPercent(revenueCents, cogsCents),
-    averageBasketCents: averageBasketCents(revenueCents, input.transactionCount),
+    // What a sale brought in, before returns (a return is not a sale).
+    averageBasketCents: averageBasketCents(input.salesRevenueCents, input.transactionCount),
     returnsCents: input.refundedCents,
   };
 }

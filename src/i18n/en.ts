@@ -1301,6 +1301,8 @@ const en: Translations = {
     confirmTitle: "Record this return?",
     confirmMessage:
       "{{amount}} will be refunded ({{method}}) and the items put back on the shelf. This cannot be undone.",
+    confirmMessageCredit:
+      "{{amount}} will come off the customer's debt and the items go back on the shelf. No money leaves the till. This cannot be undone.",
     badge: "{{count}} item(s) returned",
     netTotal: "After returns: {{amount}}",
     returnedLine: "{{quantity}} {{name}} returned · −{{amount}}",

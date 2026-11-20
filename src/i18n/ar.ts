@@ -1289,6 +1289,8 @@ const ar: Translations = {
     confirmTitle: "تسجيل هذا الإرجاع؟",
     confirmMessage:
       "سيُسترد {{amount}} ({{method}}) وتعود المنتجات إلى الرف. لا يمكن التراجع عن هذا.",
+    confirmMessageCredit:
+      "سيُخصم {{amount}} من دين الزبون وتعود المنتجات إلى الرف. لا يخرج أي مال من الصندوق. لا يمكن التراجع عن هذا.",
     badge: "{{count}} منتج(ات) مرتجع(ة)",
     netTotal: "بعد المرتجعات: {{amount}}",
     returnedLine: "{{quantity}} {{name}} مرتجع · −{{amount}}",

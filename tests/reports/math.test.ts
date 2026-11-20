@@ -353,7 +353,7 @@ describe("item returns (migration 046)", () => {
       cogsCents: 4800,
       grossProfitCents: 3200,
       marginPercent: 40,
-      averageBasketCents: 2000,
+      averageBasketCents: 2500, // 10000 of sales over 4 sales: returns do not lower it
       returnsCents: 2000,
     });
   });

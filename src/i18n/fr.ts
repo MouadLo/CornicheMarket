@@ -254,7 +254,7 @@ const fr = {
     cash: "Espèces",
     card: "Carte",
     credit: "Crédit",
-    repayments: "Remboursements en espèces",
+    repayments: "Crédit réglé en espèces",
     discounts: "Remises",
     voids: "{{count}} annulée(s) · {{amount}}",
     refunds: "Retours ({{count}})",
@@ -1319,6 +1319,8 @@ const fr = {
     confirmTitle: "Enregistrer ce retour ?",
     confirmMessage:
       "{{amount}} seront rendus ({{method}}) et les articles remis en rayon. Cette action est irréversible.",
+    confirmMessageCredit:
+      "{{amount}} seront déduits de la dette du client et les articles remis en rayon. Aucun argent ne sort de la caisse. Cette action est irréversible.",
     badge: "{{count}} article(s) retourné(s)",
     netTotal: "Après retours : {{amount}}",
     returnedLine: "{{quantity}} {{name}} retourné · −{{amount}}",

@@ -269,10 +269,15 @@ export default function SalesHistory() {
     if (!sale || !returnId.current || submission.summary.items.length === 0) return;
     const confirmed = await confirmDestructive(
       t("returns.confirmTitle"),
-      t("returns.confirmMessage", {
-        amount: isolateLtr(formatMAD(submission.summary.totalCents)),
-        method: t(refundMethodKey(submission.method)),
-      }),
+      // A credit return hands nothing back: it lowers what the customer owes.
+      submission.method === "credit"
+        ? t("returns.confirmMessageCredit", {
+            amount: isolateLtr(formatMAD(submission.summary.totalCents)),
+          })
+        : t("returns.confirmMessage", {
+            amount: isolateLtr(formatMAD(submission.summary.totalCents)),
+            method: t(refundMethodKey(submission.method)),
+          }),
       t("returns.confirm"),
       t("common.cancel")
     );
