@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { LoadError } from "@/src/components/ui/LoadError";
-import { Panel } from "@/src/components/ui/Panel";
+import { Panel, panelMode } from "@/src/components/ui/Panel";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { categoryPathLabel } from "@/src/lib/products/categoryCatalog";
 import {
@@ -31,6 +39,7 @@ type Props = {
 // been used.
 export function RecentPriceChangesPanel({ visible, categories, onClose, onUndone }: Props) {
   const { t, i18n } = useTranslation();
+  const { width } = useWindowDimensions();
   const [batches, setBatches] = useState<PriceChangeBatch[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -63,7 +72,14 @@ export function RecentPriceChangesPanel({ visible, categories, onClose, onUndone
     }
   };
 
-  return (
+  // The Products screen has no side column to dock into: on a wide screen the
+  // panel floats over the end edge (absolute start/end don't follow dir="rtl"
+  // on web, so the side is chosen here); on a narrow one Panel opens full screen.
+  const docked = panelMode(width) === "docked";
+  const side =
+    Platform.OS !== "web" ? { end: 0 } : i18n?.language === "ar" ? { left: 0 } : { right: 0 };
+  if (!visible) return null;
+  const panel = (
     <Panel visible={visible} title={t("products.priceChangesRecent")} onClose={onClose}>
       {loadError ? (
         <LoadError
@@ -108,9 +124,21 @@ export function RecentPriceChangesPanel({ visible, categories, onClose, onUndone
       )}
     </Panel>
   );
+  return docked ? <View style={[styles.dock, side]}>{panel}</View> : panel;
 }
 
 const styles = StyleSheet.create({
+  dock: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   loading: { padding: 24 },
   list: { padding: 16, gap: 12 },
   row: {

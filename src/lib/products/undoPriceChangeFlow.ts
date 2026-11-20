@@ -25,7 +25,8 @@ export async function undoPriceChangeWithConfirm(
       percent: isolateLtr(formatPercent(batch.percent)),
     }),
     t("products.priceUndoConfirmLabel"),
-    t("common.cancel")
+    // Not "Annuler": in French that is also the word for undoing the change.
+    t("products.priceUndoKeep")
   );
   if (!ok) return null;
   try {

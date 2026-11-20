@@ -530,7 +530,8 @@ const en: Translations = {
     priceUndoConfirmTitle: "Undo this price change?",
     priceUndoConfirmMessage:
       "{{count}} product(s) will go back to their old price ({{percent}} reversed). A product edited since keeps its current price.",
-    priceUndoConfirmLabel: "Undo the change",
+    priceUndoConfirmLabel: "Restore the old prices",
+    priceUndoKeep: "Keep the current prices",
     priceUndoDone: "{{restored}} prices restored.",
     priceUndoDoneSkipped:
       "{{restored}} prices restored, {{skipped}} skipped because they changed since.",

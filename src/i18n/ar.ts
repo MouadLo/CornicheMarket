@@ -526,7 +526,8 @@ const ar: Translations = {
     priceUndoConfirmTitle: "إلغاء تغيير الأسعار هذا؟",
     priceUndoConfirmMessage:
       "سيعود {{count}} منتج إلى سعره القديم (عكس {{percent}}). المنتج المعدَّل منذ ذلك الحين يحتفظ بسعره الحالي.",
-    priceUndoConfirmLabel: "إلغاء التغيير",
+    priceUndoConfirmLabel: "استرجاع الأسعار القديمة",
+    priceUndoKeep: "الإبقاء على الأسعار الحالية",
     priceUndoDone: "تمت استعادة {{restored}} سعر.",
     priceUndoDoneSkipped:
       "تمت استعادة {{restored}} سعر، وتم تجاهل {{skipped}} لأنها تغيّرت منذ ذلك الحين.",

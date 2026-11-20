@@ -536,7 +536,8 @@ const fr = {
     priceUndoConfirmTitle: "Annuler ce changement de prix ?",
     priceUndoConfirmMessage:
       "{{count}} produit(s) reviendront à leur ancien prix ({{percent}} annulé). Un produit modifié depuis garde son prix actuel.",
-    priceUndoConfirmLabel: "Annuler le changement",
+    priceUndoConfirmLabel: "Rétablir les anciens prix",
+    priceUndoKeep: "Garder les prix actuels",
     priceUndoDone: "{{restored}} prix rétablis.",
     priceUndoDoneSkipped: "{{restored}} prix rétablis, {{skipped}} ignorés car modifiés depuis.",
     priceUndoError: "Impossible d'annuler ce changement de prix.",
