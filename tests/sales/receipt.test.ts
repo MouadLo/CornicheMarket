@@ -260,6 +260,33 @@ describe("receipt html", () => {
   });
 });
 
+describe("receipt html banner and paper", () => {
+  const model = () => receiptFromPendingSale(pending());
+
+  it("prints the cashier banner at the top, escaped", () => {
+    const html = receiptToHtml(model(), labels, { ...opts, banner: '<b>Sara</b> & "Co"' });
+    expect(html).toContain('<div class="banner">');
+    expect(html).not.toContain("<b>Sara</b>");
+    expect(html).toContain("&lt;b&gt;Sara&lt;/b&gt; &amp; &quot;Co&quot;");
+    expect(html).toContain("font-size: 22px");
+    expect(html.indexOf('class="banner"')).toBeLessThan(html.indexOf("<h1>"));
+    expect(html).toContain("\u2068");
+  });
+
+  it("leaves the output unchanged without a banner or paper option", () => {
+    const plain = receiptToHtml(model(), labels, opts);
+    expect(plain).not.toContain("banner");
+    expect(plain).not.toContain("80mm auto");
+    expect(receiptToHtml(model(), labels, { ...opts, banner: "   " })).toBe(plain);
+  });
+
+  it("sizes the page for a thermal roll only when asked", () => {
+    const html = receiptToHtml(model(), labels, { ...opts, paper: "80mm" });
+    expect(html).toContain("@page { size: 80mm auto; margin: 4mm; }");
+    expect(receiptToHtml(model(), labels, opts)).toContain("@page { margin: 4mm; }");
+  });
+});
+
 describe("receipt text and quantities", () => {
   it("formats quantities to at most three decimals", () => {
     expect(formatReceiptQuantity(3)).toBe("3");

@@ -4,8 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
 import { Banner } from "@/src/components/ui/Banner";
+import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { cashierLabelFor, normalizeLanguage } from "@/src/lib/print/jobs";
+import { usePhonePrint } from "@/src/lib/print/usePhonePrint";
 import { formatMAD } from "@/src/lib/money";
 import { unitLabel } from "@/src/lib/products/unitLabel";
+import type { PhonePrintState } from "@/src/lib/print/jobs";
 import {
   canPrintReceipt,
   canShareReceipt,
@@ -52,6 +56,44 @@ export function receiptLabels(t: Translate, model: ReceiptModel): ReceiptLabels 
   };
 }
 
+function sharedBanner(state: PhonePrintState, t: Translate, retry: () => void) {
+  switch (state) {
+    case "sending":
+    case "queued":
+      return <Banner tone="info" text={t("receipt.printQueued")} />;
+    case "printing":
+      return <Banner tone="info" text={t("receipt.printPrinting")} />;
+    case "printed":
+      return <Banner tone="ok" text={t("receipt.printDone")} />;
+    case "failed":
+      return (
+        <Banner
+          tone="bad"
+          text={t("receipt.printStationFailed")}
+          action={{ label: t("receipt.printRetry"), onPress: retry }}
+        />
+      );
+    case "timeout":
+      return (
+        <Banner
+          tone="warn"
+          text={t("receipt.printNoReply")}
+          action={{ label: t("receipt.printRetry"), onPress: retry }}
+        />
+      );
+    case "offline":
+      return (
+        <Banner
+          tone="warn"
+          text={t("receipt.printOffline")}
+          action={{ label: t("receipt.printRetry"), onPress: retry }}
+        />
+      );
+    default:
+      return null;
+  }
+}
+
 // A small preview of the receipt with Print and (where the device can) Share.
 // A failure shows a message here and never touches the sale.
 export function ReceiptPanel({
@@ -65,6 +107,7 @@ export function ReceiptPanel({
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n?.language ?? "fr";
+  const { profile } = useAuth();
   const [canShare, setCanShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +123,12 @@ export function ReceiptPanel({
   }, []);
   useEffect(() => setError(null), [receipt]);
 
+  const shared = usePhonePrint({
+    receipt,
+    cashierLabel: cashierLabelFor(profile?.full_name, receipt?.cashierName),
+    language: normalizeLanguage(language),
+    timeZone,
+  });
   const labels = useMemo(() => (receipt ? receiptLabels(t, receipt) : null), [t, receipt]);
   if (!receipt || !labels) return null;
   const options = { language, timeZone };
@@ -165,10 +214,24 @@ export function ReceiptPanel({
           <Text style={styles.thanks}>{labels.thanks}</Text>
         </ScrollView>
         {error ? <Banner tone="bad" text={error} /> : null}
+        <View style={styles.stationLine}>
+          <View style={[styles.dot, shared.stationOnline ? styles.dotOnline : styles.dotOffline]} />
+          <Text style={styles.stationText}>
+            {shared.stationOnline ? t("receipt.stationReady") : t("receipt.stationUnavailable")}
+          </Text>
+        </View>
+        {sharedBanner(shared.state, t, shared.send)}
         <View style={styles.actions}>
+          <BigButton
+            label={t("receipt.printAtCounter")}
+            variant={shared.stationOnline ? "primary" : "secondary"}
+            disabled={!shared.stationOnline || shared.busy}
+            onPress={shared.send}
+          />
           {canPrintReceipt() ? (
             <BigButton
               label={t("receipt.print")}
+              variant={shared.stationOnline ? "secondary" : "primary"}
               disabled={busy}
               onPress={() =>
                 run(
@@ -228,4 +291,9 @@ const styles = StyleSheet.create({
   sub: { fontSize: 15, color: colors.ink600 },
   thanks: { fontSize: 15, color: colors.ink700, textAlign: "center", marginTop: spacing.s2 },
   actions: { gap: spacing.s2 },
+  stationLine: { flexDirection: "row", alignItems: "center", gap: spacing.s2 },
+  stationText: { fontSize: 15, color: colors.ink700 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotOnline: { backgroundColor: colors.success700 },
+  dotOffline: { backgroundColor: colors.ink600 },
 });

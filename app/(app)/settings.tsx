@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -147,6 +148,16 @@ export default function Settings() {
           <InviteCashierForm onInvited={() => setStaffVersion((n) => n + 1)} />
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>{t("settings.printStationTitle")}</Text>
+        <Text style={styles.hint}>{t("settings.printStationHint")}</Text>
+        <BigButton
+          label={t("settings.printStationOpen")}
+          variant="secondary"
+          onPress={() => router.push("/(app)/sell/print-station")}
+        />
+      </View>
 
       <View style={styles.section}>
         <BigButton label={t("settings.signOut")} variant="secondary" onPress={signOut} />

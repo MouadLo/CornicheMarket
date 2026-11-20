@@ -170,6 +170,10 @@ const fr = {
     language: "Langue",
   },
   settings: {
+    printStationTitle: "Poste d'impression (PC de la caisse)",
+    printStationHint:
+      "À ouvrir sur le PC relié à l'imprimante de tickets : les caissiers y envoient leurs reçus depuis leur téléphone.",
+    printStationOpen: "Ouvrir le poste d'impression",
     staffTitle: "Équipe",
     staffHint:
       "Les personnes désactivées ne peuvent plus se connecter. Leurs ventes passées restent dans vos registres.",
@@ -1354,6 +1358,48 @@ const fr = {
     share: "Partager",
     printFailed: "Impossible d'imprimer le reçu. La vente n'est pas affectée.",
     shareFailed: "Impossible de partager le reçu. La vente n'est pas affectée.",
+    stationReady: "Imprimante de la caisse prête",
+    stationUnavailable: "Imprimante de la caisse non disponible",
+    printAtCounter: "Imprimer à la caisse",
+    printQueued: "En file…",
+    printPrinting: "Impression…",
+    printDone: "Imprimé ✓",
+    printNoReply: "La caisse n'a pas répondu.",
+    printStationFailed: "L'impression a échoué à la caisse.",
+    printOffline: "Pas de connexion — imprimez ici ou partagez.",
+    printRetry: "Réessayer",
+  },
+  printStation: {
+    title: "Poste d'impression",
+    active: "Poste d'impression actif",
+    printedToday: "Imprimés aujourd'hui : {{count}}",
+    lastPrint: "Dernière impression : {{time}}",
+    neverPrinted: "Rien imprimé pour l'instant",
+    testButton: "Imprimer un test",
+    testLine: "Article test",
+    testFailed: "Le test n'a pas pu s'imprimer. Vérifiez l'imprimante.",
+    keepVisible: "Gardez cette fenêtre visible",
+    connectionLost: "Connexion perdue — nouvelle tentative…",
+    nativeOnly:
+      "Le poste d'impression fonctionne dans le navigateur du PC de la caisse. Ouvrez l'application web sur ce PC.",
+    recent: "Derniers reçus",
+    empty: "Aucun reçu envoyé pour l'instant",
+    statusPending: "En attente",
+    statusPrinting: "Impression…",
+    statusPrinted: "Imprimé",
+    statusFailed: "Échec",
+    statusCancelled: "Ignoré",
+    print: "Imprimer",
+    ignore: "Ignorer",
+    actionFailed: "Action impossible. Réessayez.",
+    setupTitle: "Installation",
+    setupStep1:
+      "1) Installez le pilote de l'imprimante dans Windows, réglez le papier sur 80 mm et définissez-la comme imprimante par défaut.",
+    setupStep2:
+      "2) Créez un raccourci sur le Bureau avec cette cible (Chrome ouvre alors la page et imprime sans fenêtre de confirmation) :",
+    setupStep3:
+      "3) Ouvrez-le, connectez-vous une seule fois, puis laissez la fenêtre ouverte (sans la réduire).",
+    setupStep4: "4) Appuyez sur « Imprimer un test ».",
   },
   units: {
     // French/English only ever resolve to the "one"/"other" CLDR plural
