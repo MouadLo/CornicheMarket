@@ -24,7 +24,8 @@ import { Text } from "@/src/theme/Text";
 import { colors, radius, spacing, tilePalette } from "@/src/theme/tokens";
 import { tabularNumbers } from "@/src/theme/type";
 
-const GAP = 10;
+export const GAP = 10;
+export const TILE_HEIGHT = 104;
 
 type Props = {
   tabs: ResolvedTab[];
@@ -33,20 +34,29 @@ type Props = {
   onAdd: (product: GridProduct) => void;
   activeTabId?: string | null;
   onTabChange?: (id: string) => void;
+  // Owner only: switches the grid into arrange mode. Cashiers get no control.
+  onArrange?: () => void;
 };
+
+// The grid's columns and tile width for a pane, shared with the arrange mode so
+// both draw the same tiles in the same places.
+export function gridMetrics(paneWidth: number) {
+  const columns = tileColumns(paneWidth || 760);
+  const tileWidth = paneWidth
+    ? Math.floor((paneWidth - GAP * (columns - 1) - spacing.s4 * 2) / columns)
+    : 132;
+  return { columns, tileWidth };
+}
 
 // Category tabs and tiles. Tapping a tile adds it (a weighed product opens the
 // weight pad, as scanning one does). Every tile is tappable whatever its stock.
-export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange }: Props) {
+export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange, onArrange }: Props) {
   const { t } = useTranslation();
   const [localTab, setLocalTab] = useState<string | null>(null);
   const [paneWidth, setPaneWidth] = useState(0);
 
   const current = tabs.find((x) => x.id === (activeTabId ?? localTab)) ?? tabs[0];
-  const columns = tileColumns(paneWidth || 760);
-  const tileWidth = paneWidth
-    ? Math.floor((paneWidth - GAP * (columns - 1) - spacing.s4 * 2) / columns)
-    : 132;
+  const { tileWidth } = gridMetrics(paneWidth);
   const select = (id: string) => {
     setLocalTab(id);
     onTabChange?.(id);
@@ -60,33 +70,50 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange }: P
       style={styles.wrap}
       onLayout={(e: LayoutChangeEvent) => setPaneWidth(e.nativeEvent.layout.width)}
     >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabsScroll}
-        contentContainerStyle={styles.tabs}
-        accessibilityLabel={t("sell.grid.tabs")}
-      >
-        {tabs.map((tab) => {
-          const on = tab.id === current.id;
-          return (
-            <Pressable
-              key={tab.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              onPress={() => select(tab.id)}
-              style={[styles.tab, on && styles.tabOn]}
-            >
-              {tab.kind === "favorites" ? (
-                <Icon name="star" size={18} color={on ? colors.white : colors.sand500} />
-              ) : null}
-              <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
-                {isolateBidi(tab.label)}
+      <View style={styles.tabsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScroll}
+          contentContainerStyle={styles.tabs}
+          accessibilityLabel={t("sell.grid.tabs")}
+        >
+          {tabs.map((tab) => {
+            const on = tab.id === current.id;
+            return (
+              <Pressable
+                key={tab.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                onPress={() => select(tab.id)}
+                style={[styles.tab, on && styles.tabOn]}
+              >
+                {tab.kind === "favorites" ? (
+                  <Icon name="star" size={18} color={on ? colors.white : colors.sand500} />
+                ) : null}
+                <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
+                  {isolateBidi(tab.label)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {onArrange ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("sell.grid.arrange")}
+            onPress={onArrange}
+            style={styles.arrange}
+          >
+            <Icon name="sliders" size={22} color={colors.brand700} />
+            {paneWidth >= 640 ? (
+              <Text style={styles.arrangeText} numberOfLines={1}>
+                {t("sell.grid.arrange")}
               </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+            ) : null}
+          </Pressable>
+        ) : null}
+      </View>
 
       <ScrollView style={styles.tilesScroll} contentContainerStyle={styles.tiles}>
         {tiles.map((tile) => (
@@ -117,7 +144,8 @@ function namePad(language: string | undefined) {
   return { paddingEnd: 16 };
 }
 
-function Tile({
+// Also drawn by the arrange mode (ArrangeGrid), which passes no onPress.
+export function Tile({
   tile,
   width,
   count,
@@ -126,7 +154,7 @@ function Tile({
   tile: ResolvedTile;
   width: number;
   count: number;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n?.language;
@@ -147,6 +175,7 @@ function Tile({
           : t("sell.grid.tileLabelEmpty", { name: product.name, price })
       }
       onPress={onPress}
+      disabled={!onPress}
       style={({ pressed }) => [
         styles.tile,
         { width, backgroundColor: palette.tint },
@@ -220,6 +249,19 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, minHeight: 0 },
   // Never shrinks: on web a long tile list would otherwise squeeze the tabs.
   tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tabsWrap: { flex: 1, minWidth: 0 },
+  tabsRow: { flexDirection: "row", alignItems: "center", flexGrow: 0, flexShrink: 0 },
+  arrange: {
+    minHeight: 48,
+    minWidth: 48,
+    marginEnd: spacing.s4,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  arrangeText: { fontSize: 15, fontWeight: "600", color: colors.brand700 },
   tilesScroll: { flex: 1, minHeight: 0 },
   tabs: { gap: spacing.s2, paddingHorizontal: spacing.s4, paddingVertical: spacing.s3 },
   tab: {
@@ -244,7 +286,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.s4,
   },
   tile: {
-    height: 104,
+    height: TILE_HEIGHT,
     borderRadius: radius.control,
     overflow: "hidden",
     paddingVertical: 10,

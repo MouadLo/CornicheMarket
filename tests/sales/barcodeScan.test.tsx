@@ -25,6 +25,8 @@ const catalog = [
 
 let mockOnline = true;
 
+// Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
+jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => "sale-id" }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("react-i18next", () => ({
