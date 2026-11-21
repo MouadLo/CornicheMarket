@@ -144,7 +144,7 @@ describe("receipt model", () => {
     expect(json).not.toMatch(/cost|margin|profit/i);
     expect(json).not.toContain("420");
     // The stylesheet legitimately says "margin"; check the visible markup.
-    const html = receiptToHtml(model, labels, opts).replace(/<style>[\s\S]*?<\/style>/, "");
+    const html = receiptToHtml(model, labels, opts).replace(/<style[^>]*>[\s\S]*?<\/style>/g, "");
     const text = receiptToText(model, labels, opts);
     expect(html).not.toMatch(/cost|margin|profit/i);
     expect(text).not.toMatch(/cost|margin|profit/i);
@@ -293,8 +293,13 @@ describe("receipt html banner and paper", () => {
 
   it("sizes the page for a thermal roll only when asked", () => {
     const html = receiptToHtml(model(), labels, { ...opts, paper: "80mm" });
-    expect(html).toContain("@page { size: 80mm auto; margin: 4mm; }");
-    expect(receiptToHtml(model(), labels, opts)).toContain("@page { margin: 4mm; }");
+    expect(html).toContain("@page { size: 80mm auto; margin: 0; }");
+    // marked so printReceipt can fit the page to the receipt, in its own rule
+    expect(html).toContain('data-paper="80mm"');
+    expect(html).toContain('<style id="receipt-page">');
+    const plain = receiptToHtml(model(), labels, opts);
+    expect(plain).toContain("@page { margin: 4mm; }");
+    expect(plain).not.toContain("data-paper");
   });
 });
 

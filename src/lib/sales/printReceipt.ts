@@ -2,6 +2,8 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 
+import { rollPageCss } from "@/src/lib/sales/receipt";
+
 // Printing and sharing a receipt. Nothing here touches the sale: callers show
 // a failure next to the buttons and leave everything else alone.
 
@@ -15,7 +17,10 @@ function printInIframe(html: string): Promise<void> {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
     frame.setAttribute("tabindex", "-1");
-    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    // Laid out at the width of an 80 mm roll (so a roll receipt can be
+    // measured), kept off screen and invisible.
+    frame.style.cssText =
+      "position:fixed;left:-10000px;top:0;width:80mm;height:10px;border:0;opacity:0;pointer-events:none;";
     let removed = false;
     const remove = () => {
       if (removed) return;
@@ -35,6 +40,7 @@ function printInIframe(html: string): Promise<void> {
         return;
       }
       try {
+        fitRollPage(view.document);
         view.addEventListener("afterprint", remove);
         view.focus();
         view.print();
@@ -49,6 +55,19 @@ function printInIframe(html: string): Promise<void> {
     frame.srcdoc = html;
     document.body.appendChild(frame);
   });
+}
+
+// An 80 mm roll receipt gets a page exactly as long as its content, so the
+// printer stops (and cuts) right after the last line instead of feeding the
+// driver's default paper length. Anything else is left alone.
+export function fitRollPage(doc: Document | null | undefined): void {
+  const root = doc?.documentElement;
+  if (!root || root.getAttribute("data-paper") !== "80mm") return;
+  const rule = doc.getElementById("receipt-page");
+  const content = doc.querySelector(".receipt") ?? doc.body;
+  if (!rule || !content) return;
+  const height = Math.ceil(content.getBoundingClientRect().bottom);
+  rule.textContent = rollPageCss(height);
 }
 
 // iPhone and iPad browsers print the whole page instead of the hidden frame, so

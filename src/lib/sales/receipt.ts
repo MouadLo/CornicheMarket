@@ -280,6 +280,18 @@ export function loyaltyFooterLines(
   return out;
 }
 
+// Paper fed after the last line so the cutter does not cut through it.
+export const ROLL_TAIL_MM = 6;
+
+// The @page rule of an 80 mm roll receipt: exactly as long as its content
+// (heightPx, CSS pixels at 96 per inch) plus the cutter tail; "auto" before it
+// has been measured.
+export function rollPageCss(heightPx: number | null): string {
+  if (heightPx === null || !(heightPx > 0)) return "@page { size: 80mm auto; margin: 0; }";
+  const mm = Math.ceil((heightPx * 25.4) / 96) + ROLL_TAIL_MM;
+  return `@page { size: 80mm ${mm}mm; margin: 0; }`;
+}
+
 export function receiptToHtml(
   model: ReceiptModel,
   labels: ReceiptLabels,
@@ -357,20 +369,27 @@ export function receiptToHtml(
   const banner = options.banner?.trim()
     ? `<div class="banner">${name(options.banner.trim())}</div>\n`
     : "";
-  const page =
-    options.paper === "80mm" ? "@page { size: 80mm auto; margin: 4mm; }" : "@page { margin: 4mm; }";
+  const roll = options.paper === "80mm";
+  // A roll: no page margins (the printer's own 4 mm edges stay blank), the
+  // 72 mm printable width centred, and a page as long as the receipt. Chrome on
+  // Windows ignores "auto" and uses the driver's paper length (a long blank
+  // tail), so printReceipt measures the receipt and replaces this rule with
+  // its real height (rollPageCss) just before printing.
+  const page = roll ? rollPageCss(null) : "@page { margin: 4mm; }";
 
   return `<!doctype html>
-<html lang="${escapeHtml(options.language)}" dir="${dir}">
+<html lang="${escapeHtml(options.language)}" dir="${dir}"${roll ? ' data-paper="80mm"' : ""}>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(model.shopName)} ${escapeHtml(model.receiptNumber)}</title>
+<style id="receipt-page">${page}</style>
 <style>
-  ${page}
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Helvetica, Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; }
-  .receipt { width: 72mm; max-width: 100%; margin: 0 auto; }
+  .receipt { width: 72mm; max-width: 100%; margin: 0 auto; }${
+    roll ? "\n  html, body { width: 80mm; }\n  .receipt { padding: 2mm 0 0; }" : ""
+  }
   h1 { font-size: 16px; text-align: center; margin: 0 0 6px; }
   .meta { text-align: center; margin-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; }
