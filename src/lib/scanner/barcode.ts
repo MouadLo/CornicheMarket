@@ -12,12 +12,13 @@
 // lookup tries every equivalent form, preferring the exact text.
 
 export type BarcodeFormatName =
-  "ean13" | "ean8" | "upca" | "upce" | "code128" | "code39" | "code93" | "itf" | "unknown";
+  "ean13" | "ean8" | "upca" | "upce" | "code128" | "code39" | "code93" | "itf" | "qr" | "unknown";
 
 // Readers name formats differently: expo-camera "ean13" / "upc_e", the browser
 // BarcodeDetector "ean_13", zxing "EAN_13", iOS "org.gs1.EAN-13".
 export function normalizeFormat(type: string | null | undefined): BarcodeFormatName {
   const key = (type ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (key === "qr" || key.includes("qrcode")) return "qr";
   if (key.includes("ean13")) return "ean13";
   if (key.includes("ean8")) return "ean8";
   if (key.includes("upca")) return "upca";

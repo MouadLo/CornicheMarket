@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { bonusIsActive } from "@/src/lib/loyalty/bonus";
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
 import type { Product } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
@@ -32,6 +33,10 @@ function ProductRowComponent({ product, showCost, onPress, highlighted }: Props)
   const margin = hasCost ? marginPercent(product.selling_price_cents, cost) : null;
   const belowCost = unitProfit !== null && unitProfit < 0;
 
+  // Loyalty: not cost data, so cashiers see it too.
+  const loyaltyExcluded = product.loyalty_excluded === true;
+  const bonusActive = bonusIsActive(product);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -47,6 +52,25 @@ function ProductRowComponent({ product, showCost, onPress, highlighted }: Props)
         <Text style={[styles.name, { textAlign }]} numberOfLines={1}>
           {isolateBidi(product.name)}
         </Text>
+        {loyaltyExcluded || bonusActive ? (
+          <View style={styles.badgeRow}>
+            {loyaltyExcluded ? (
+              <View style={[styles.badge, styles.badgeExcluded]}>
+                <Text style={[styles.badgeText, styles.badgeExcludedText]}>
+                  {t("loyalty.rowExcluded")}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.badge, styles.badgeBonus]}>
+                <Text style={[styles.badgeText, styles.badgeBonusText]}>
+                  {t("loyalty.rowBonus", {
+                    points: isolateLtr(String(product.loyalty_bonus_points)),
+                  })}
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
         <Text style={[styles.meta, { textAlign }]} numberOfLines={1}>
           {product.barcode ?? t("productRow.noBarcode")} · {product.stock_quantity}{" "}
           {unitLabel(product.unit, product.stock_quantity, t)}
@@ -94,9 +118,16 @@ const styles = StyleSheet.create({
   },
   highlighted: { backgroundColor: colors.brand100 },
   pressed: { backgroundColor: colors.sunken },
-  main: { flex: 1, gap: 4 },
+  main: { flex: 1, gap: 3 },
   name: { fontSize: 16, fontWeight: "600" },
   meta: { fontSize: 13, color: colors.ink600 },
+  badgeRow: { flexDirection: "row" },
+  badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  badgeBonus: { backgroundColor: colors.success100 },
+  badgeExcluded: { backgroundColor: colors.sunken },
+  badgeText: { fontSize: 13, fontWeight: "700" },
+  badgeBonusText: { color: colors.success700 },
+  badgeExcludedText: { color: colors.ink700 },
   right: { alignItems: "flex-end", gap: 2 },
   price: { fontSize: 17, fontWeight: "700" },
   cost: { fontSize: 13, color: colors.ink600 },

@@ -48,7 +48,7 @@ export function CameraBarcodeView({
         style={StyleSheet.absoluteFill}
         facing="back"
         barcodeScannerSettings={{
-          barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
+          barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"],
         }}
         onBarcodeScanned={({ data, type }) => {
           const code = filter.current?.push(

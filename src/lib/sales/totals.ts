@@ -14,6 +14,23 @@ export type CartLine = {
   // sale; here it only drives the cashier's limit). A basket saved before this
   // field existed has it missing, which is read as true (see basketStore).
   discountable: boolean;
+  // What the device needs to estimate loyalty points for this line (never sent
+  // to the server: it stamps its own copy). Absent on a line built before
+  // loyalty existed, or from a product the device holds no loyalty data for;
+  // such a line is read as eligible with no bonus.
+  loyalty?: LineLoyalty;
+};
+
+export type LineLoyalty = {
+  category_id: string | null;
+  // The product's own exclusion (Divers is never eligible, see `misc`).
+  excluded: boolean;
+  // Bonus points per whole unit while the promo runs.
+  bonus: number;
+  // The instant the bonus ends (null = no end).
+  bonus_until: string | null;
+  // The free-amount Divers item.
+  misc: boolean;
 };
 
 // The one place a cart line is built from a product. The Sell screen and the
@@ -27,9 +44,19 @@ export function cartLineFrom(
     current_cost_cents?: number | null;
     // Missing on a product the device cached before this field existed.
     discountable?: boolean | null;
+    category_id?: string | null;
+    // Loyalty fields (migration 048); missing on rows from an older cache.
+    loyalty_excluded?: boolean;
+    loyalty_bonus_points?: number;
+    loyalty_bonus_until?: string | null;
+    kind?: string;
   },
   quantity: number
 ): CartLine {
+  const hasLoyalty =
+    product.loyalty_excluded !== undefined ||
+    product.loyalty_bonus_points !== undefined ||
+    product.kind === "misc";
   return {
     product_id: product.id,
     name: product.name,
@@ -39,6 +66,17 @@ export function cartLineFrom(
     discount_cents: 0,
     unit_cost_cents: product.current_cost_cents ?? null,
     discountable: product.discountable ?? true,
+    ...(hasLoyalty
+      ? {
+          loyalty: {
+            category_id: product.category_id ?? null,
+            excluded: product.loyalty_excluded === true,
+            bonus: Math.max(0, Math.trunc(product.loyalty_bonus_points ?? 0)),
+            bonus_until: product.loyalty_bonus_until ?? null,
+            misc: product.kind === "misc",
+          },
+        }
+      : {}),
   };
 }
 
@@ -56,6 +94,18 @@ export function cartSubtotal(lines: CartLine[]): number {
 
 export function saleTotal(lines: CartLine[], saleDiscountCents: number): number {
   return Math.max(0, cartSubtotal(lines) - Math.max(0, saleDiscountCents));
+}
+
+// What the customer is charged: the manual sale discount and the value of the
+// points they spend are both taken off the basket. Only the manual part is
+// ever checked against the cashier's discount limit (points are the customer's
+// own money, not a favour of the cashier).
+export function saleTotalWithPoints(
+  lines: CartLine[],
+  manualDiscountCents: number,
+  pointsValueCents: number
+): number {
+  return saleTotal(lines, Math.max(0, manualDiscountCents) + Math.max(0, pointsValueCents));
 }
 
 export function changeDue(tenderedCents: number, totalCents: number): number {

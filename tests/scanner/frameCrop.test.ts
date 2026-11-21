@@ -4,7 +4,12 @@ import {
   aimCropRect,
   decodeSize,
 } from "../../src/lib/scanner/frameCrop";
-import { pickCentered, pickDecoder, DETECTOR_FORMATS } from "../../src/lib/scanner/webDecoder";
+import {
+  pickCentered,
+  pickDecoder,
+  DETECTOR_FORMATS,
+  REQUIRED_DETECTOR_FORMATS,
+} from "../../src/lib/scanner/webDecoder";
 
 describe("aimCropRect", () => {
   it("portrait phone, portrait 720x1280 stream: a centred band around the aiming box", () => {
@@ -55,6 +60,12 @@ describe("pickDecoder", () => {
     expect(pickDecoder(true, DETECTOR_FORMATS)).toBe("native");
     expect(pickDecoder(false, DETECTOR_FORMATS)).toBe("zxing");
     expect(pickDecoder(true, ["ean_13", "qr_code"])).toBe("zxing");
+  });
+
+  it("reads the loyalty card QR when the browser can, without requiring it", () => {
+    expect(DETECTOR_FORMATS).toContain("qr_code");
+    expect(REQUIRED_DETECTOR_FORMATS).not.toContain("qr_code");
+    expect(pickDecoder(true, ["ean_13", "ean_8", "upc_e", "code_128"])).toBe("native");
   });
 
   it("a detector without upc_a (Apple's) is still used", () => {

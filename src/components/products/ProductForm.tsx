@@ -1,6 +1,7 @@
 import { Chip } from "@/src/components/ui/Chip";
+import { DateField } from "@/src/components/ui/DateField";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -49,6 +50,10 @@ import {
   type DiscountOverride,
 } from "@/src/lib/sales/discountLimit";
 import { fetchDiscountLimits } from "@/src/lib/sales/queries";
+import { bonusUntilFromDay, dayFromBonusUntil, parseBonusPoints } from "@/src/lib/loyalty/bonus";
+import { fetchStoreTimezone } from "@/src/lib/reports/queries";
+import { DEFAULT_STORE_TIMEZONE } from "@/src/lib/reports/ranges";
+import { storeDayKey } from "@/src/lib/sales/historyView";
 import { priceWarning } from "@/src/lib/products/pricing";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { TileColorPicker, TilePreview } from "@/src/components/products/TileColorPicker";
@@ -114,7 +119,37 @@ export function ProductForm({
   const [discountOverride, setDiscountOverride] = useState<DiscountOverride>(
     initial?.discount_override ?? null
   );
+  // Loyalty: an excluded product earns nothing; the bonus is points per unit
+  // sold, optionally until the end of a store day.
+  const [timeZone, setTimeZone] = useState(DEFAULT_STORE_TIMEZONE);
+  const [loyaltyExcluded, setLoyaltyExcluded] = useState(initial?.loyalty_excluded ?? false);
+  const [bonusPoints, setBonusPoints] = useState(
+    initial?.loyalty_bonus_points ? String(initial.loyalty_bonus_points) : ""
+  );
+  const [bonusDay, setBonusDay] = useState(() =>
+    dayFromBonusUntil(initial?.loyalty_bonus_until, DEFAULT_STORE_TIMEZONE)
+  );
+  const bonusDayTouched = useRef(false);
   const [limits, setLimits] = useState<DiscountLimits>(DEFAULT_DISCOUNT_LIMITS);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve()
+      .then(fetchStoreTimezone)
+      .then((zone) => {
+        if (cancelled || typeof zone !== "string") return;
+        setTimeZone(zone);
+        // The saved end is shown as the store day it ends, in the store's zone.
+        if (!bonusDayTouched.current) {
+          setBonusDay(dayFromBonusUntil(initial?.loyalty_bonus_until, zone));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Read once when the form opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     let cancelled = false;
     Promise.resolve()
@@ -148,6 +183,9 @@ export function ProductForm({
     favorite,
     tileColor,
     discountOverride,
+    loyaltyExcluded,
+    bonusPoints,
+    bonusDay,
   ]);
   const [initialSnapshot] = useState(snapshot);
   useEffect(() => {
@@ -254,6 +292,25 @@ export function ProductForm({
 
     const thresholdValue = parseQuantity(threshold) ?? 0;
 
+    const bonus = parseBonusPoints(bonusPoints);
+    if (bonus === null) return setError("loyalty.errBonusPoints");
+    // The promo's last day, kept as the instant that day ends in the store's zone.
+    let bonusUntil: string | null = null;
+    if (bonus > 0 && bonusDay) {
+      if (
+        initial?.loyalty_bonus_until &&
+        bonusDay === dayFromBonusUntil(initial.loyalty_bonus_until, timeZone)
+      ) {
+        // Unchanged: an ended promo does not block saving other changes.
+        bonusUntil = initial.loyalty_bonus_until;
+      } else {
+        bonusUntil = bonusUntilFromDay(bonusDay, timeZone);
+        if (bonusUntil === null || new Date(bonusUntil).getTime() <= Date.now()) {
+          return setError("loyalty.errBonusUntilPast");
+        }
+      }
+    }
+
     // Zero or below-cost prices are allowed, but never by accident. The cost
     // is only known to the owner (null for cashiers).
     const warning = priceWarning(priceCents, initial?.current_cost_cents ?? null);
@@ -302,6 +359,9 @@ export function ProductForm({
           low_stock_threshold: thresholdValue,
           active,
           discount_override: discountOverride,
+          loyalty_excluded: loyaltyExcluded,
+          loyalty_bonus_points: bonus,
+          loyalty_bonus_until: bonusUntil,
         },
         tile
       );
@@ -508,6 +568,45 @@ export function ProductForm({
         )}
       </Field>
 
+      <Field label={t("loyalty.productSection")}>
+        <View style={styles.switchRow}>
+          <Text style={[styles.label, styles.flex]}>{t("loyalty.productExcluded")}</Text>
+          <Switch
+            value={loyaltyExcluded}
+            onValueChange={setLoyaltyExcluded}
+            accessibilityLabel={t("loyalty.productExcluded")}
+          />
+        </View>
+        <Text style={styles.note}>{t("loyalty.productExcludedHint")}</Text>
+
+        <Text style={styles.label}>{t("loyalty.productBonusLabel")}</Text>
+        <TextInput
+          style={[styles.input, loyaltyExcluded && styles.inputDisabled]}
+          value={bonusPoints}
+          onChangeText={setBonusPoints}
+          editable={!loyaltyExcluded}
+          placeholder="0"
+          keyboardType="number-pad"
+          accessibilityLabel={t("loyalty.productBonusLabel")}
+          accessibilityState={{ disabled: loyaltyExcluded }}
+        />
+        <Text style={styles.note}>
+          {loyaltyExcluded ? t("loyalty.productBonusDisabled") : t("loyalty.productBonusHint")}
+        </Text>
+        <DateField
+          label={t("loyalty.productBonusUntil")}
+          value={bonusDay}
+          onChange={(day) => {
+            bonusDayTouched.current = true;
+            setBonusDay(day);
+          }}
+          today={storeDayKey(new Date().toISOString(), timeZone)}
+          min={storeDayKey(new Date().toISOString(), timeZone)}
+          clearable
+          disabled={loyaltyExcluded}
+        />
+      </Field>
+
       <View style={styles.switchRow}>
         <Text style={styles.label}>{t("products.formActive")}</Text>
         <Switch value={active} onValueChange={setActive} />
@@ -627,6 +726,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: colors.white,
   },
+  inputDisabled: { backgroundColor: colors.sunken, color: colors.disabledFg },
   row: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
   scanButton: {

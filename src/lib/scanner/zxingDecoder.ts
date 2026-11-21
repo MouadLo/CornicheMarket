@@ -18,6 +18,7 @@ export function createZxingDecoder(): FrameDecoder {
     BarcodeFormat.UPC_E,
     BarcodeFormat.CODE_128,
     BarcodeFormat.CODE_39,
+    BarcodeFormat.QR_CODE,
   ]);
   // Scans more rows (and a rotated pass) per frame. Affordable because only
   // the area around the aiming box is decoded, not the whole frame.

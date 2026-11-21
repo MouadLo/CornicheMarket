@@ -13,8 +13,18 @@ import { useTranslation } from "react-i18next";
 import { Banner } from "@/src/components/ui/Banner";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { LoadError } from "@/src/components/ui/LoadError";
+import { displayPhone } from "@/src/lib/loyalty/phone";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
+import { MemberBadge } from "@/src/components/loyalty/MemberBadge";
+import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { valueAndPoints } from "@/src/lib/loyalty/display";
+import {
+  fetchLoyaltyBalances,
+  fetchLoyaltySettings,
+  fetchMemberIds,
+} from "@/src/lib/loyalty/queries";
+import { DEFAULT_LOYALTY_SETTINGS } from "@/src/lib/loyalty/settings";
 import { formatMAD } from "@/src/lib/money";
 import { filterCustomers } from "@/src/lib/sales/cashEntry";
 import {
@@ -28,6 +38,13 @@ import { colors, radius, touch } from "@/src/theme/tokens";
 
 export default function CreditScreen() {
   const { t } = useTranslation();
+  const { profile } = useAuth();
+  const isOwner = profile?.role === "owner";
+  // Loyalty is extra: if it cannot be read the list still shows, without it.
+  const [memberIds, setMemberIds] = useState<Set<string>>(new Set());
+  // Owner only: points per member.
+  const [pointBalances, setPointBalances] = useState<Map<string, number> | null>(null);
+  const [pointValueCents, setPointValueCents] = useState(DEFAULT_LOYALTY_SETTINGS.pointValueCents);
   // null = never read successfully. A failed read must never turn into an
   // empty list ("nobody owes anything", total 0): it is its own state.
   const [balances, setBalances] = useState<CustomerBalance[] | null>(null);
@@ -37,6 +54,20 @@ export default function CreditScreen() {
   const [search, setSearch] = useState("");
 
   const load = useCallback(() => {
+    Promise.resolve()
+      .then(fetchMemberIds)
+      .then(setMemberIds)
+      .catch(() => {});
+    if (isOwner) {
+      Promise.resolve()
+        .then(fetchLoyaltyBalances)
+        .then(setPointBalances)
+        .catch(() => {});
+      Promise.resolve()
+        .then(fetchLoyaltySettings)
+        .then((settings) => setPointValueCents(settings.pointValueCents))
+        .catch(() => {});
+    }
     fetchCustomerBalances()
       .then((rows) => {
         setBalances(rows);
@@ -44,7 +75,7 @@ export default function CreditScreen() {
       })
       .catch((failure) => setLoadError(errorKey(failure)))
       .finally(() => setLoaded(true));
-  }, []);
+  }, [isOwner]);
 
   // Re-read on every return to this screen (a payment or sale may have changed
   // a balance in a customer's history).
@@ -76,6 +107,20 @@ export default function CreditScreen() {
       </ScrollView>
     );
   }
+
+  // The member badge, and for the owner the points balance (DH first).
+  const loyaltyLine = (id: string) => {
+    if (!memberIds.has(id)) return null;
+    const points = pointBalances?.get(id);
+    return (
+      <>
+        <MemberBadge />
+        {points !== undefined ? (
+          <Text style={styles.meta}>{valueAndPoints(t, points, pointValueCents)}</Text>
+        ) : null}
+      </>
+    );
+  };
 
   const open = (id: string) => router.push({ pathname: "/(app)/clients/[id]", params: { id } });
 
@@ -126,8 +171,9 @@ export default function CreditScreen() {
           >
             <View style={styles.rowMain}>
               <Text style={styles.name}>{isolateBidi(balance.name)}</Text>
+              {loyaltyLine(balance.id)}
               <Text style={styles.meta}>
-                {balance.phone ? `${isolateLtr(balance.phone)} · ` : ""}
+                {balance.phone ? `${isolateLtr(displayPhone(balance.phone))} · ` : ""}
                 {t("credit.took")} {isolateLtr(formatMAD(balance.credit_total_cents))} ·{" "}
                 {t("credit.paid")} {isolateLtr(formatMAD(balance.paid_total_cents))}
               </Text>
@@ -157,7 +203,10 @@ export default function CreditScreen() {
               style={styles.settledRow}
               onPress={() => open(balance.id)}
             >
-              <Text style={styles.settledName}>{isolateBidi(balance.name)}</Text>
+              <View style={styles.settledMain}>
+                <Text style={styles.settledName}>{isolateBidi(balance.name)}</Text>
+                {loyaltyLine(balance.id)}
+              </View>
               <Text style={styles.settledValue}>
                 {balance.balance_cents < 0
                   ? t("credit.inCredit", { amount: isolateLtr(formatMAD(-balance.balance_cents)) })
@@ -220,7 +269,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
-  settledName: { flex: 1, fontSize: 15, color: colors.ink900 },
+  settledMain: { flex: 1, gap: 3, paddingVertical: 6 },
+  settledName: { fontSize: 15, color: colors.ink900 },
   settledValue: { fontSize: 14, color: colors.ink600 },
   empty: { textAlign: "center", color: colors.ink600, marginVertical: 20 },
 });

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { LoyaltySection } from "@/src/components/settings/LoyaltySection";
 import { StaffSection } from "@/src/components/settings/StaffSection";
 import { Banner } from "@/src/components/ui/Banner";
 import { InlineError } from "@/src/components/ui/InlineError";
@@ -132,6 +133,14 @@ export default function Settings() {
           <Text style={styles.sectionLabel}>{t("settings.creditTitle")}</Text>
           <Text style={styles.hint}>{t("settings.creditHint")}</Text>
           <CreditLimitForm />
+        </View>
+      )}
+
+      {isOwner && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("loyalty.settingsTitle")}</Text>
+          <Text style={styles.hint}>{t("loyalty.settingsHint")}</Text>
+          <LoyaltySection />
         </View>
       )}
 

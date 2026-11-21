@@ -22,6 +22,12 @@ export type Product = {
   discountable?: boolean;
   // The owner's choice for this product; only owners read it (null = automatic).
   discount_override?: DiscountOverride;
+  // Loyalty (migration 048); not cost data, so the cashier view has them too.
+  // Missing on rows from an older cache.
+  loyalty_excluded?: boolean;
+  loyalty_bonus_points?: number;
+  // The instant the bonus ends (null = no end).
+  loyalty_bonus_until?: string | null;
 };
 
 // code: the stable identity of a catalogue category (migration 035); null for
@@ -53,12 +59,15 @@ export type ProductInput = {
   low_stock_threshold: number;
   active: boolean;
   discount_override?: DiscountOverride;
+  loyalty_excluded?: boolean;
+  loyalty_bonus_points?: number;
+  loyalty_bonus_until?: string | null;
 };
 
 export const PAGE_SIZE = 50;
 
 const LIST_COLUMNS =
-  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active, discountable";
+  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until";
 
 // The owner also reads the buying price and his cashier-discount choice.
 const OWNER_COLUMNS = `${LIST_COLUMNS}, current_cost_cents, discount_override`;

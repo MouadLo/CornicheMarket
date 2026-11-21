@@ -46,6 +46,10 @@ const mockGrid = {
 };
 const mockSave = jest.fn();
 
+jest.mock(
+  "../../src/lib/loyalty/queries",
+  () => require("../fixtures/loyaltyQueriesMock").loyaltyQueriesMock
+);
 jest.mock("expo-crypto", () => ({ randomUUID: () => "sale-id" }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("react-i18next", () => ({

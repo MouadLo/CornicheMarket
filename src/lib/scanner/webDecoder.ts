@@ -10,8 +10,17 @@ export type FrameDecoder = {
   decode: (video: HTMLVideoElement) => Promise<ScanRead | null>;
 };
 
-// Same formats as the native camera: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39.
-export const DETECTOR_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"];
+// Same formats as the native camera: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39,
+// and the QR of a loyalty card (not required: a detector without it still scans products).
+export const DETECTOR_FORMATS = [
+  "ean_13",
+  "ean_8",
+  "upc_a",
+  "upc_e",
+  "code_128",
+  "code_39",
+  "qr_code",
+];
 
 // What the browser's detector must read to be used. UPC-A and Code 39 are
 // welcome but not required: a detector without upc_a (Apple's) reads a UPC-A

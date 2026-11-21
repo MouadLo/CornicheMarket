@@ -255,6 +255,8 @@ export function pendingSaleFrom(
     payment_method: PendingSale["payment_method"];
     discount_cents: number;
     total_cents: number;
+    // Only present when the sale has a loyalty member.
+    loyalty?: PendingSale["loyalty"];
   },
   lines: PendingSale["lines"],
   // The signed-in user at the moment the sale is accepted. Immutable from here on.

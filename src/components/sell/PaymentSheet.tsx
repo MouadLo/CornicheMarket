@@ -3,6 +3,16 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } f
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { BarcodeScannerModal } from "@/src/components/products/BarcodeScannerModal";
+import { cardTokenFromScan } from "@/src/lib/loyalty/card";
+import { pointsText, valueAndPoints } from "@/src/lib/loyalty/display";
+import {
+  maxRedeemablePoints,
+  pointsValueCents,
+  stepRedeemPoints,
+  type LoyaltyRates,
+} from "@/src/lib/loyalty/points";
+import type { RedeemCheck, RedeemRefusal } from "@/src/lib/loyalty/queries";
 import { centsToDisplay, formatMAD, parseMoneyToCents } from "@/src/lib/money";
 import { filterCustomers, findCustomerByName, pressCashKey } from "@/src/lib/sales/cashEntry";
 import {
@@ -20,6 +30,30 @@ import { Banner } from "@/src/components/ui/Banner";
 import { Chip } from "@/src/components/ui/Chip";
 import { Text } from "@/src/theme/Text";
 
+// What the sheet needs to let a loyalty member pay with points. Present only
+// when the member is known online (the balance and the card are checked live).
+export type PaymentLoyalty = {
+  customerId: string;
+  balance: number; // points
+  // What points may pay for: the eligible lines, after their own discounts and
+  // never more than what is due. Excluded items and Divers are not in it.
+  eligibleCents: number;
+  rates: LoyaltyRates;
+  // The card QR already scanned for this sale (the proof), if any.
+  cardToken: string | null;
+  // Whether this device can scan the card here (camera); otherwise it must be
+  // scanned before paying (USB scanner on the Sell screen).
+  canScan: boolean;
+  resolveCard: (token: string) => Promise<{ customerId: string } | null>;
+  checkRedeem: (
+    customerId: string,
+    points: number,
+    cardToken: string | null
+  ) => Promise<RedeemCheck>;
+};
+
+export type PaymentRedemption = { points: number; cardToken: string | null };
+
 type Props = {
   visible: boolean;
   totalCents: number;
@@ -28,13 +62,25 @@ type Props = {
   error: string | null;
   onClose: () => void;
   // change: what to hand back (cash only; 0 for an exact amount or any other method).
-  onConfirm: (method: PaymentMethod, customerId: string | null, change: number) => void;
+  // redemption: only passed when points are being spent (never as a 4th
+  // argument otherwise).
+  onConfirm: (
+    method: PaymentMethod,
+    customerId: string | null,
+    change: number,
+    redemption?: PaymentRedemption
+  ) => void;
   onCreateCustomer: (name: string) => Promise<Customer | null>;
   // The owner is not limited on customer debt: they see the same figures and a
   // note, but Pay Later is never disabled for them.
   isOwner?: boolean;
   // The store's default debt limit, for a customer with no limit of their own.
   storeCreditLimitCents?: number;
+  loyalty?: PaymentLoyalty;
+  // A loyalty member is attached to the sale: a credit sale is theirs and
+  // nobody else's. customerId is null when it cannot be told which customer
+  // they are (attached offline by phone and not in the customer list).
+  loyaltyCredit?: { customerId: string | null; name: string };
 };
 
 const METHODS: PaymentMethod[] = ["cash", "card", "credit"];
@@ -60,6 +106,8 @@ export function PaymentSheet({
   onCreateCustomer,
   isOwner = false,
   storeCreditLimitCents = DEFAULT_CREDIT_LIMIT_CENTS,
+  loyalty,
+  loyaltyCredit,
 }: Props) {
   const { t } = useTranslation();
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -68,6 +116,14 @@ export function PaymentSheet({
   const [newCustomer, setNewCustomer] = useState("");
   const [search, setSearch] = useState("");
   const [cardDeclined, setCardDeclined] = useState(false);
+  // Loyalty: points being spent (0 = none), the card scanned as proof, and what
+  // the cashier is told about them.
+  const [points, setPoints] = useState(0);
+  const [proofToken, setProofToken] = useState<string | null>(loyalty?.cardToken ?? null);
+  const [scanning, setScanning] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   // The sheet stays mounted between sales, so its state would otherwise carry
   // over: after a credit sale the next customer's sheet opened on "Pay later"
@@ -85,13 +141,32 @@ export function PaymentSheet({
       setNewCustomer("");
       setSearch("");
       setCardDeclined(false);
+      setPoints(0);
+      setProofToken(loyalty?.cardToken ?? null);
+      setScanning(false);
+      setProofError(null);
+      setChecking(false);
+      setRefusal(null);
     }
   }
 
+  // Points: never more than the balance, never more than the eligible items
+  // cost; their value comes off what is due.
+  const maxPoints = loyalty
+    ? maxRedeemablePoints(loyalty.balance, loyalty.eligibleCents, loyalty.rates)
+    : 0;
+  const usedPoints = loyalty && maxPoints > 0 ? Math.min(points, maxPoints) : 0;
+  const pointsValue = loyalty ? pointsValueCents(usedPoints, loyalty.rates) : 0;
+  const dueCents = Math.max(0, totalCents - pointsValue);
+  const needsProof = usedPoints > 0 && !proofToken;
+
   const tenderedCents = parseMoneyToCents(tendered) ?? 0;
-  const short = method === "cash" && tendered !== "" && isShortPayment(tenderedCents, totalCents);
-  const change = changeDue(tenderedCents, totalCents);
-  const chosen = customers.find((customer) => customer.id === customerId) ?? null;
+  const short = method === "cash" && tendered !== "" && isShortPayment(tenderedCents, dueCents);
+  const change = changeDue(tenderedCents, dueCents);
+  // With a loyalty member on the sale, a credit sale is theirs: nobody else can
+  // be picked (a sale never carries a member different from its debtor).
+  const debtorId = loyaltyCredit ? loyaltyCredit.customerId : customerId;
+  const chosen = customers.find((customer) => customer.id === debtorId) ?? null;
   const needsCustomer = method === "credit" && !chosen;
   // What the customer already owes against their limit, and whether this sale
   // would go over it. The device blocks a cashier here (it works offline); the
@@ -99,7 +174,7 @@ export function PaymentSheet({
   const credit =
     method === "credit" && chosen ? customerCreditState(chosen, storeCreditLimitCents) : null;
   const creditProblem = credit
-    ? creditLimitProblem(credit.balanceCents, totalCents, credit.limitCents)
+    ? creditLimitProblem(credit.balanceCents, dueCents, credit.limitCents)
     : null;
   const creditBlocked = !isOwner && creditProblem !== null;
 
@@ -144,14 +219,86 @@ export function PaymentSheet({
 
   const shown = filterCustomers(customers, search);
 
+  const refusalText = (reason: RedeemRefusal | null): string => {
+    switch (reason) {
+      case "disabled":
+        return t("loyalty.refuseDisabled");
+      case "not_member":
+        return t("loyalty.refuseNotMember");
+      case "no_proof":
+        return t("loyalty.refuseNoProof");
+      case "below_minimum":
+        return t("loyalty.refuseBelowMinimum", {
+          points: pointsText(t, loyalty?.rates.minRedeemPoints ?? 0),
+        });
+      case "over_balance":
+        return t("loyalty.refuseOverBalance");
+      default:
+        return t("loyalty.payCheckFailed");
+    }
+  };
+
+  // Every way of completing the sale comes through here. Points are checked with
+  // the server first (balance, proof, minimum); a refusal stops the payment and
+  // the cashier can take the points off and pay normally. Without points this is
+  // exactly the plain confirm.
+  const submit = async (
+    payMethod: PaymentMethod,
+    payCustomerId: string | null,
+    payChange: number
+  ) => {
+    if (!loyalty || usedPoints <= 0) {
+      onConfirm(payMethod, payCustomerId, payChange);
+      return;
+    }
+    if (checking) return;
+    setRefusal(null);
+    setChecking(true);
+    let check: RedeemCheck;
+    try {
+      check = await loyalty.checkRedeem(loyalty.customerId, usedPoints, proofToken);
+    } catch {
+      setChecking(false);
+      setRefusal(t("loyalty.payCheckFailed"));
+      return;
+    }
+    setChecking(false);
+    if (!check.ok) {
+      setRefusal(refusalText(check.reason));
+      return;
+    }
+    onConfirm(payMethod, payCustomerId, payChange, { points: usedPoints, cardToken: proofToken });
+  };
+
+  const onCardScanned = async (raw: string) => {
+    setScanning(false);
+    setProofError(null);
+    const token = cardTokenFromScan(raw);
+    if (!token) {
+      setProofError(t("loyalty.payScanNotCard"));
+      return;
+    }
+    try {
+      const found = await loyalty?.resolveCard(token);
+      if (!found) setProofError(t("loyalty.payScanUnknown"));
+      else if (found.customerId !== loyalty?.customerId) {
+        setProofError(t("loyalty.payScanWrongCustomer"));
+      } else setProofToken(token);
+    } catch {
+      setProofError(t("loyalty.payScanFailed"));
+    }
+  };
+
   const confirmLabel = saving
     ? t("common.saving")
     : method === "credit" && chosen
       ? t("sell.putOnCredit", {
-          amount: isolateLtr(formatMAD(totalCents)),
+          amount: isolateLtr(formatMAD(dueCents)),
           name: isolateBidi(chosen.name),
         })
-      : t("sell.completeSale");
+      : checking
+        ? t("loyalty.payChecking")
+        : t("sell.completeSale");
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -162,7 +309,103 @@ export function PaymentSheet({
             contentContainerStyle={styles.sheetContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.total}>{formatMAD(totalCents)}</Text>
+            <Text style={styles.total}>{formatMAD(dueCents)}</Text>
+
+            {loyalty && maxPoints > 0 ? (
+              <View style={styles.pointsBox} testID="loyalty-redeem">
+                {usedPoints === 0 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.pointsRow}
+                    onPress={() => setPoints(maxPoints)}
+                  >
+                    <Text style={styles.pointsTitle}>{t("loyalty.payUse")}</Text>
+                    <Text style={styles.pointsUpTo}>
+                      {t("loyalty.payUpTo", {
+                        value: isolateLtr(formatMAD(pointsValueCents(maxPoints, loyalty.rates))),
+                        points: pointsText(t, maxPoints),
+                      })}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <Text style={styles.pointsTitle}>{t("loyalty.payUse")}</Text>
+                    <View style={styles.stepper}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("loyalty.payMinus")}
+                        testID="points-minus"
+                        style={styles.stepButton}
+                        onPress={() =>
+                          setPoints(stepRedeemPoints(usedPoints, "down", maxPoints, loyalty.rates))
+                        }
+                      >
+                        <Text style={styles.stepText}>−</Text>
+                      </Pressable>
+                      <Text style={styles.pointsValue} testID="points-value">
+                        {valueAndPoints(t, usedPoints, loyalty.rates.pointValueCents)}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("loyalty.payPlus")}
+                        testID="points-plus"
+                        style={styles.stepButton}
+                        onPress={() =>
+                          setPoints(stepRedeemPoints(usedPoints, "up", maxPoints, loyalty.rates))
+                        }
+                      >
+                        <Text style={styles.stepText}>+</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        testID="points-max"
+                        style={styles.maxButton}
+                        onPress={() => setPoints(maxPoints)}
+                      >
+                        <Text style={styles.maxText}>{t("loyalty.payMax")}</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={styles.pointsUpTo}>
+                      {t("loyalty.payUpTo", {
+                        value: isolateLtr(formatMAD(pointsValueCents(maxPoints, loyalty.rates))),
+                        points: pointsText(t, maxPoints),
+                      })}
+                    </Text>
+                    <View style={styles.discountLine} testID="points-discount-line">
+                      <Text style={styles.pointsTitle}>{t("loyalty.payLine")}</Text>
+                      <Text style={styles.pointsTitle}>{`−${formatMAD(pointsValue)}`}</Text>
+                    </View>
+                    {proofToken ? (
+                      <Text style={styles.proofOk} testID="points-proof-ok">
+                        {t("loyalty.payProofOk")}
+                      </Text>
+                    ) : loyalty.canScan ? (
+                      <BigButton
+                        label={t("loyalty.payScanCard")}
+                        variant="secondary"
+                        onPress={() => {
+                          setProofError(null);
+                          setScanning(true);
+                        }}
+                      />
+                    ) : (
+                      <Text style={styles.hint}>{t("loyalty.payScanHint")}</Text>
+                    )}
+                    {proofError ? <Text style={styles.error}>{proofError}</Text> : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.removePoints}
+                      onPress={() => {
+                        setPoints(0);
+                        setRefusal(null);
+                      }}
+                    >
+                      <Text style={styles.removePointsText}>{t("loyalty.payRemove")}</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            ) : null}
 
             <View style={styles.methods}>
               {METHODS.map((value) => (
@@ -199,7 +442,7 @@ export function PaymentSheet({
                 {short ? (
                   <Text style={styles.short}>
                     {t("sell.shortBy", {
-                      amount: isolateLtr(formatMAD(totalCents - tenderedCents)),
+                      amount: isolateLtr(formatMAD(dueCents - tenderedCents)),
                     })}
                   </Text>
                 ) : (
@@ -213,13 +456,13 @@ export function PaymentSheet({
                   <Pressable
                     accessibilityRole="button"
                     style={[styles.quick, styles.quickExact]}
-                    onPress={() => setTendered(centsToDisplay(totalCents))}
+                    onPress={() => setTendered(centsToDisplay(dueCents))}
                   >
                     <Text style={[styles.quickText, styles.quickExactText]}>
                       {t("sell.exactAmount")}
                     </Text>
                   </Pressable>
-                  {quickAmounts(totalCents).map((amount) => (
+                  {quickAmounts(dueCents).map((amount) => (
                     <Pressable
                       accessibilityRole="button"
                       key={amount}
@@ -253,15 +496,23 @@ export function PaymentSheet({
             {method === "card" && (
               <View style={styles.block}>
                 <Text style={styles.cardInstruction}>
-                  {t("sell.cardInstruction", { amount: isolateLtr(formatMAD(totalCents)) })}
+                  {t("sell.cardInstruction", { amount: isolateLtr(formatMAD(dueCents)) })}
                 </Text>
               </View>
             )}
 
             {method === "credit" && (
               <View style={styles.block}>
-                <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
-                {customers.length > SEARCH_FROM && (
+                {loyaltyCredit ? (
+                  <Text style={styles.hint} testID="credit-locked">
+                    {chosen
+                      ? t("loyalty.payCreditLocked", { name: isolateBidi(loyaltyCredit.name) })
+                      : t("loyalty.payCreditUnknown")}
+                  </Text>
+                ) : (
+                  <Text style={styles.label}>{t("sell.whoPaysLater")}</Text>
+                )}
+                {!loyaltyCredit && customers.length > SEARCH_FROM && (
                   <TextInput
                     style={styles.input}
                     value={search}
@@ -271,7 +522,7 @@ export function PaymentSheet({
                   />
                 )}
                 <View style={styles.customers}>
-                  {shown.map((customer) => {
+                  {(loyaltyCredit ? [] : shown).map((customer) => {
                     const owed = customer.balance_cents ?? 0;
                     const selected = customerId === customer.id;
                     return (
@@ -288,7 +539,7 @@ export function PaymentSheet({
                       />
                     );
                   })}
-                  {shown.length === 0 && (
+                  {!loyaltyCredit && shown.length === 0 && (
                     <Text style={styles.hint}>{t("sell.noCustomerFound")}</Text>
                   )}
                 </View>
@@ -318,31 +569,41 @@ export function PaymentSheet({
                   </View>
                 )}
 
-                <View style={styles.newCustomerRow}>
-                  <TextInput
-                    style={[styles.input, styles.flex]}
-                    value={newCustomer}
-                    onChangeText={setNewCustomer}
-                    placeholder={t("sell.newCustomerName")}
-                    accessibilityLabel={t("sell.newCustomerName")}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.addCustomer}
-                    onPress={handleCreateCustomer}
-                  >
-                    <Text style={styles.addCustomerText}>{t("common.add")}</Text>
-                  </Pressable>
-                </View>
+                {!loyaltyCredit ? (
+                  <View style={styles.newCustomerRow}>
+                    <TextInput
+                      style={[styles.input, styles.flex]}
+                      value={newCustomer}
+                      onChangeText={setNewCustomer}
+                      placeholder={t("sell.newCustomerName")}
+                      accessibilityLabel={t("sell.newCustomerName")}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.addCustomer}
+                      onPress={handleCreateCustomer}
+                    >
+                      <Text style={styles.addCustomerText}>{t("common.add")}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
             )}
 
             {error && <Text style={styles.error}>{error}</Text>}
+            {refusal && (
+              <Text style={styles.error} testID="points-refusal">
+                {refusal}
+              </Text>
+            )}
           </ScrollView>
 
           {/* Pinned: Complete sale is always in the same place, whatever the method. */}
           <View style={styles.footer}>
-            {needsCustomer && <Text style={styles.hint}>{t("sell.chooseCustomer")}</Text>}
+            {needsCustomer && !loyaltyCredit && (
+              <Text style={styles.hint}>{t("sell.chooseCustomer")}</Text>
+            )}
+            {needsProof && <Text style={styles.hint}>{t("loyalty.payNeedProof")}</Text>}
             {method === "card" ? (
               <>
                 <View accessibilityLiveRegion="polite">
@@ -352,8 +613,8 @@ export function PaymentSheet({
                   label={saving ? t("common.saving") : t("sell.cardAccepted")}
                   variant="pay"
                   tall
-                  onPress={() => onConfirm("card", customerId, 0)}
-                  disabled={saving}
+                  onPress={() => void submit("card", debtorId, 0)}
+                  disabled={saving || checking || needsProof}
                 />
                 <View style={styles.declineGap}>
                   <BigButton
@@ -369,9 +630,20 @@ export function PaymentSheet({
                 label={confirmLabel}
                 variant="pay"
                 tall
-                onPress={() => onConfirm(method, customerId, method === "cash" ? change : 0)}
+                onPress={() =>
+                  void submit(
+                    method,
+                    method === "credit" ? debtorId : customerId,
+                    method === "cash" ? change : 0
+                  )
+                }
                 disabled={
-                  saving || needsCustomer || short || (method === "credit" && creditBlocked)
+                  saving ||
+                  checking ||
+                  needsProof ||
+                  needsCustomer ||
+                  short ||
+                  (method === "credit" && creditBlocked)
                 }
               />
             )}
@@ -380,6 +652,13 @@ export function PaymentSheet({
             </Pressable>
           </View>
         </View>
+        {loyalty ? (
+          <BarcodeScannerModal
+            visible={scanning}
+            onClose={() => setScanning(false)}
+            onScanned={(code) => void onCardScanned(code)}
+          />
+        ) : null}
       </View>
     </Modal>
   );
@@ -503,6 +782,41 @@ const styles = StyleSheet.create({
   },
   cardInstruction: { fontSize: 17, fontWeight: "600", color: colors.ink900, textAlign: "center" },
   declineGap: { marginTop: 12 },
+  pointsBox: {
+    gap: 8,
+    padding: 14,
+    borderRadius: radius.control,
+    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  pointsRow: { gap: 2, minHeight: touch.min, justifyContent: "center" },
+  pointsTitle: { fontSize: 16, fontWeight: "700", color: colors.brand700 },
+  pointsUpTo: { fontSize: 14, color: colors.ink700 },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stepButton: {
+    minHeight: touch.min,
+    minWidth: touch.min,
+    borderRadius: radius.control,
+    backgroundColor: colors.brand100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepText: { fontSize: 24, fontWeight: "700", color: colors.brand700 },
+  pointsValue: { flex: 1, fontSize: 17, fontWeight: "800", textAlign: "center" },
+  maxButton: {
+    minHeight: touch.min,
+    paddingHorizontal: 14,
+    borderRadius: radius.control,
+    backgroundColor: colors.brand700,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  maxText: { fontSize: 15, fontWeight: "700", color: colors.white },
+  discountLine: { flexDirection: "row", justifyContent: "space-between" },
+  proofOk: { fontSize: 15, fontWeight: "600", color: colors.success700 },
+  removePoints: { minHeight: touch.min, justifyContent: "center", alignSelf: "flex-start" },
+  removePointsText: { fontSize: 15, fontWeight: "600", color: colors.danger700 },
   hint: { fontSize: 15, color: colors.ink600, textAlign: "center" },
   // Small and apart from Complete sale: a slip must not leave the payment.
   back: { minHeight: touch.min, alignItems: "center", justifyContent: "center", marginTop: 8 },

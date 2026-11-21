@@ -8,6 +8,10 @@ import { resolveGrid, type GridProduct } from "../../src/lib/sellGrid/layout";
 import { allTexts } from "./sellTestUtils";
 
 let mockWidth = 1366;
+jest.mock(
+  "../../src/lib/loyalty/queries",
+  () => require("../fixtures/loyaltyQueriesMock").loyaltyQueriesMock
+);
 // Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
 jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => "sale-id" }));

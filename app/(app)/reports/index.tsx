@@ -10,6 +10,9 @@ import { DateField } from "@/src/components/ui/DateField";
 import { Icon } from "@/src/components/ui/Icon";
 import { MiniBarChart, type ChartPoint } from "@/src/components/reports/MiniBarChart";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { pointsText } from "@/src/lib/loyalty/display";
+import { fetchLoyaltyReport } from "@/src/lib/loyalty/queries";
+import { memberSalesShare, type LoyaltyReport } from "@/src/lib/loyalty/report";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
 import { exportTablesAsCsv, exportTablesAsPdf } from "@/src/lib/reports/export";
 import { buildReportTables } from "@/src/lib/reports/exportTables";
@@ -72,6 +75,8 @@ export default function ReportsScreen() {
   const [products, setProducts] = useState<ProductPerformance[]>([]);
   const [deadStock, setDeadStock] = useState<DeadStockRow[]>([]);
   const [inventory, setInventory] = useState<InventoryValue | null>(null);
+  // null = not read (or it failed): the card is left out, the rest still shows.
+  const [loyalty, setLoyalty] = useState<LoyaltyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The owner-configured store time zone, fetched once and reused for
@@ -115,6 +120,7 @@ export default function ReportsScreen() {
         performance,
         dead,
         inventoryValue,
+        loyaltyReport,
       ] = await Promise.all([
         fetchSummary(todayRange.from, todayRange.to),
         fetchSummary(range.from, range.to),
@@ -124,6 +130,10 @@ export default function ReportsScreen() {
         fetchProductPerformance(range.from, range.to),
         fetchDeadStock(30),
         fetchInventoryValue(),
+        // Extra: a failure here must never hide the other reports.
+        Promise.resolve()
+          .then(() => fetchLoyaltyReport(range.from, range.to))
+          .catch(() => null),
       ]);
 
       setToday(todaySummary);
@@ -134,6 +144,7 @@ export default function ReportsScreen() {
       setProducts(performance);
       setDeadStock(dead);
       setInventory(inventoryValue);
+      setLoyalty(loyaltyReport);
       setShowAllDeadStock(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("reports.loadError"));
@@ -357,6 +368,78 @@ export default function ReportsScreen() {
           {!singleDay && (
             <Section title={t("reports.byHour")}>
               <MiniBarChart columnWidth={56} points={hourPoints} />
+            </Section>
+          )}
+
+          {loyalty && (
+            <Section title={t("loyalty.reportTitle")}>
+              <View style={styles.metricGrid}>
+                <Metric
+                  label={t("loyalty.reportValueSpent")}
+                  value={formatMAD(loyalty.valueRedeemedCents)}
+                  large
+                />
+                <Metric
+                  label={t("loyalty.reportPointsSpent")}
+                  value={pointsText(t, loyalty.pointsRedeemed)}
+                />
+                <Metric
+                  label={t("loyalty.reportPointsEarned")}
+                  value={pointsText(t, loyalty.pointsEarned)}
+                  large
+                />
+                <Metric
+                  label={t("loyalty.reportPointsBonus")}
+                  value={pointsText(t, loyalty.pointsBonus)}
+                />
+                <Metric
+                  label={t("loyalty.reportMembers")}
+                  value={isolateLtr(`${loyalty.membersNew} / ${loyalty.membersTotal}`)}
+                />
+                <Metric
+                  label={t("loyalty.reportMemberShare")}
+                  value={(() => {
+                    const share = memberSalesShare(loyalty);
+                    return share === null ? "—" : isolateLtr(`${share}%`);
+                  })()}
+                />
+              </View>
+
+              <Text style={styles.tableTitle}>{t("loyalty.reportTopMembers")}</Text>
+              {loyalty.topMembers.length === 0 ? (
+                <Text style={styles.empty}>{t("loyalty.reportNoMembers")}</Text>
+              ) : (
+                <>
+                  <ReportTableHeader
+                    mainLabel={t("loyalty.reportColMember")}
+                    metaLabel={t("loyalty.reportColBalance")}
+                    valueLabel={t("loyalty.reportColSales")}
+                  />
+                  {loyalty.topMembers.map((member, index) => (
+                    <ReportRow
+                      key={`${member.name}-${index}`}
+                      index={index}
+                      name={member.name}
+                      subtitle={pointsText(t, member.pointsBalance)}
+                      value={formatMAD(member.salesCents)}
+                    />
+                  ))}
+                </>
+              )}
+
+              {loyalty.topBonusProducts.length > 0 ? (
+                <>
+                  <Text style={styles.tableTitle}>{t("loyalty.reportTopBonus")}</Text>
+                  {loyalty.topBonusProducts.map((product, index) => (
+                    <ReportRow
+                      key={`${product.productName}-${index}`}
+                      index={index}
+                      name={product.productName}
+                      value={pointsText(t, product.bonusPoints)}
+                    />
+                  ))}
+                </>
+              ) : null}
             </Section>
           )}
 
@@ -595,7 +678,7 @@ function ReportRow({
   index,
 }: {
   name: string;
-  subtitle: string;
+  subtitle?: string;
   value: string;
   valueNegative?: boolean;
   index: number;
@@ -616,7 +699,7 @@ function ReportRow({
         <Text style={[styles.rowName, { textAlign }]} numberOfLines={1}>
           {isolateBidi(name)}
         </Text>
-        <Text style={[styles.rowMeta, { textAlign }]}>{subtitle}</Text>
+        {subtitle ? <Text style={[styles.rowMeta, { textAlign }]}>{subtitle}</Text> : null}
       </View>
       <Text style={[styles.rowValue, valueNegative && styles.rowValueNegative]}>{value}</Text>
     </View>
@@ -742,6 +825,7 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 15, fontWeight: "700", minWidth: 72, textAlign: "right" },
   rowValueNegative: { color: colors.danger600 },
   empty: { color: colors.ink600, fontSize: 14 },
+  tableTitle: { fontSize: 14, fontWeight: "700", color: colors.ink700, marginTop: 8 },
   deadStockTotal: { color: colors.ink700, fontSize: 13, fontWeight: "600", marginBottom: 6 },
   snapshotLabel: { color: colors.ink600, fontSize: 13, fontStyle: "italic", marginBottom: 8 },
   showAllButton: { paddingVertical: 10, alignItems: "center" },

@@ -9,6 +9,10 @@ import { enqueueSale } from "../../src/lib/sales/offlineQueue";
 const mockSync = jest.fn();
 const mockUuid = jest.fn();
 const mockT = (key: string) => key;
+jest.mock(
+  "../../src/lib/loyalty/queries",
+  () => require("../fixtures/loyaltyQueriesMock").loyaltyQueriesMock
+);
 // Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
 jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => mockUuid() }));

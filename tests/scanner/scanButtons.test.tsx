@@ -22,6 +22,10 @@ const DESKTOP: Env = { ...PHONE, coarsePointer: false };
 const NATIVE: Env = { ...DESKTOP, platform: "ios" };
 let mockEnv: Env = PHONE;
 
+jest.mock(
+  "../../src/lib/loyalty/queries",
+  () => require("../fixtures/loyaltyQueriesMock").loyaltyQueriesMock
+);
 // Sell imports the arrange save (it reaches Supabase); no test here saves a grid.
 jest.mock("../../src/lib/sellGrid/queries", () => ({ saveGridArrangement: jest.fn() }));
 jest.mock("react-i18next", () => ({
@@ -31,6 +35,7 @@ jest.mock("react-i18next", () => ({
   }),
 }));
 jest.mock("expo-crypto", () => ({ randomUUID: () => "id" }));
+jest.mock("../../src/lib/reports/queries", () => ({ fetchStoreTimezone: async () => "UTC" }));
 jest.mock("expo-router", () => ({
   router: { push: jest.fn() },
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),

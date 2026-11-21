@@ -61,6 +61,8 @@ export type SaleSummary = {
   // Names for the history rows; null when unknown or not readable.
   customer_name?: string | null;
   cashier_name?: string | null;
+  // How much of discount_cents was paid in loyalty points (migration 048).
+  loyalty_discount_cents?: number;
 };
 
 // One line of a sale as the history shows it. No cost column, ever: a cashier
@@ -99,6 +101,11 @@ function salePayload(sale: PendingSale) {
 export async function submitSale(sale: PendingSale): Promise<void> {
   const { error, status } = await supabase.rpc("record_sale", {
     ...salePayload(sale),
+    // The loyalty member and points spent (migration 048). Left out entirely
+    // when the sale has none, so a sale queued before loyalty is sent exactly as
+    // it always was. recover_sale has no such argument: a recovered sale keeps
+    // its discount but earns and spends nothing.
+    ...(sale.loyalty ? { p_loyalty: sale.loyalty } : {}),
     // An assertion, not a claim: the server credits the caller's session and
     // refuses the sale if that is not this user (audit C05). Legacy sales have
     // no user id and are never sent here.
@@ -206,7 +213,7 @@ export async function fetchRecentSales(
   let query = supabase
     .from("sales")
     .select(
-      "id, created_at, occurred_at, payment_method, total_cents, discount_cents, customer_id, cashier_id, voided_at, void_reason, customers(name), profiles!sales_cashier_id_fkey(full_name)"
+      "id, created_at, occurred_at, payment_method, total_cents, discount_cents, loyalty_discount_cents, customer_id, cashier_id, voided_at, void_reason, customers(name), profiles!sales_cashier_id_fkey(full_name)"
     );
   if (range) {
     query = query

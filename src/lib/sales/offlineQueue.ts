@@ -26,6 +26,16 @@ export type PendingSale = {
   // claim in the payload). Missing on sales queued before audit C05 was fixed:
   // those are "legacy" and are never sent automatically.
   cashier_id?: string;
+  // The loyalty member on this sale and the points spent, sent to record_sale
+  // as p_loyalty. Absent when the sale has no member (every sale queued before
+  // loyalty existed): the sale is then sent exactly as it always was. It is
+  // part of the sale, so a retry re-sends the same value with the same id.
+  loyalty?: {
+    customer_id?: string;
+    phone?: string;
+    redeem_points?: number;
+    card_token?: string;
+  };
 };
 
 // A stored entry no version of the app can read as a sale. Never deleted: it is
@@ -100,6 +110,17 @@ function withStorage<T>(operation: () => Promise<T>): Promise<T> {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
+function isLoyalty(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  return (
+    (value.customer_id === undefined || typeof value.customer_id === "string") &&
+    (value.phone === undefined || typeof value.phone === "string") &&
+    (value.redeem_points === undefined ||
+      (Number.isSafeInteger(value.redeem_points) && (value.redeem_points as number) > 0)) &&
+    (value.card_token === undefined || typeof value.card_token === "string")
+  );
+}
 function isSale(value: unknown): value is PendingSale {
   if (!isRecord(value)) return false;
   return (
@@ -115,6 +136,7 @@ function isSale(value: unknown): value is PendingSale {
     (value.last_error === undefined || typeof value.last_error === "string") &&
     (value.cashier_id === undefined ||
       (typeof value.cashier_id === "string" && value.cashier_id.length > 0)) &&
+    isLoyalty(value.loyalty) &&
     Array.isArray(value.lines) &&
     value.lines.every(
       (line: unknown) =>
@@ -143,6 +165,7 @@ export function normalizeSale(value: unknown): PendingSale | null {
   if (sale.discount_cents === undefined) sale.discount_cents = 0;
   if (sale.attempts === undefined) sale.attempts = 0;
   if (sale.last_error === null) delete sale.last_error;
+  if (sale.loyalty === null) delete sale.loyalty;
   if (Array.isArray(sale.lines)) {
     sale.lines = sale.lines.map((line: unknown) => {
       if (!isRecord(line)) return line;

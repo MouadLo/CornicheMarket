@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -6,10 +6,12 @@ import { useTranslation } from "react-i18next";
 import { BigButton } from "@/src/components/BigButton";
 import { CreditLimitEditor } from "@/src/components/clients/CreditLimitEditor";
 import { CustomerPaymentAction } from "@/src/components/clients/CustomerPaymentAction";
+import { LoyaltyPanel } from "@/src/components/clients/LoyaltyPanel";
 import { Banner } from "@/src/components/ui/Banner";
 import { InlineError } from "@/src/components/ui/InlineError";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { StatusPill } from "@/src/components/ui/StatusPill";
+import { displayPhone } from "@/src/lib/loyalty/phone";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
 import { formatMAD } from "@/src/lib/money";
@@ -330,7 +332,9 @@ export default function CustomerHistory() {
 
       <View style={styles.summary}>
         <Text style={styles.name}>{isolateBidi(balance.name)}</Text>
-        {balance.phone ? <Text style={styles.meta}>{isolateLtr(balance.phone)}</Text> : null}
+        {balance.phone ? (
+          <Text style={styles.meta}>{isolateLtr(displayPhone(balance.phone))}</Text>
+        ) : null}
         {owes ? (
           <>
             <Text style={styles.summaryLabel}>{t("credit.owes")}</Text>
@@ -370,6 +374,16 @@ export default function CustomerHistory() {
           onSaved={load}
         />
       ) : null}
+
+      <LoyaltyPanel
+        customerId={balance.id}
+        customerPhone={balance.phone}
+        isOwner={isOwner}
+        timeZone={timeZone}
+        onJoinedElsewhere={(customerId) =>
+          router.replace({ pathname: "/(app)/clients/[id]", params: { id: customerId } })
+        }
+      />
 
       <Text style={styles.sectionLabel}>{t("credit.historySection")}</Text>
       {entries.length === 0 && <Text style={styles.empty}>{t("credit.noHistory")}</Text>}

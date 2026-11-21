@@ -33,6 +33,10 @@ const labels: ReceiptLabels = {
   refundMethod: (method) => ({ cash: "cash", card: "card", credit: "credit" })[method],
   allReturned: "All items were returned",
   lineDiscount: (amount) => `Discount ${amount}`,
+  loyaltyDiscount: "Loyalty discount",
+  pointsEarned: (points) => `Points earned ${points}`,
+  loyaltyBalance: (value, points) => `Balance ${value} (${points} points)`,
+  loyaltyPending: "Points added when synced",
   unit: (unit, quantity) => `${unit}${quantity === 1 ? "" : "s"}`,
 };
 
