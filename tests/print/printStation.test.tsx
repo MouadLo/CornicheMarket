@@ -197,7 +197,7 @@ describe("print station screen (web)", () => {
     expect(html).toContain("Sara &lt;b&gt;");
     expect(html).toContain('lang="ar"');
     expect(html).toContain("ar:receipt.thanks");
-    expect(html).toContain("@page { size: 80mm auto; margin: 4mm; }");
+    expect(html).toContain("@page { size: 80mm auto; margin: 0; }");
     expect(finish).toHaveBeenCalledWith("job-1", true);
   });
 

@@ -3,9 +3,11 @@ import { Platform } from "react-native";
 import {
   canPrintReceipt,
   canShareReceipt,
+  fitRollPage,
   printReceipt,
   shareReceipt,
 } from "../../src/lib/sales/printReceipt";
+import { rollPageCss } from "../../src/lib/sales/receipt";
 
 const mockPrintAsync = jest.fn();
 const mockPrintToFile = jest.fn();
@@ -138,5 +140,41 @@ describe("canPrintReceipt", () => {
     expect(canPrintReceipt()).toBe(false);
     browser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605", 5);
     expect(canPrintReceipt()).toBe(false);
+  });
+});
+
+describe("80 mm roll: the page is as long as the receipt", () => {
+  // A minimal document: the receipt's bottom edge and the page rule.
+  function fakeDoc(paper: string | null, bottom: number) {
+    const rule = { textContent: "@page { size: 80mm auto; margin: 0; }" };
+    return {
+      rule,
+      doc: {
+        documentElement: { getAttribute: (name: string) => (name === "data-paper" ? paper : null) },
+        getElementById: (id: string) => (id === "receipt-page" ? rule : null),
+        querySelector: () => ({ getBoundingClientRect: () => ({ bottom }) }),
+        body: null,
+      } as unknown as Document,
+    };
+  }
+
+  it("sets the measured height plus the cutter tail", () => {
+    // 378 px at 96 dpi = 100.0 mm, + 6 mm tail
+    const { doc, rule } = fakeDoc("80mm", 378);
+    fitRollPage(doc);
+    expect(rule.textContent).toBe("@page { size: 80mm 107mm; margin: 0; }");
+  });
+
+  it("leaves a receipt that is not for a roll alone", () => {
+    const { doc, rule } = fakeDoc(null, 378);
+    fitRollPage(doc);
+    expect(rule.textContent).toBe("@page { size: 80mm auto; margin: 0; }");
+    expect(() => fitRollPage(null)).not.toThrow();
+  });
+
+  it("rollPageCss before and after measuring", () => {
+    expect(rollPageCss(null)).toBe("@page { size: 80mm auto; margin: 0; }");
+    expect(rollPageCss(0)).toBe("@page { size: 80mm auto; margin: 0; }");
+    expect(rollPageCss(96)).toBe("@page { size: 80mm 32mm; margin: 0; }"); // 25.4 -> 26 + 6
   });
 });
