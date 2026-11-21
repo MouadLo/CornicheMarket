@@ -110,8 +110,11 @@ describe("bonus", () => {
   });
 
   it("stores the last day as the instant that day ends in the store's zone", () => {
-    // Casablanca is UTC+1 in winter: the day after 2026-12-31 starts at 23:00Z.
-    expect(bonusUntilFromDay("2026-12-31", "Africa/Casablanca")).toBe("2026-12-31T23:00:00.000Z");
+    // A fixed UTC+1 zone (Etc/GMT-1 is UTC+1 by POSIX convention): the day
+    // after 2026-12-31 starts at 23:00Z. Not Africa/Casablanca: its offset
+    // differs between time-zone database versions (Node 22's 2026c data and
+    // older data disagree), and CI must not depend on that.
+    expect(bonusUntilFromDay("2026-12-31", "Etc/GMT-1")).toBe("2026-12-31T23:00:00.000Z");
     expect(bonusUntilFromDay("2026-12-31", "UTC")).toBe("2027-01-01T00:00:00.000Z");
     expect(bonusUntilFromDay("2026-02-30", "UTC")).toBeNull();
     expect(bonusUntilFromDay("", "UTC")).toBeNull();
