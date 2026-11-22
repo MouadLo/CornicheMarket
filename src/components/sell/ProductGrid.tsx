@@ -36,6 +36,10 @@ type Props = {
   onTabChange?: (id: string) => void;
   // Owner only: switches the grid into arrange mode. Cashiers get no control.
   onArrange?: () => void;
+  // The built-in "Montant libre" tile: always first on every tab, never part of
+  // the owner's arrangement. Absent (null) while the device does not know the
+  // Divers product yet, so there is no tile rather than a broken one.
+  divers?: { count: number; onPress: () => void } | null;
 };
 
 // The grid's columns and tile width for a pane, shared with the arrange mode so
@@ -50,7 +54,15 @@ export function gridMetrics(paneWidth: number) {
 
 // Category tabs and tiles. Tapping a tile adds it (a weighed product opens the
 // weight pad, as scanning one does). Every tile is tappable whatever its stock.
-export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange, onArrange }: Props) {
+export function ProductGrid({
+  tabs,
+  inCart,
+  onAdd,
+  activeTabId,
+  onTabChange,
+  onArrange,
+  divers,
+}: Props) {
   const { t } = useTranslation();
   const [localTab, setLocalTab] = useState<string | null>(null);
   const [paneWidth, setPaneWidth] = useState(0);
@@ -120,6 +132,9 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange, onA
       </View>
 
       <ScrollView style={styles.tilesScroll} contentContainerStyle={styles.tiles}>
+        {divers ? (
+          <DiversTile width={tileWidth} count={divers.count} onPress={divers.onPress} />
+        ) : null}
         {tiles.map((tile) => (
           <Tile
             key={tile.key}
@@ -131,6 +146,55 @@ export function ProductGrid({ tabs, inCart, onAdd, activeTabId, onTabChange, onA
         ))}
       </ScrollView>
     </View>
+  );
+}
+
+// "Montant libre": white with a 2 px outline, so it is never mistaken for a
+// product. No price and no stock badge (it tracks no stock).
+export function DiversTile({
+  width,
+  count,
+  onPress,
+}: {
+  width: number;
+  count: number;
+  onPress: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const language = i18n?.language;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        count > 0 ? t("sell.diversTileLabel", { count }) : t("sell.diversTileLabelEmpty")
+      }
+      testID="divers-tile"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        styles.diversTile,
+        { width },
+        pressed && styles.tilePressed,
+      ]}
+    >
+      <View style={styles.tileTop}>
+        <Text style={[styles.name, namePad(language)]} numberOfLines={2}>
+          {isolateBidi(t("sell.diversTile"))}
+        </Text>
+      </View>
+      {count > 0 ? (
+        <View
+          style={[styles.qty, cornerSide(language, 3)]}
+          testID="divers-qty-badge"
+          pointerEvents="none"
+        >
+          <Text style={[styles.qtyText, tabularNumbers]}>{`×${count}`}</Text>
+        </View>
+      ) : null}
+      <View style={styles.tileBottom}>
+        <Icon name="pencil" size={22} color={colors.brand700} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -318,6 +382,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(21,33,43,0.07)",
   },
+  diversTile: { backgroundColor: colors.white, borderWidth: 2, borderColor: colors.brand700 },
   tilePressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
   strip: { position: "absolute", top: 0, bottom: 0, start: 0, width: 6 },
   tileTop: {

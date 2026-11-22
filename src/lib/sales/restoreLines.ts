@@ -1,4 +1,4 @@
-import type { CartLine } from "@/src/lib/sales/totals";
+import { lineKey, type CartLine } from "@/src/lib/sales/totals";
 
 // Undo for removing lines from the basket (UX C11). The basket may have
 // changed since the removal, so restoring never overwrites it: a product that
@@ -8,7 +8,7 @@ import type { CartLine } from "@/src/lib/sales/totals";
 // Put one removed line back at its old position (or the end if the basket is
 // now shorter). Skipped if that product is already in the basket.
 export function restoreLine(current: CartLine[], line: CartLine, index: number): CartLine[] {
-  if (current.some((other) => other.product_id === line.product_id)) return current;
+  if (current.some((other) => lineKey(other) === lineKey(line))) return current;
   const at = Math.max(0, Math.min(index, current.length));
   return [...current.slice(0, at), line, ...current.slice(at)];
 }
@@ -16,8 +16,8 @@ export function restoreLine(current: CartLine[], line: CartLine, index: number):
 // Put back every line of an emptied basket, in their old order and before any
 // line added since. Products already in the basket again are skipped.
 export function restoreLines(current: CartLine[], removed: CartLine[]): CartLine[] {
-  const present = new Set(current.map((line) => line.product_id));
-  return [...removed.filter((line) => !present.has(line.product_id)), ...current];
+  const present = new Set(current.map((line) => lineKey(line)));
+  return [...removed.filter((line) => !present.has(lineKey(line))), ...current];
 }
 
 // The sale discount comes back only if none was typed since.

@@ -31,7 +31,9 @@ function isLine(value: unknown): value is CartLine {
     Number.isInteger(line.unit_price_cents) &&
     Number.isInteger(line.discount_cents) &&
     (line.unit_cost_cents === null || Number.isInteger(line.unit_cost_cents)) &&
-    (line.discountable === undefined || typeof line.discountable === "boolean")
+    (line.discountable === undefined || typeof line.discountable === "boolean") &&
+    (line.key === undefined || typeof line.key === "string") &&
+    (line.note === undefined || typeof line.note === "string")
   );
 }
 

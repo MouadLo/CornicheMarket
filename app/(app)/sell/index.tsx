@@ -23,6 +23,7 @@ import { PendingAttemptCard } from "@/src/components/sell/PendingAttemptCard";
 import { MemberChip } from "@/src/components/loyalty/MemberChip";
 import { SaleLoyaltyPanel } from "@/src/components/loyalty/SaleLoyaltyPanel";
 import { ReceiptPanel } from "@/src/components/sell/ReceiptPanel";
+import { DiversPad } from "@/src/components/sell/DiversPad";
 import { WeightPad } from "@/src/components/sell/WeightPad";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { earnLinesOf, eligibleCentsOf } from "@/src/lib/loyalty/basket";
@@ -69,6 +70,7 @@ import {
   cartLineFrom,
   cartSubtotal,
   hasInvalidQuantity,
+  lineKey,
   saleTotal,
   validateSaleDiscounts,
 } from "@/src/lib/sales/totals";
@@ -103,6 +105,7 @@ import {
 } from "@/src/lib/sellGrid/arrange";
 import { ArrangeGrid } from "@/src/components/sell/ArrangeGrid";
 import { saveGridArrangement } from "@/src/lib/sellGrid/queries";
+import { addDiversLine, cleanDiversNote, diversCartLine } from "@/src/lib/sellGrid/divers";
 import { resolveGrid, sellLayoutFor, type ResolvedTab } from "@/src/lib/sellGrid/layout";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { useDebouncedValue } from "@/src/lib/useDebouncedValue";
@@ -139,6 +142,8 @@ export default function SellScreen() {
   const cameraScan = useCameraScanAvailable();
   // A weighed (kg) product waiting for its weight on the keypad.
   const [weighing, setWeighing] = useState<Product | null>(null);
+  // The "Montant libre" (Divers) amount pad.
+  const [diversOpen, setDiversOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [saving, setSaving] = useState(false);
@@ -347,7 +352,7 @@ export default function SellScreen() {
       setChangeDue(null);
       setLastReceipt(null);
       setLines((current) => {
-        const existing = current.findIndex((line) => line.product_id === product.id);
+        const existing = current.findIndex((line) => lineKey(line) === product.id);
         if (existing >= 0) {
           const next = [...current];
           next[existing] = {
@@ -465,7 +470,7 @@ export default function SellScreen() {
       addByBarcode(barcode);
       // The camera feeds the same handler; never let both read one scan.
     },
-    !paymentOpen && !weighing && !scannerOpen
+    !paymentOpen && !weighing && !scannerOpen && !diversOpen
   );
 
   const attachMember = useCallback((attached: SaleMember) => {
@@ -697,11 +702,36 @@ export default function SellScreen() {
   };
 
   // Basket quantities by product, for the grid's ×N badges.
+  // Divers lines are counted on their own tile, not by product.
   const inCart = useMemo(
     () =>
-      Object.fromEntries(lines.map((l) => [l.product_id, l.quantity])) as Record<string, number>,
+      Object.fromEntries(
+        lines.filter((l) => l.key === undefined).map((l) => [l.product_id, l.quantity])
+      ) as Record<string, number>,
     [lines]
   );
+  const diversCount = useMemo(() => lines.filter((l) => l.key !== undefined).length, [lines]);
+
+  // The Divers pad confirmed an amount: always a new line with its own note.
+  const addDivers = (amountCents: number, note: string | null) => {
+    const config = cachedGrid?.divers;
+    setDiversOpen(false);
+    if (!config) return;
+    setChangeDue(null);
+    setLastReceipt(null);
+    setLines((current) =>
+      addDiversLine(
+        current,
+        diversCartLine(config, {
+          amountCents,
+          note: cleanDiversNote(note ?? ""),
+          name: t("sell.diversName"),
+          key: Crypto.randomUUID(),
+        })
+      )
+    );
+    showFlash(t("sell.diversAdded", { amount: isolateLtr(formatMAD(amountCents)) }));
+  };
 
   const retryAttempt = async () => {
     const attempt = attemptedSale.current;
@@ -907,7 +937,7 @@ export default function SellScreen() {
   const removeLine = (index: number) => {
     const removed = lines[index];
     if (!removed) return;
-    setLines((current) => current.filter((line) => line.product_id !== removed.product_id));
+    setLines((current) => current.filter((line) => lineKey(line) !== lineKey(removed)));
     showToast({
       text: t("sell.lineRemoved", { name: isolateBidi(removed.name) }),
       action: {
@@ -961,7 +991,7 @@ export default function SellScreen() {
       )}
       <FlatList
         data={lines}
-        keyExtractor={(line) => line.product_id}
+        keyExtractor={(line) => lineKey(line)}
         renderItem={({ item, index }) => (
           <CartLineRow
             line={item}
@@ -1069,6 +1099,9 @@ export default function SellScreen() {
           inCart={inCart}
           // The cache rows and live rows share the fields addProduct reads.
           onAdd={(product) => addProduct(product as unknown as Product)}
+          divers={
+            cachedGrid?.divers ? { count: diversCount, onPress: () => setDiversOpen(true) } : null
+          }
           onArrange={
             isOwner && gridInput ? () => setArranging(resolveArrangeTabs(gridInput)) : undefined
           }
@@ -1131,6 +1164,15 @@ export default function SellScreen() {
         onClose={() => setScannerOpen(false)}
         onScanned={addByBarcode}
       />
+
+      {diversOpen && cachedGrid?.divers && (
+        <DiversPad
+          maxCents={cachedGrid.divers.maxCents}
+          isOwner={isOwner}
+          onCancel={() => setDiversOpen(false)}
+          onConfirm={addDivers}
+        />
+      )}
 
       {weighing && (
         <WeightPad

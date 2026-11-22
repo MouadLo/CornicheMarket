@@ -19,7 +19,17 @@ export type CartLine = {
   // loyalty existed, or from a product the device holds no loyalty data for;
   // such a line is read as eligible with no bonus.
   loyalty?: LineLoyalty;
+  // Only on a Divers (free-amount) line. Divers lines are never merged, so each
+  // has its own key (the product id is the same for all of them) and its own
+  // optional note (sent to record_sale, at most 60 characters).
+  key?: string;
+  note?: string;
 };
+
+// What identifies a line in the basket: its own key (Divers) or its product.
+export function lineKey(line: Pick<CartLine, "product_id" | "key">): string {
+  return line.key ?? line.product_id;
+}
 
 export type LineLoyalty = {
   category_id: string | null;

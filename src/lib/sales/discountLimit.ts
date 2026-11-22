@@ -2,7 +2,7 @@
 // the server never rejects a sale for it, it only flags it for the owner.
 // Every amount is integer centimes. A percent such as 7.5 is turned into
 // hundredths of a percent first, so no float ever multiplies a price.
-import { lineSubtotal, type CartLine } from "@/src/lib/sales/totals";
+import { lineKey, lineSubtotal, type CartLine } from "@/src/lib/sales/totals";
 
 export type DiscountLimits = { percent: number; maxCents: number };
 
@@ -41,7 +41,7 @@ export function cashierDiscountProblem(
 ): CashierDiscountProblem | null {
   const blocked = lines.filter((line) => !line.discountable && line.discount_cents > 0);
   if (blocked.length > 0) {
-    return { kind: "blocked", lineIds: blocked.map((line) => line.product_id) };
+    return { kind: "blocked", lineIds: blocked.map((line) => lineKey(line)) };
   }
   const totalCents =
     lines.reduce((sum, line) => sum + Math.max(0, line.discount_cents), 0) +

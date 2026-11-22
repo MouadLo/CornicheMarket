@@ -19,7 +19,10 @@ type Props = {
 
 export function CartLineRow({ line, onChange, onRemove, restrictDiscount = false }: Props) {
   const { t } = useTranslation();
-  const weighted = line.unit === "kg";
+  // The free-amount Divers line: quantity fixed at 1, no stepper; to change the
+  // amount the cashier removes it and adds it again.
+  const divers = line.loyalty?.misc === true;
+  const weighted = line.unit === "kg" && !divers;
   const discountTooHigh = !isLineDiscountValid(
     line.quantity,
     line.unit_price_cents,
@@ -56,14 +59,28 @@ export function CartLineRow({ line, onChange, onRemove, restrictDiscount = false
             {isolateBidi(line.name)}
           </Text>
           <Text style={styles.unitPrice} numberOfLines={1}>
-            {isolateLtr(formatMAD(line.unit_price_cents))} / {unitLabel(line.unit, 1, t)}
+            {divers
+              ? line.note
+                ? isolateBidi(line.note)
+                : ""
+              : `${isolateLtr(formatMAD(line.unit_price_cents))} / ${unitLabel(line.unit, 1, t)}`}
             {line.discount_cents > 0
-              ? ` · ${isolateLtr(`−${formatMAD(line.discount_cents)}`)}`
+              ? `${divers && !line.note ? "" : " · "}${isolateLtr(`−${formatMAD(line.discount_cents)}`)}`
               : ""}
           </Text>
         </Pressable>
 
-        {weighted ? (
+        {divers ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("sell.remove")}
+            testID="divers-remove"
+            style={styles.stepButton}
+            onPress={onRemove}
+          >
+            <Text style={styles.stepText}>×</Text>
+          </Pressable>
+        ) : weighted ? (
           <WeightField
             quantity={line.quantity}
             onQuantity={(quantity) => onChange({ ...line, quantity })}
