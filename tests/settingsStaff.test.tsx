@@ -57,6 +57,10 @@ jest.mock("../src/lib/loyalty/queries", () => ({
   updateLoyaltySettings: jest.fn(),
   setCategoryLoyaltyExcluded: jest.fn(),
 }));
+jest.mock("../src/lib/sellGrid/queries", () => ({
+  fetchDiversSettings: async () => ({ maxCents: 20000, marginPercent: 20 }),
+  updateDiversSettings: jest.fn(),
+}));
 jest.mock("../src/lib/sales/queries", () => ({
   fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
   updateDiscountLimits: jest.fn(),

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { DiversSection } from "@/src/components/settings/DiversSection";
 import { LoyaltySection } from "@/src/components/settings/LoyaltySection";
 import { StaffSection } from "@/src/components/settings/StaffSection";
 import { Banner } from "@/src/components/ui/Banner";
@@ -125,6 +126,14 @@ export default function Settings() {
           <Text style={styles.sectionLabel}>{t("settings.discountTitle")}</Text>
           <Text style={styles.hint}>{t("settings.discountHint")}</Text>
           <DiscountLimitsForm />
+        </View>
+      )}
+
+      {isOwner && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("settings.diversTitle")}</Text>
+          <Text style={styles.hint}>{t("settings.diversHint")}</Text>
+          <DiversSection />
         </View>
       )}
 
