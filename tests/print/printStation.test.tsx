@@ -193,7 +193,7 @@ describe("print station screen (web)", () => {
     await tick(0);
     expect(print).toHaveBeenCalledTimes(1);
     const html = print.mock.calls[0][0];
-    expect(html).toContain('<div class="banner">');
+    expect(html).toContain('<div class="cashier-tag">');
     expect(html).toContain("Sara &lt;b&gt;");
     expect(html).toContain('lang="ar"');
     expect(html).toContain("ar:receipt.thanks");
