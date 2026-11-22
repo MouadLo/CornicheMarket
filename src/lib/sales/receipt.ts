@@ -282,13 +282,17 @@ export function loyaltyFooterLines(
 
 // Paper fed after the last line so the cutter does not cut through it.
 export const ROLL_TAIL_MM = 6;
+// A page wider than it is tall is read as LANDSCAPE: Chrome then prints the
+// receipt sideways on the roll (seen on a real Epson TM-T20II). A very short
+// receipt (80 x 74 mm) was exactly that, so the page is never shorter than this.
+export const ROLL_MIN_HEIGHT_MM = 90;
 
-// The @page rule of an 80 mm roll receipt: exactly as long as its content
-// (heightPx, CSS pixels at 96 per inch) plus the cutter tail; "auto" before it
-// has been measured.
+// The @page rule of an 80 mm roll receipt: as long as its content (heightPx, CSS
+// pixels at 96 per inch) plus the cutter tail, never below ROLL_MIN_HEIGHT_MM so
+// it stays portrait; "auto" before it has been measured.
 export function rollPageCss(heightPx: number | null): string {
   if (heightPx === null || !(heightPx > 0)) return "@page { size: 80mm auto; margin: 0; }";
-  const mm = Math.ceil((heightPx * 25.4) / 96) + ROLL_TAIL_MM;
+  const mm = Math.max(ROLL_MIN_HEIGHT_MM, Math.ceil((heightPx * 25.4) / 96) + ROLL_TAIL_MM);
   return `@page { size: 80mm ${mm}mm; margin: 0; }`;
 }
 

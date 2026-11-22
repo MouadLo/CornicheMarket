@@ -175,6 +175,9 @@ describe("80 mm roll: the page is as long as the receipt", () => {
   it("rollPageCss before and after measuring", () => {
     expect(rollPageCss(null)).toBe("@page { size: 80mm auto; margin: 0; }");
     expect(rollPageCss(0)).toBe("@page { size: 80mm auto; margin: 0; }");
-    expect(rollPageCss(96)).toBe("@page { size: 80mm 32mm; margin: 0; }"); // 25.4 -> 26 + 6
+    // a short receipt still gets a portrait page (taller than the 80 mm width)
+    expect(rollPageCss(96)).toBe("@page { size: 80mm 90mm; margin: 0; }");
+    expect(rollPageCss(254)).toBe("@page { size: 80mm 90mm; margin: 0; }"); // 67.2 + 6 = 74 -> 90
+    expect(rollPageCss(378)).toBe("@page { size: 80mm 107mm; margin: 0; }");
   });
 });
