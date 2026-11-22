@@ -274,31 +274,40 @@ describe("receipt html", () => {
 describe("receipt html banner and paper", () => {
   const model = () => receiptFromPendingSale(pending());
 
-  it("prints the cashier banner at the top, escaped", () => {
+  it("boxes the shop name at the top, bigger, with the cashier below it, escaped", () => {
     const html = receiptToHtml(model(), labels, { ...opts, banner: '<b>Sara</b> & "Co"' });
-    expect(html).toContain('<div class="banner">');
+    expect(html).toContain('<div class="cashier-tag">');
     expect(html).not.toContain("<b>Sara</b>");
     expect(html).toContain("&lt;b&gt;Sara&lt;/b&gt; &amp; &quot;Co&quot;");
-    // The shop name is the headline; the cashier tag is a smaller routing strip.
-    expect(html).toContain("h1 { font-size: 22px");
-    expect(html).toContain(".banner { font-size: 14px");
-    expect(html.indexOf('class="banner"')).toBeLessThan(html.indexOf("<h1>"));
+    // shop name: the biggest text, in a box; the cashier under it, smaller
+    expect(html).toContain("h1 { font-size: 24px; border: 3px solid #000;");
+    expect(html).toContain(".cashier-tag { font-size: 16px");
+    expect(html.indexOf("<h1>")).toBeLessThan(html.indexOf('class="cashier-tag"'));
+    expect(html.indexOf('class="cashier-tag"')).toBeLessThan(html.indexOf('class="meta"'));
+    expect(html).toContain(`${labels.cashier}: `);
     expect(html).toContain("\u2068");
   });
 
   it("does not repeat the cashier when the tag already names them", () => {
     const m = { ...model(), cashierName: "Mouad" };
     const withTag = receiptToHtml(m, labels, { ...opts, banner: " mouad " });
-    expect(withTag).toContain('<div class="banner">');
-    expect(withTag).not.toContain(`${labels.cashier}:`);
+    expect(withTag).toContain('<div class="cashier-tag">');
+    // said once, in the tag under the shop name, not again in the details
+    expect(withTag.match(new RegExp(`${labels.cashier}:`, "g"))).toHaveLength(1);
     // another cashier's tag, or no tag: the cashier line stays
-    expect(receiptToHtml(m, labels, { ...opts, banner: "Sara" })).toContain(`${labels.cashier}:`);
-    expect(receiptToHtml(m, labels, opts)).toContain(`${labels.cashier}:`);
+    expect(
+      receiptToHtml(m, labels, { ...opts, banner: "Sara" }).match(
+        new RegExp(`${labels.cashier}:`, "g")
+      )
+    ).toHaveLength(2);
+    expect(
+      receiptToHtml(m, labels, opts).match(new RegExp(`${labels.cashier}:`, "g"))
+    ).toHaveLength(1);
   });
 
   it("leaves the output unchanged without a banner or paper option", () => {
     const plain = receiptToHtml(model(), labels, opts);
-    expect(plain).not.toContain("banner");
+    expect(plain).not.toContain("cashier-tag");
     expect(plain).not.toContain("80mm auto");
     expect(receiptToHtml(model(), labels, { ...opts, banner: "   " })).toBe(plain);
   });

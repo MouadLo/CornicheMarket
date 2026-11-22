@@ -333,7 +333,7 @@ export function receiptToHtml(
       `<div>${escapeHtml(labels.returnedOn(rtl ? isolateLtr(returnDateText(model, options)) : returnDateText(model, options)))}</div>`
     );
   }
-  // The shared printer's tag at the top already names the cashier: do not say it
+  // The cashier tag under the shop name already names the cashier: do not say it
   // twice when it is the same person.
   const tagIsCashier =
     !!options.banner &&
@@ -376,8 +376,10 @@ export function receiptToHtml(
     .map((line) => `<div class="loyalty">${escapeHtml(line)}</div>`)
     .join("");
 
-  const banner = options.banner?.trim()
-    ? `<div class="banner">${name(options.banner.trim())}</div>\n`
+  // The shared printer sends the name of the cashier at the counter's side: it is
+  // printed under the shop name so staff can sort the papers.
+  const tag = options.banner?.trim()
+    ? `<div class="cashier-tag">${escapeHtml(labels.cashier)}: ${name(options.banner.trim())}</div>\n`
     : "";
   const roll = options.paper === "80mm";
   // A roll: no page margins (the printer's own 4 mm edges stay blank), the
@@ -411,15 +413,16 @@ export function receiptToHtml(
   tr.total td { font-size: 15px; font-weight: 700; border-top: 1px solid #000; padding-top: 5px; }
   .loyalty { margin-top: 4px; }
   .thanks { text-align: center; margin-top: 10px; }${
-    banner
-      ? "\n  .banner { font-size: 14px; font-weight: 700; text-align: center; border: 2px solid #000; padding: 3px 4px; margin: 0 0 8px; overflow-wrap: anywhere; }"
+    tag
+      ? "\n  h1 { font-size: 24px; border: 3px solid #000; padding: 6px 4px; margin: 0 0 6px; overflow-wrap: anywhere; }\n  .cashier-tag { font-size: 16px; font-weight: 700; text-align: center; margin: 0 0 6px; overflow-wrap: anywhere; }"
       : ""
   }
 </style>
 </head>
 <body>
 <div class="receipt">
-${banner}<h1>${escapeHtml(model.shopName)}</h1>
+<h1>${escapeHtml(model.shopName)}</h1>
+${tag}
 <div class="meta">${meta.join("")}</div>
 <table class="items"><tbody>${lineRows}</tbody></table>${allReturned ? `<div class="meta">${escapeHtml(labels.allReturned)}</div>` : ""}
 <table><tbody>${totals.join("")}</tbody></table>${loyaltyNotes}
