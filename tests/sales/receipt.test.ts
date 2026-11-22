@@ -297,6 +297,11 @@ describe("receipt html banner and paper", () => {
     // marked so printReceipt can fit the page to the receipt, in its own rule
     expect(html).toContain('data-paper="80mm"');
     expect(html).toContain('<style id="receipt-page">');
+    // 70 mm of content inside the printer's 72 mm printable width, and no fixed
+    // 80 mm box: if Chrome adds page margins the receipt must shrink to fit, not
+    // run off the right edge of the paper.
+    expect(html).toContain(".receipt { width: 70mm;");
+    expect(html).not.toContain("body { width: 80mm");
     const plain = receiptToHtml(model(), labels, opts);
     expect(plain).toContain("@page { margin: 4mm; }");
     expect(plain).not.toContain("data-paper");

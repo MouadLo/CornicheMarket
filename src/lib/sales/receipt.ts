@@ -392,7 +392,7 @@ export function receiptToHtml(
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Helvetica, Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; }
   .receipt { width: 72mm; max-width: 100%; margin: 0 auto; }${
-    roll ? "\n  html, body { width: 80mm; }\n  .receipt { padding: 2mm 0 0; }" : ""
+    roll ? "\n  .receipt { width: 70mm; padding: 2mm 0 0; }" : ""
   }
   h1 { font-size: 16px; text-align: center; margin: 0 0 6px; }
   .meta { text-align: center; margin-bottom: 8px; }
