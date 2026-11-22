@@ -90,6 +90,8 @@ function salePayload(sale: PendingSale) {
       quantity: line.quantity,
       unit_price_cents: line.unit_price_cents,
       discount_cents: line.discount_cents,
+      // A Divers line's note (record_sale keeps it for Divers lines only).
+      ...(line.note ? { note: line.note } : {}),
     })),
     // The real sale time, captured on the device when the cashier completed
     // the sale (see pendingSaleFrom) -- not when this request happens to

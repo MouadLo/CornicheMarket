@@ -4,7 +4,12 @@ import { supabase } from "@/src/lib/supabase/client";
 import { productsSource, type ProductUnit } from "@/src/lib/products/queries";
 import { rankBySearch } from "@/src/lib/products/search";
 import { pickByBarcode } from "@/src/lib/scanner/barcode";
-import { fetchGridCategories, fetchGridLayout } from "@/src/lib/sellGrid/queries";
+import { parseDiversConfig, type DiversConfig } from "@/src/lib/sellGrid/divers";
+import {
+  fetchDiversConfig,
+  fetchGridCategories,
+  fetchGridLayout,
+} from "@/src/lib/sellGrid/queries";
 import type { GridCategory, GridTab, GridTile } from "@/src/lib/sellGrid/layout";
 
 const CACHE_KEY = "corniche.productCache.v2";
@@ -38,6 +43,11 @@ type ProductCache = {
   products: CachedProduct[];
   categories?: GridCategory[];
   grid?: { tabs: GridTab[]; tiles: GridTile[] };
+  // The built-in Divers product and the cashier's maximum (the product id and
+  // one number: never a cost). Added to v2 without a version change, like the
+  // other optional fields: a cache written before has none, and the tile stays
+  // hidden until the next online refresh fills it.
+  divers?: DiversConfig | null;
   refreshedAt: string;
 };
 
@@ -82,12 +92,22 @@ export async function refreshProductCache(isOwner: boolean): Promise<void> {
     grid = previous?.grid ?? { tabs: [], tiles: [] };
   }
 
+  // Same rule for Divers: a failed read keeps what the device already knew; a
+  // successful one with no Divers product (older database) clears it.
+  let divers: DiversConfig | null;
+  try {
+    divers = await fetchDiversConfig();
+  } catch {
+    divers = parseDiversConfig((await readCache().catch(() => null))?.divers);
+  }
+
   await AsyncStorage.setItem(
     CACHE_KEY,
     JSON.stringify({
       products: all,
       categories,
       grid,
+      divers,
       refreshedAt: new Date().toISOString(),
     } satisfies ProductCache)
   );
@@ -140,6 +160,7 @@ export async function getCachedGrid(): Promise<{
   categories: GridCategory[];
   tabs: GridTab[];
   tiles: GridTile[];
+  divers: DiversConfig | null;
 } | null> {
   try {
     const cache = await readCache();
@@ -149,6 +170,7 @@ export async function getCachedGrid(): Promise<{
       categories: cache.categories ?? [],
       tabs: cache.grid?.tabs ?? [],
       tiles: cache.grid?.tiles ?? [],
+      divers: parseDiversConfig(cache.divers),
     };
   } catch {
     return null;

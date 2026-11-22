@@ -82,7 +82,8 @@ export function receiptFromPendingSale(
   } = {}
 ): ReceiptModel {
   const lines: ReceiptLine[] = sale.lines.map((line) => ({
-    name: line.name,
+    // A Divers line prints as its name and its note ("Divers - sac").
+    name: line.note ? `${line.name} - ${line.note}` : line.name,
     quantity: line.quantity,
     unit: line.unit,
     unitPriceCents: line.unit_price_cents,

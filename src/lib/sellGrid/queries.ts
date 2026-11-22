@@ -1,5 +1,7 @@
 import type { ArrangementPayload } from "@/src/lib/sellGrid/arrange";
 import { supabase } from "@/src/lib/supabase/client";
+import { parseDiversConfig, type DiversConfig } from "@/src/lib/sellGrid/divers";
+import { parseDiversSettings, type DiversSettings } from "@/src/lib/sellGrid/diversSettings";
 import type { GridCategory, GridTab, GridTile, TileColor } from "@/src/lib/sellGrid/layout";
 import {
   TileSettingsError,
@@ -180,4 +182,58 @@ export async function saveGridArrangement(payload: ArrangementPayload): Promise<
     p_tiles: payload.tiles,
   });
   if (error) throw error;
+}
+
+// ---- Divers (the built-in free-amount item) ----
+
+// The Divers product's id and the cashier's maximum, for the amount pad. Both
+// are readable by everyone signed in (the cashier view of products and
+// store_settings hold no cost). Null when the database has no Divers product
+// yet: the tile is then not offered. Throws on a read error, so a failed
+// refresh keeps the last known value instead of erasing it.
+export async function fetchDiversConfig(): Promise<DiversConfig | null> {
+  const [product, settings] = await Promise.all([
+    supabase.from("products_cashier_view").select("id").eq("kind", "misc").maybeSingle(),
+    supabase.from("store_settings").select("divers_max_cents").eq("singleton", true).maybeSingle(),
+  ]);
+  if (product.error) throw new Error(product.error.message);
+  if (settings.error) throw new Error(settings.error.message);
+  const id = (product.data as { id: string } | null)?.id;
+  if (!id) return null;
+  return parseDiversConfig({
+    productId: id,
+    maxCents: (settings.data as { divers_max_cents: number } | null)?.divers_max_cents,
+  });
+}
+
+// Owner only (Settings). The margin lives in owner_settings, which cashiers
+// cannot read (RLS), so it never reaches a cashier device.
+export async function fetchDiversSettings(): Promise<DiversSettings> {
+  const [store, owner] = await Promise.all([
+    supabase.from("store_settings").select("divers_max_cents").eq("singleton", true).maybeSingle(),
+    supabase
+      .from("owner_settings")
+      .select("divers_margin_percent")
+      .eq("singleton", true)
+      .maybeSingle(),
+  ]);
+  if (store.error) throw new Error(store.error.message);
+  if (owner.error) throw new Error(owner.error.message);
+  return parseDiversSettings(
+    store.data as Record<string, unknown> | null,
+    owner.data as Record<string, unknown> | null
+  );
+}
+
+export async function updateDiversSettings(settings: DiversSettings): Promise<void> {
+  const store = await supabase
+    .from("store_settings")
+    .update({ divers_max_cents: settings.maxCents })
+    .eq("singleton", true);
+  if (store.error) throw new Error(store.error.message);
+  const owner = await supabase
+    .from("owner_settings")
+    .update({ divers_margin_percent: settings.marginPercent })
+    .eq("singleton", true);
+  if (owner.error) throw new Error(owner.error.message);
 }
