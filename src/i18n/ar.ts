@@ -1125,6 +1125,13 @@ const ar: Translations = {
     metricAvgBasket: "متوسط السلة",
     metricLosses: "الخسائر المشطوبة",
     metricReturns: "المرتجعات",
+    diversTitle: "متفرقات (تقديري)",
+    diversLines: "أسطر المتفرقات",
+    diversRevenue: "مبيعات المتفرقات",
+    diversProfit: "الربح التقديري",
+    diversShare: "{{percent}} من الإيرادات",
+    diversHint:
+      "تكلفة مبيعات المتفرقات مقدّرة حسب الهامش المحدد في الإعدادات، ولا تظهر في ترتيب المنتجات.",
     metricAtCost: "بسعر التكلفة",
     metricAtSellingPrice: "بسعر البيع",
     metricPotentialProfit: "الربح المحتمل",
