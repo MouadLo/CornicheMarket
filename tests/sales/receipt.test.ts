@@ -279,9 +279,21 @@ describe("receipt html banner and paper", () => {
     expect(html).toContain('<div class="banner">');
     expect(html).not.toContain("<b>Sara</b>");
     expect(html).toContain("&lt;b&gt;Sara&lt;/b&gt; &amp; &quot;Co&quot;");
-    expect(html).toContain("font-size: 22px");
+    // The shop name is the headline; the cashier tag is a smaller routing strip.
+    expect(html).toContain("h1 { font-size: 22px");
+    expect(html).toContain(".banner { font-size: 14px");
     expect(html.indexOf('class="banner"')).toBeLessThan(html.indexOf("<h1>"));
     expect(html).toContain("\u2068");
+  });
+
+  it("does not repeat the cashier when the tag already names them", () => {
+    const m = { ...model(), cashierName: "Mouad" };
+    const withTag = receiptToHtml(m, labels, { ...opts, banner: " mouad " });
+    expect(withTag).toContain('<div class="banner">');
+    expect(withTag).not.toContain(`${labels.cashier}:`);
+    // another cashier's tag, or no tag: the cashier line stays
+    expect(receiptToHtml(m, labels, { ...opts, banner: "Sara" })).toContain(`${labels.cashier}:`);
+    expect(receiptToHtml(m, labels, opts)).toContain(`${labels.cashier}:`);
   });
 
   it("leaves the output unchanged without a banner or paper option", () => {
