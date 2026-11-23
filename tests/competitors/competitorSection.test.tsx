@@ -12,6 +12,7 @@ import {
   saveManualPrice,
   setProductMarginFloor,
 } from "../../src/lib/competitors/queries";
+import { downloadCompetitorImage } from "../../src/lib/competitors/imageDownload";
 import { confirm } from "../../src/lib/dialog/store";
 import { allTexts, pressableByText } from "../sales/sellTestUtils";
 
@@ -34,6 +35,9 @@ jest.mock("../../src/lib/auth/AuthProvider", () => ({
 }));
 jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/lib/dialog/store", () => ({ confirm: jest.fn(), showToast: jest.fn() }));
+jest.mock("../../src/lib/competitors/imageDownload", () => ({
+  downloadCompetitorImage: jest.fn(),
+}));
 jest.mock("../../src/lib/competitors/queries", () => ({
   fetchCompetitorRows: jest.fn(),
   addCompetitorLink: jest.fn(),
@@ -332,4 +336,20 @@ describe("minimum margin override", () => {
     expect(setProductMarginFloor).not.toHaveBeenCalled();
     expect(texts()).toContain("competitors.marginInvalid");
   });
+});
+
+it("offers to download the competitor photo of a link, named after what the shop calls the product", async () => {
+  jest.mocked(downloadCompetitorImage).mockResolvedValue("saved");
+  await render();
+  await press("competitors.catalog.downloadPhoto");
+  expect(downloadCompetitorImage).toHaveBeenCalledWith(
+    "https://yournightshop.ma/img.jpg",
+    "Lorenz Crunchips Paprika"
+  );
+});
+
+it("no download action when the link has no photo", async () => {
+  jest.mocked(fetchCompetitorRows).mockResolvedValue([row({ image_url: null })]);
+  await render();
+  expect(texts()).not.toContain("competitors.catalog.downloadPhoto");
 });

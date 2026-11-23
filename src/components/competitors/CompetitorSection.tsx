@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { PhotoDownload } from "@/src/components/competitors/CatalogCard";
 import { Banner } from "@/src/components/ui/Banner";
 import { Field } from "@/src/components/ui/Field";
 import { InlineError } from "@/src/components/ui/InlineError";
@@ -296,6 +297,9 @@ function LinkCard({ row, onChanged }: { row: OverviewRow; onChanged: () => Promi
           />
         ) : null}
         <LinkAction label={t("competitors.open")} onPress={() => void Linking.openURL(row.url)} />
+        {row.image_url ? (
+          <PhotoDownload imageUrl={row.image_url} name={row.title ?? row.product_name} />
+        ) : null}
         <LinkAction label={t("competitors.remove")} onPress={() => void remove()} danger />
       </View>
     </View>

@@ -1,180 +1,82 @@
-import { Redirect, router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { Redirect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { BigButton } from "@/src/components/BigButton";
-import { ComparisonCard } from "@/src/components/competitors/ComparisonCard";
-import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
-import { Chip } from "@/src/components/ui/Chip";
-import { EmptyState } from "@/src/components/ui/EmptyState";
-import { LoadError } from "@/src/components/ui/LoadError";
+import { ConfirmTab } from "@/src/components/competitors/ConfirmTab";
+import { MissingTab } from "@/src/components/competitors/MissingTab";
+import { ShopsTab } from "@/src/components/competitors/ShopsTab";
+import { SourcingTab } from "@/src/components/competitors/SourcingTab";
+import { TrackedList } from "@/src/components/competitors/TrackedList";
+import { Tabs } from "@/src/components/ui/Tabs";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
-import { applySuggestions } from "@/src/lib/competitors/applyFlow";
-import { compareProducts, type ProductComparison } from "@/src/lib/competitors/overview";
-import { needsReview } from "@/src/lib/competitors/pricing";
-import { fetchCompetitorRows } from "@/src/lib/competitors/queries";
-import { errorKey } from "@/src/lib/errors/userMessage";
-import { Text } from "@/src/theme/Text";
+import { fetchCatalogCounts, type CatalogCounts } from "@/src/lib/competitors/shops";
 import { colors } from "@/src/theme/tokens";
 
-type Filter = "review" | "all" | "out";
+type Tab = "tracked" | "confirm" | "missing" | "sourcing" | "shops";
 
-const openProduct = (id: string) => router.push(`/(app)/competitors/${id}`);
-
-// Owner only (a cashier is sent back to Vente): every product we track, with the
-// pricing decision and a button to apply it. A product joins the list when it
-// gets its first competitor link and leaves when its last link is deleted.
-export default function CompetitorPrices() {
+// Owner only (a cashier is sent back to Vente). Concurrents: the tracked
+// products (phase 1), the proposed matches to confirm, the competitors' products
+// we do not have, what to source, and the shops we read.
+export default function Competitors() {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const isOwner = profile?.role === "owner";
-  const [products, setProducts] = useState<ProductComparison[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("review");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [tab, setTab] = useState<Tab>("tracked");
+  const [counts, setCounts] = useState<CatalogCounts | null>(null);
+  // Remounts the list of the open tab after a change made in another one.
+  const [version, setVersion] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoadError(null);
-    try {
-      setProducts(compareProducts(await fetchCompetitorRows(), Date.now()));
-      setSelected(new Set());
-    } catch (failure) {
-      setLoadError(errorKey(failure));
-    }
+  const refreshCounts = useCallback(() => {
+    fetchCatalogCounts()
+      .then(setCounts)
+      .catch(() => setCounts(null));
   }, []);
 
   useEffect(() => {
-    if (isOwner) void load();
-  }, [isOwner, load]);
-
-  const shown = useMemo(() => {
-    if (!products) return [];
-    if (filter === "review") return products.filter((p) => needsReview(p.decision));
-    if (filter === "out") return products.filter((p) => p.anyOutOfStock);
-    return products;
-  }, [products, filter]);
+    if (isOwner) refreshCounts();
+  }, [isOwner, refreshCounts, tab]);
 
   if (profile && !isOwner) return <Redirect href="/(app)/sell" />;
+  if (!isOwner) return null;
 
-  const apply = async (items: ProductComparison[]) => {
-    setBusy(true);
-    try {
-      await applySuggestions(items, t, load);
-    } finally {
-      setBusy(false);
-    }
+  const changed = () => {
+    refreshCounts();
   };
-
-  const toggle = (id: string) =>
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const follow = (
-    <View style={styles.follow}>
-      <BigButton
-        label={t("competitors.followProduct")}
-        variant={picking ? "secondary" : "primary"}
-        onPress={() => setPicking((open) => !open)}
-      />
-      {picking ? <ProductSearchPicker excludeIds={[]} onPick={(p) => openProduct(p.id)} /> : null}
-    </View>
-  );
-
-  if (loadError) {
-    return (
-      <LoadError
-        title={t("competitors.loadErrorScreen")}
-        reasonKey={loadError}
-        onRetry={() => void load()}
-      />
-    );
-  }
-  if (!products) return <ActivityIndicator style={{ marginTop: 40 }} />;
-  if (products.length === 0) {
-    return (
-      <ScrollView contentContainerStyle={styles.emptyWrap}>
-        {follow}
-        <EmptyState
-          icon="tag"
-          title={t("competitors.emptyTitle")}
-          message={t("competitors.emptyHint")}
-        />
-      </ScrollView>
-    );
-  }
-
-  const selectedItems = products.filter(
-    (p) => selected.has(p.productId) && needsReview(p.decision)
-  );
 
   return (
     <View style={styles.screen}>
-      {follow}
-      <View style={styles.chips}>
-        <Chip
-          label={t("competitors.filterReview")}
-          selected={filter === "review"}
-          onPress={() => setFilter("review")}
-        />
-        <Chip
-          label={t("competitors.filterAll")}
-          selected={filter === "all"}
-          onPress={() => setFilter("all")}
-        />
-        <Chip
-          label={t("competitors.filterOut")}
-          selected={filter === "out"}
-          onPress={() => setFilter("out")}
-        />
+      <Tabs
+        items={[
+          { key: "tracked", label: t("competitors.tabs.tracked") },
+          { key: "confirm", label: t("competitors.tabs.confirm"), badge: counts?.proposed },
+          { key: "missing", label: t("competitors.tabs.missing") },
+          {
+            key: "sourcing",
+            label: t("competitors.tabs.sourcing"),
+            badge: counts?.wanted,
+            badgeTone: "info",
+          },
+          { key: "shops", label: t("competitors.tabs.shops") },
+        ]}
+        value={tab}
+        onChange={(key) => {
+          setTab(key as Tab);
+          setVersion((v) => v + 1);
+        }}
+      />
+      <View style={styles.body} key={`${tab}-${version}`}>
+        {tab === "tracked" ? <TrackedList /> : null}
+        {tab === "confirm" ? <ConfirmTab onChanged={changed} /> : null}
+        {tab === "missing" ? <MissingTab onChanged={changed} /> : null}
+        {tab === "sourcing" ? <SourcingTab onChanged={changed} /> : null}
+        {tab === "shops" ? <ShopsTab onChanged={changed} /> : null}
       </View>
-      <ScrollView contentContainerStyle={styles.list}>
-        {shown.length === 0 ? (
-          <Text style={styles.hint}>{t("competitors.nothingToReview")}</Text>
-        ) : (
-          shown.map((product) => (
-            <ComparisonCard
-              key={product.productId}
-              product={product}
-              selected={selected.has(product.productId)}
-              disabled={busy}
-              onToggle={() => toggle(product.productId)}
-              onOpen={() => openProduct(product.productId)}
-              onApply={() => void apply([product])}
-            />
-          ))
-        )}
-      </ScrollView>
-      {selectedItems.length > 0 ? (
-        <View style={styles.footer}>
-          <BigButton
-            label={t("competitors.applySelected", { count: selectedItems.length })}
-            onPress={() => void apply(selectedItems)}
-            disabled={busy}
-          />
-        </View>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  follow: { gap: 8, padding: 12, paddingBottom: 0 },
-  chips: { flexDirection: "row", gap: 8, padding: 12, flexWrap: "wrap" },
-  list: { padding: 12, gap: 12 },
-  emptyWrap: { flexGrow: 1 },
-  hint: { fontSize: 13, color: colors.ink600, lineHeight: 18 },
-  footer: {
-    padding: 12,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
+  body: { flex: 1 },
 });

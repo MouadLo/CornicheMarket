@@ -72,6 +72,9 @@ const UNITS: ProductUnit[] = ["piece", "kg", "pack"];
 type Props = {
   categories: Category[];
   initial?: Product | null;
+  // A name to start with on a NEW product (e.g. from a competitor's catalogue);
+  // unlike `initial` it switches nothing else on.
+  initialName?: string;
   submitLabel: string;
   // `tile` is set only when the Sell grid settings changed (and are shown).
   onSubmit: (input: ProductInput, tile: TileChange | null) => Promise<void>;
@@ -85,6 +88,7 @@ type Props = {
 export function ProductForm({
   categories: loadedCategories,
   initial,
+  initialName,
   submitLabel,
   onSubmit,
   initialTile,
@@ -105,7 +109,7 @@ export function ProductForm({
   const [newCategory, setNewCategory] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
-  const [name, setName] = useState(initial?.name ?? "");
+  const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [barcode, setBarcode] = useState(initial?.barcode ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.category_id ?? null);
   const selectedMain = mainCategoryId(categories, categoryId);
