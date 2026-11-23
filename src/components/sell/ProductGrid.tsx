@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -11,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/src/components/ui/Icon";
 import { formatMADGrouped } from "@/src/lib/money";
+import { usePhotoUrl } from "@/src/lib/products/photoUrls";
 import {
   stockLevel,
   priceFontSize,
@@ -206,10 +208,12 @@ function cornerSide(language: string | undefined, inset: number) {
   return { end: inset };
 }
 
-// The name keeps the corner free on the same side (see styles.name).
-function namePad(language: string | undefined) {
-  if (Platform.OS === "web") return language === "ar" ? { paddingLeft: 16 } : { paddingRight: 16 };
-  return { paddingEnd: 16 };
+// The name keeps the corner free on the same side (see styles.name): room for
+// the badge, or for the photo when the tile has one.
+function namePad(language: string | undefined, pad = 16) {
+  if (Platform.OS === "web")
+    return language === "ar" ? { paddingLeft: pad } : { paddingRight: pad };
+  return { paddingEnd: pad };
 }
 
 // Also drawn by the arrange mode (ArrangeGrid), which passes no onPress.
@@ -233,6 +237,12 @@ export function Tile({
   const price = `${amount}${kg ? "/kg" : " DH"}`;
   const level = stockLevel(product.stock_quantity, product.low_stock_threshold);
   const stock = kg ? product.stock_quantity.toFixed(1) : String(product.stock_quantity);
+  // The photo, when its URL is known and the file loads. Otherwise the tile is
+  // drawn exactly as it is without a photo (never a broken image).
+  const photoUrl = usePhotoUrl(product.photo_path);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  useEffect(() => setPhotoFailed(false), [photoUrl]);
+  const showPhoto = !!photoUrl && !photoFailed;
 
   const label =
     count > 0
@@ -242,10 +252,29 @@ export function Tile({
     <>
       <View style={[styles.strip, { backgroundColor: palette.strip }]} />
       <View style={styles.tileTop}>
-        <Text style={[styles.name, namePad(language)]} numberOfLines={2}>
+        {/* With a photo in the top end corner, the name keeps its full text (the
+            size matters at the counter: 33cl vs 1L) on up to three smaller lines. */}
+        <Text
+          style={[
+            styles.name,
+            showPhoto && styles.nameWithPhoto,
+            namePad(language, showPhoto ? 44 : 16),
+          ]}
+          numberOfLines={showPhoto ? 3 : 2}
+        >
           {isolateBidi(tile.label)}
         </Text>
       </View>
+      {showPhoto ? (
+        <Image
+          source={{ uri: photoUrl }}
+          style={[styles.photo, cornerSide(language, 10)]}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+          onError={() => setPhotoFailed(true)}
+          testID="tile-photo"
+        />
+      ) : null}
       {/* The end corner holds the basket badge, or the scale for a weighed
           product not yet in the basket. Overlaid, so the name's width never
           changes (C16). */}
@@ -257,7 +286,7 @@ export function Tile({
         >
           <Text style={[styles.qtyText, tabularNumbers]}>{kg ? "✓" : `×${count}`}</Text>
         </View>
-      ) : kg ? (
+      ) : kg && !showPhoto ? (
         <View style={[styles.corner, cornerSide(language, 5)]} pointerEvents="none">
           <Icon name="scale" size={18} color={colors.ink600} />
         </View>
@@ -401,6 +430,18 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   corner: { position: "absolute", top: 6 },
+  // Three lines of 18 px end at 64, above the price and stock row (72-94).
+  nameWithPhoto: { fontSize: 15, lineHeight: 18 },
+  // 36 px square in the top end corner. The basket badge, drawn after it, sits
+  // on its corner. Overlaid, so the tile keeps its size.
+  photo: {
+    position: "absolute",
+    top: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.65)",
+  },
   qty: {
     position: "absolute",
     top: 4,

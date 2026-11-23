@@ -40,6 +40,8 @@ export type GridProduct = {
   loyalty_excluded?: boolean;
   loyalty_bonus_points?: number;
   loyalty_bonus_until?: string | null;
+  // Storage path of the photo (migration 053), shown on the tile when known.
+  photo_path?: string | null;
 };
 
 // parent_id: set on a sub-category (migration 036); its products show in the parent's tab.

@@ -220,6 +220,7 @@ export default function SellScreen() {
               loyalty_excluded: p.loyalty_excluded,
               loyalty_bonus_points: p.loyalty_bonus_points,
               loyalty_bonus_until: p.loyalty_bonus_until,
+              photo_path: p.photo_path ?? null,
             })),
           }
         : null,

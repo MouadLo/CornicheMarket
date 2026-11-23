@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
+import { ProductPhotoSection } from "@/src/components/products/ProductPhotoSection";
 import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmMatch } from "@/src/lib/competitors/shops";
@@ -13,6 +14,12 @@ import {
   updateProduct,
   type Category,
 } from "@/src/lib/products/queries";
+import {
+  copyCompetitorPhoto,
+  fetchCompetitorItemImageUrl,
+  uploadProductPhoto,
+  type PreparedPhoto,
+} from "@/src/lib/products/photos";
 import { saveProductTileSettings } from "@/src/lib/sellGrid/queries";
 import { refreshGridCache } from "@/src/lib/sellGrid/refresh";
 import { DEFAULT_TILE_SETTINGS } from "@/src/lib/sellGrid/tileSettings";
@@ -38,6 +45,10 @@ export default function NewProduct() {
   // Set once the product exists: if the grid settings then fail, saving again
   // updates this product instead of creating a second one.
   const createdId = useRef<string | null>(null);
+  // The photo the owner picked on this form, uploaded once the product exists.
+  const pendingPhoto = useRef<PreparedPhoto | null>(null);
+  // The photo step runs once, even if saving is retried after a later failure.
+  const photoDone = useRef(false);
 
   useEffect(() => {
     fetchCategories()
@@ -54,6 +65,15 @@ export default function NewProduct() {
       onDirtyChange={setDirty}
       categories={categories}
       initialName={startName}
+      header={
+        <ProductPhotoSection
+          productId={null}
+          canEdit
+          onPendingChange={(photo) => {
+            pendingPhoto.current = photo;
+          }}
+        />
+      }
       initialTile={DEFAULT_TILE_SETTINGS}
       submitLabel={t("products.formCreate")}
       onSubmit={async (input, tile) => {
@@ -71,6 +91,25 @@ export default function NewProduct() {
             showToast({ text: t("competitors.sourcingTab.linked"), tone: "success" });
           } catch {
             showToast({ text: t("competitors.sourcingTab.linkFailed"), tone: "info" });
+          }
+        }
+        // The photo: the one the owner picked, else the competitor item's. A
+        // failure only warns: the product is kept.
+        if (!photoDone.current) {
+          photoDone.current = true;
+          const productId = createdId.current;
+          try {
+            if (pendingPhoto.current) {
+              await uploadProductPhoto(productId, pendingPhoto.current);
+            } else if (competitorItemId) {
+              const imageUrl = await fetchCompetitorItemImageUrl(competitorItemId);
+              if (imageUrl) {
+                const result = await copyCompetitorPhoto(imageUrl, productId);
+                if (result !== "saved") throw new Error(result);
+              }
+            }
+          } catch {
+            showToast({ text: t("products.photo.attachFailed"), tone: "info" });
           }
         }
         router.back();

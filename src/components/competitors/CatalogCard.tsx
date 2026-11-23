@@ -6,7 +6,8 @@ import { Money } from "@/src/components/ui/Money";
 import { StatusPill } from "@/src/components/ui/StatusPill";
 import { discountPercent, type CatalogRow } from "@/src/lib/competitors/catalog";
 import { downloadCompetitorImage } from "@/src/lib/competitors/imageDownload";
-import { showToast } from "@/src/lib/dialog/store";
+import { confirm, showToast } from "@/src/lib/dialog/store";
+import { copyCompetitorPhoto, fetchProductPhotoPath } from "@/src/lib/products/photos";
 import { formatMAD } from "@/src/lib/money";
 import { isolateLtr } from "@/src/lib/text/bidi";
 import { Text } from "@/src/theme/Text";
@@ -74,6 +75,51 @@ export function PhotoDownload({ imageUrl, name }: { imageUrl: string; name: stri
   return (
     <CardAction
       label={t(busy ? "competitors.catalog.downloading" : "competitors.catalog.downloadPhoto")}
+      onPress={() => void run()}
+      disabled={busy}
+    />
+  );
+}
+
+// "Utiliser cette photo": copies the competitor's photo to OUR product (stored in
+// our own bucket, never linked to their site). Owner only (the edge function
+// refuses anyone else). Asks first when the product already has a photo.
+export function UsePhoto({ imageUrl, productId }: { imageUrl: string; productId: string }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const existing = await fetchProductPhotoPath(productId).catch(() => null);
+      if (existing) {
+        const ok = await confirm({
+          title: t("competitors.catalog.usePhotoReplaceTitle"),
+          message: t("competitors.catalog.usePhotoReplaceMessage"),
+          confirmLabel: t("competitors.catalog.usePhotoReplace"),
+          cancelLabel: t("common.cancel"),
+        });
+        if (!ok) return;
+      }
+      const result = await copyCompetitorPhoto(imageUrl, productId);
+      showToast({
+        text: t(
+          result === "saved"
+            ? "competitors.catalog.usePhotoDone"
+            : result === "refused"
+              ? "competitors.catalog.photoRefused"
+              : "competitors.catalog.usePhotoError"
+        ),
+        tone: result === "saved" ? "success" : "info",
+      });
+    } catch {
+      showToast({ text: t("competitors.catalog.usePhotoError"), tone: "info" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <CardAction
+      label={t(busy ? "competitors.catalog.usingPhoto" : "competitors.catalog.usePhoto")}
       onPress={() => void run()}
       disabled={busy}
     />
