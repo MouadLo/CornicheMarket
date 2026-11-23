@@ -146,6 +146,7 @@ const ar: Translations = {
     clients: "كريدي",
     sell: "بيع",
     products: "المنتجات",
+    competitors: "المنافسون",
     stockIn: "المخزون",
     reports: "التقارير",
     settings: "الإعدادات",
@@ -559,7 +560,8 @@ const ar: Translations = {
     priceChangesLoadError: "تعذّر تحميل تغييرات الأسعار.",
     priceChangeLine: "{{percent}} · {{count}} منتج",
     priceChangeCategoryGone: "فئة محذوفة",
-    competitorPrices: "أسعار المنافسين",
+    trackedAt: "يُتتبَّع عند {{count}} منافس(ين)",
+    trackedSee: "عرض",
     priceChangeCompetitor: "مطابقة المنافسين",
     priceChangeLineCompetitor: "{{count}} منتج",
     priceUndoConfirmMessageCompetitor:
@@ -1276,8 +1278,9 @@ const ar: Translations = {
       other: "تعذّرت القراءة.",
     },
     emptyTitle: "لا توجد روابط منافسين بعد",
-    emptyHint:
-      "افتح صفحة منتج (المنتجات ثم المنتج)، قسم «المنافسون»، وألصق رابط المنتج نفسه عند أحد المنافسين. ستظهر المقارنات هنا.",
+    emptyHint: "أضف منتجًا لتتبّعه، ثم ألصق رابط المنتج نفسه عند أحد المنافسين.",
+    followProduct: "تتبّع منتجًا",
+    viewProduct: "عرض صفحة المنتج",
     filterReview: "للمراجعة",
     filterAll: "الكل",
     filterOut: "منافس نفد مخزونه",
@@ -1570,7 +1573,7 @@ const ar: Translations = {
     low: "الأدنى {{price}}",
   },
   screenTitles: {
-    competitorPrices: "أسعار المنافسين",
+    competitorProduct: "منتج متتبَّع",
     newProduct: "منتج جديد",
     editProduct: "تعديل المنتج",
     importProducts: "استيراد المنتجات",

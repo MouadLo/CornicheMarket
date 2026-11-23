@@ -120,16 +120,13 @@ it("a cashier is never offered the owner's action", async () => {
   expect(texts()).not.toContain("products.competitorPrices");
 });
 
-it("the owner reaches the competitor prices screen from the product tools", async () => {
+it("the product tools no longer link to the competitor screen (it is its own section)", async () => {
   mockFetchProducts.mockResolvedValue([]);
   await render();
   await act(async () => {
     pressableByText(tree.root, "products.moreActions").props.onPress();
   });
-  await act(async () => {
-    pressableByText(tree.root, "products.competitorPrices").props.onPress();
-  });
-  expect(mockPush).toHaveBeenCalledWith("/(app)/products/competitors");
+  expect(texts()).not.toContain("products.competitorPrices");
 });
 
 describe("on a phone", () => {

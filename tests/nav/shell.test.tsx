@@ -158,7 +158,7 @@ describe("navigation by role (laptop and tablet, >= 900 dp)", () => {
     expect(labelsOf(r)).toEqual(["nav.sell", "nav.clients"]);
   });
 
-  it("the owner's rail has all six sections", async () => {
+  it("the owner's rail has all seven sections", async () => {
     mockProfile = owner;
     const r = await render(
       <AppShell>
@@ -169,6 +169,7 @@ describe("navigation by role (laptop and tablet, >= 900 dp)", () => {
       "nav.sell",
       "nav.clients",
       "nav.products",
+      "nav.competitors",
       "nav.stockIn",
       "nav.reports",
       "nav.settings",
@@ -213,7 +214,7 @@ describe("navigation on a phone (< 900 dp)", () => {
     expect(labelsOf(r)).toEqual(["nav.sell", "nav.clients"]);
   });
 
-  it("the owner gets four tabs plus More, which holds Rapports and Réglages", async () => {
+  it("the owner gets four tabs plus More, which holds Concurrents, Rapports and Réglages", async () => {
     mockProfile = owner;
     const r = await render(
       <AppShell>
@@ -228,7 +229,9 @@ describe("navigation on a phone (< 900 dp)", () => {
       "shell.more",
     ]);
     await act(async () => byLabel(r, "shell.more")[0].props.onPress());
-    expect(texts(r.root)).toEqual(expect.arrayContaining(["nav.reports", "nav.settings"]));
+    expect(texts(r.root)).toEqual(
+      expect.arrayContaining(["nav.competitors", "nav.reports", "nav.settings"])
+    );
   });
 });
 
@@ -240,14 +243,18 @@ describe("the route guard in the layout", () => {
     expect(r.root.findAllByType("Slot" as never)).toHaveLength(0);
   });
 
-  it.each(["/products/new", "/stock-in/adjust", "/settings", "/dev-components"])(
-    "also guards %s",
-    async (path) => {
-      mockPathname = path;
-      const r = await render(<AppLayout />);
-      expect(r.root.findByType("Redirect" as never).props.href).toBe("/(app)/sell");
-    }
-  );
+  it.each([
+    "/products/new",
+    "/competitors",
+    "/competitors/p1",
+    "/stock-in/adjust",
+    "/settings",
+    "/dev-components",
+  ])("also guards %s", async (path) => {
+    mockPathname = path;
+    const r = await render(<AppLayout />);
+    expect(r.root.findByType("Redirect" as never).props.href).toBe("/(app)/sell");
+  });
 
   it("lets the owner in, inside the shell", async () => {
     mockProfile = owner;
