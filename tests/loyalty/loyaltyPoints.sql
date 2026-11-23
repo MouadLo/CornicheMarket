@@ -746,7 +746,11 @@ begin
       raise exception 'unexpected keys in a history row: %', h;
     end if;
   end loop;
-  if c::text ~ '212|phone' then raise exception 'phone leaked in the public card: %', c; end if;
+  -- A Moroccan mobile number in any form (+212 6xx…, 06xx…), or a phone key.
+  -- Not a bare '212': a timestamp such as 07:12:17.0212… contains it.
+  if c::text ~ '(\+?212|0)[5-7][0-9]{8}|phone' then
+    raise exception 'phone leaked in the public card: %', c;
+  end if;
 
   -- a member whose name is only the phone shows no name
   c := public.loyalty_card(phone_member);
