@@ -388,3 +388,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # before using service credentials. This supports both JWT signing key modes.
 [functions.extract-invoice]
 verify_jwt = false
+
+# check-competitor-prices handles its own auth: the owner's session token (owner
+# role checked in the function) or, for the daily job, the x-cron-secret header.
+[functions.check-competitor-prices]
+verify_jwt = false
