@@ -1,15 +1,16 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { CompetitorSection } from "@/src/components/competitors/CompetitorSection";
 import { ProductForm } from "@/src/components/products/ProductForm";
+import { fetchCompetitorRows } from "@/src/lib/competitors/queries";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { Text } from "@/src/theme/Text";
+import { colors } from "@/src/theme/tokens";
 import {
   fetchCategories,
   fetchProduct,
@@ -42,6 +43,16 @@ export default function EditProduct() {
   const [tile, setTile] = useState<TileSettings | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // How many competitors this product is tracked at (owner only; a failed read
+  // just hides the line).
+  const [tracked, setTracked] = useState(0);
+
+  useEffect(() => {
+    if (!id || !isOwner) return;
+    fetchCompetitorRows(id)
+      .then((rows) => setTracked(rows.length))
+      .catch(() => setTracked(0));
+  }, [id, isOwner]);
 
   // A translation key (see errorKey), never the server's text.
   const load = useCallback(() => {
@@ -75,21 +86,45 @@ export default function EditProduct() {
   if (!product) return <Text style={{ padding: 20 }}>{t("products.formProductNotFound")}</Text>;
 
   return (
-    <ProductForm
-      onDirtyChange={setDirty}
-      categories={categories}
-      initial={product}
-      initialTile={tile}
-      footer={<CompetitorSection productId={product.id} />}
-      submitLabel={t("products.formSave")}
-      onSubmit={async (input, change) => {
-        await updateProduct(product.id, input);
-        if (change) {
-          await saveProductTileSettings(product.id, change.tabCategoryId, change.settings);
-          void refreshGridCache(true);
-        }
-        router.back();
-      }}
-    />
+    <>
+      {tracked > 0 ? (
+        <View style={styles.tracked}>
+          <Text style={styles.trackedText}>{t("products.trackedAt", { count: tracked })}</Text>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push(`/(app)/competitors/${product.id}`)}
+          >
+            <Text style={styles.trackedLink}>{t("products.trackedSee")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <ProductForm
+        onDirtyChange={setDirty}
+        categories={categories}
+        initial={product}
+        initialTile={tile}
+        submitLabel={t("products.formSave")}
+        onSubmit={async (input, change) => {
+          await updateProduct(product.id, input);
+          if (change) {
+            await saveProductTileSettings(product.id, change.tabCategoryId, change.settings);
+            void refreshGridCache(true);
+          }
+          router.back();
+        }}
+      />
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  tracked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  trackedText: { fontSize: 14, color: colors.ink600 },
+  trackedLink: { fontSize: 14, fontWeight: "600", color: colors.brand700 },
+});

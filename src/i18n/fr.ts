@@ -150,6 +150,7 @@ const fr = {
     clients: "Clients",
     sell: "Vente",
     products: "Produits",
+    competitors: "Concurrents",
     stockIn: "Stock",
     reports: "Rapports",
     settings: "Paramètres",
@@ -569,7 +570,8 @@ const fr = {
     priceChangesLoadError: "Impossible de charger les changements de prix.",
     priceChangeLine: "{{percent}} · {{count}} produit(s)",
     priceChangeCategoryGone: "Catégorie supprimée",
-    competitorPrices: "Prix concurrents",
+    trackedAt: "Suivi chez {{count}} concurrent(s)",
+    trackedSee: "Voir",
     priceChangeCompetitor: "Alignement sur les concurrents",
     priceChangeLineCompetitor: "{{count}} produit(s)",
     priceUndoConfirmMessageCompetitor:
@@ -1302,7 +1304,9 @@ const fr = {
     },
     emptyTitle: "Aucun lien concurrent pour le moment",
     emptyHint:
-      "Ouvrez la fiche d'un produit (Produits, puis le produit), section « Concurrents », et collez le lien du même produit chez un concurrent. Les comparaisons apparaîtront ici.",
+      "Ajoutez un produit à suivre, puis collez le lien du même produit chez un concurrent.",
+    followProduct: "Suivre un produit",
+    viewProduct: "Voir la fiche produit",
     filterReview: "À revoir",
     filterAll: "Tous",
     filterOut: "Concurrent en rupture",
@@ -1608,7 +1612,7 @@ const fr = {
     low: "min {{price}}",
   },
   screenTitles: {
-    competitorPrices: "Prix concurrents",
+    competitorProduct: "Produit suivi",
     newProduct: "Nouveau produit",
     editProduct: "Modifier le produit",
     importProducts: "Importer des produits",

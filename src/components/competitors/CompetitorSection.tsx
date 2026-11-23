@@ -49,7 +49,15 @@ export function agoText(iso: string | null, t: Translate, now = Date.now()): str
 
 // Owner only: renders nothing for anyone else (and the database refuses a
 // cashier's session anyway).
-export function CompetitorSection({ productId }: { productId: string }) {
+export function CompetitorSection({
+  productId,
+  onChanged,
+}: {
+  productId: string;
+  // Called after a link was added, checked, edited or removed, or the margin
+  // floor saved, so a page showing the decision can refresh it.
+  onChanged?: () => void;
+}) {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const isOwner = profile?.role === "owner";
@@ -69,6 +77,11 @@ export function CompetitorSection({ productId }: { productId: string }) {
     if (isOwner) void load();
   }, [isOwner, load]);
 
+  const changed = async () => {
+    await load();
+    onChanged?.();
+  };
+
   if (!isOwner) return null;
 
   return (
@@ -85,10 +98,10 @@ export function CompetitorSection({ productId }: { productId: string }) {
       ) : rows.length === 0 ? (
         <Text style={styles.hint}>{t("competitors.empty")}</Text>
       ) : (
-        rows.map((row) => <LinkCard key={row.link_id} row={row} onChanged={load} />)
+        rows.map((row) => <LinkCard key={row.link_id} row={row} onChanged={changed} />)
       )}
-      <AddLinkForm productId={productId} onAdded={load} />
-      <MarginOverride productId={productId} />
+      <AddLinkForm productId={productId} onAdded={changed} />
+      <MarginOverride productId={productId} onSaved={onChanged} />
     </View>
   );
 }
@@ -399,7 +412,7 @@ function AddLinkForm({ productId, onAdded }: { productId: string; onAdded: () =>
   );
 }
 
-function MarginOverride({ productId }: { productId: string }) {
+function MarginOverride({ productId, onSaved }: { productId: string; onSaved?: () => void }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [storePercent, setStorePercent] = useState<number | null>(null);
@@ -441,6 +454,7 @@ function MarginOverride({ productId }: { productId: string }) {
     try {
       await setProductMarginFloor(productId, percent);
       showToast({ text: t("competitors.marginSaved"), tone: "success" });
+      onSaved?.();
     } catch (failure) {
       setError(errorKey(failure));
     } finally {

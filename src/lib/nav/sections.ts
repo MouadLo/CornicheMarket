@@ -4,7 +4,8 @@
 import type { IconName } from "@/src/components/ui/Icon";
 
 export type Role = "owner" | "cashier";
-export type SectionId = "sell" | "clients" | "products" | "stock" | "reports" | "settings";
+export type SectionId =
+  "sell" | "clients" | "products" | "competitors" | "stock" | "reports" | "settings";
 
 export type Section = {
   id: SectionId;
@@ -13,7 +14,13 @@ export type Section = {
   // First path segment, as reported by usePathname() (group names are dropped).
   segment: string;
   labelKey:
-    "nav.sell" | "nav.clients" | "nav.products" | "nav.stockIn" | "nav.reports" | "nav.settings";
+    | "nav.sell"
+    | "nav.clients"
+    | "nav.products"
+    | "nav.competitors"
+    | "nav.stockIn"
+    | "nav.reports"
+    | "nav.settings";
   icon: IconName;
   ownerOnly: boolean;
 };
@@ -41,6 +48,14 @@ export const SECTIONS: readonly Section[] = [
     segment: "products",
     labelKey: "nav.products",
     icon: "package",
+    ownerOnly: true,
+  },
+  {
+    id: "competitors",
+    route: "/(app)/competitors",
+    segment: "competitors",
+    labelKey: "nav.competitors",
+    icon: "scale",
     ownerOnly: true,
   },
   {
@@ -106,8 +121,15 @@ export function guardRedirect(role: Role | null, pathname: string): string | nul
   return canAccessPath(role, pathname) ? null : HOME_ROUTE;
 }
 
-// Phone: at most five tabs. The owner's last two sections live behind "More".
+// Sections that never take a bottom tab, so the daily ones (Stock) keep theirs.
+const MORE_ONLY: readonly SectionId[] = ["competitors"];
+
+// Phone: at most five tabs. The rest (Concurrents, Rapports, Réglages) live
+// behind "More".
 export function phoneTabs(role: Role | null): { tabs: SectionId[]; more: SectionId[] } {
   const ids = allowedSections(role).map((s) => s.id);
-  return ids.length <= 5 ? { tabs: ids, more: [] } : { tabs: ids.slice(0, 4), more: ids.slice(4) };
+  if (ids.length <= 5) return { tabs: ids, more: [] };
+  const tabbable = ids.filter((id) => !MORE_ONLY.includes(id));
+  const tabs = tabbable.slice(0, 4);
+  return { tabs, more: ids.filter((id) => !tabs.includes(id)) };
 }

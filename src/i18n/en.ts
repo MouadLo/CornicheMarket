@@ -149,6 +149,7 @@ const en: Translations = {
     clients: "Clients",
     sell: "Sell",
     products: "Products",
+    competitors: "Competitors",
     stockIn: "Stock In",
     reports: "Reports",
     settings: "Settings",
@@ -563,7 +564,8 @@ const en: Translations = {
     priceChangesLoadError: "Could not load the price changes.",
     priceChangeLine: "{{percent}} · {{count}} product(s)",
     priceChangeCategoryGone: "Deleted category",
-    competitorPrices: "Competitor prices",
+    trackedAt: "Tracked at {{count}} competitor(s)",
+    trackedSee: "See",
     priceChangeCompetitor: "Matching competitors",
     priceChangeLineCompetitor: "{{count}} product(s)",
     priceUndoConfirmMessageCompetitor:
@@ -1287,8 +1289,9 @@ const en: Translations = {
       other: "Could not read it.",
     },
     emptyTitle: "No competitor links yet",
-    emptyHint:
-      'Open a product (Products, then the product), "Competitors" section, and paste the link to the same product at a competitor. The comparisons will appear here.',
+    emptyHint: "Add a product to track, then paste the link to the same product at a competitor.",
+    followProduct: "Track a product",
+    viewProduct: "View the product page",
     filterReview: "To review",
     filterAll: "All",
     filterOut: "Competitor out of stock",
@@ -1587,7 +1590,7 @@ const en: Translations = {
     low: "low {{price}}",
   },
   screenTitles: {
-    competitorPrices: "Competitor prices",
+    competitorProduct: "Tracked product",
     newProduct: "New product",
     editProduct: "Edit product",
     importProducts: "Import products",

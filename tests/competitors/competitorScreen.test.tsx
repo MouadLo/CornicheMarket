@@ -7,7 +7,7 @@ import { showToast } from "../../src/lib/dialog/store";
 import { undoPriceChange } from "../../src/lib/products/queries";
 import { allTexts, pressableByText } from "../sales/sellTestUtils";
 
-import CompetitorPrices from "../../app/(app)/products/competitors";
+import CompetitorPrices from "../../app/(app)/competitors/index";
 
 let mockRole: "owner" | "cashier" = "owner";
 const mockPush = jest.fn();
@@ -41,6 +41,12 @@ jest.mock("../../src/lib/competitors/queries", () => ({
   applyCompetitorSuggestions: jest.fn(),
 }));
 jest.mock("../../src/lib/products/queries", () => ({ undoPriceChange: jest.fn() }));
+jest.mock("../../src/components/stock/ProductSearchPicker", () => ({
+  ProductSearchPicker: ({ onPick }: { onPick: (p: { id: string }) => void }) => {
+    const React = require("react");
+    return React.createElement("Picker", { onPick });
+  },
+}));
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 const base: OverviewRow = {
@@ -125,13 +131,14 @@ afterEach(() => act(() => tree.unmount()));
 it("a cashier is sent back and nothing is read", async () => {
   mockRole = "cashier";
   await render();
-  expect(tree.root.findAllByType("Redirect" as never)[0].props.href).toBe("/(app)/products");
+  expect(tree.root.findAllByType("Redirect" as never)[0].props.href).toBe("/(app)/sell");
   expect(fetchCompetitorRows).not.toHaveBeenCalled();
 });
 
-it("shows an empty state that explains how to add links", async () => {
+it("shows an empty state that explains how to add links, with the follow button", async () => {
   jest.mocked(fetchCompetitorRows).mockResolvedValue([]);
   await render();
+  expect(texts()).toContain("competitors.followProduct");
   expect(texts()).toContain("competitors.emptyTitle");
   expect(texts()).toContain("competitors.emptyHint");
 });
@@ -234,8 +241,17 @@ it("tells the owner when no price actually changed", async () => {
   expect(jest.mocked(showToast).mock.calls[0][0].text).toBe("competitors.appliedNothing");
 });
 
-it("opens the product when its name is pressed", async () => {
+it("opens the product's competitor page when its name is pressed", async () => {
   await render();
   await press("Chips");
-  expect(mockPush).toHaveBeenCalledWith("/(app)/products/p1");
+  expect(mockPush).toHaveBeenCalledWith("/(app)/competitors/p1");
+});
+
+it("Suivre un produit opens a picker, and picking a product opens its competitor page", async () => {
+  await render();
+  expect(tree.root.findAllByType("Picker" as never)).toHaveLength(0);
+  await press("competitors.followProduct");
+  const picker = tree.root.findByType("Picker" as never);
+  await act(async () => picker.props.onPick({ id: "p9" }));
+  expect(mockPush).toHaveBeenCalledWith("/(app)/competitors/p9");
 });
