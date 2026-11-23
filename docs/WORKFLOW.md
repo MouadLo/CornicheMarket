@@ -56,8 +56,35 @@ The branch is **blocked from merging** until CI passes. Set this up in GitHub �
 After review and CI passes, use **Squash and merge** (keeps `main` history clean) or **Merge commit** (preserves individual commits). After merging:
 
 - The **CI** workflow runs one more time on `main`.
-- If it passes, **deploy-web** runs automatically: staging database migrations first, then the Expo web build deploys to Vercel.
+- If it passes, **deploy-web** sends that commit to the **test app** (staging) automatically: migrations on the staging Supabase project first, then the Expo web build on the `corniche-staging` Vercel project (https://corniche-staging.vercel.app). It never touches production and refuses to run if any setting points at a production project.
+- Try the feature on the test app. If it works, ship that same commit to production (see **Shipping to production** below).
 - **mobile** runs an EAS Update that pushes the new JavaScript bundle to the **preview** channel, so testers with preview builds get it immediately without reinstalling.
+
+---
+
+## The test app (staging)
+
+| | Test app (staging) | Live app (production) |
+|---|---|---|
+| Website | https://corniche-staging.vercel.app | https://corniche-market.vercel.app |
+| Supabase project | `nvlmgyimspbdplbhbirw` | `oqbmmpvsiykburfseowv` |
+| Updated | automatically after every merge to `main` | only when the owner says "ship" |
+
+The staging database holds a copy of production's data (same logins). Refreshing it replaces everything on staging.
+
+**GitHub setup** (Settings → Environments → `staging`):
+- Secrets: `SUPABASE_ACCESS_TOKEN` (a Supabase personal access token), `VERCEL_TOKEN` (a Vercel token for the `mouad-ls-projects` team).
+- Variables: `SUPABASE_STAGING_PROJECT_REF`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (the staging project's URL and publishable key), `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (the `corniche-staging` project).
+
+A manual re-deploy of `main` to staging: Actions → "Deploy to the test app (staging)" → Run workflow.
+
+## Shipping to production
+
+Only a commit that was tested on staging is shipped:
+1. Back up production (schema and data dumps).
+2. `supabase db push --linked --dry-run`, then the real push, from a checkout linked to production. The migrations are the ones that already ran on staging.
+3. Build the same commit with the production URL and key and deploy it to the `corniche-market` Vercel project.
+4. Tag the commit `prod-YYYY-MM-DD` so it is always known what is live.
 
 ---
 
