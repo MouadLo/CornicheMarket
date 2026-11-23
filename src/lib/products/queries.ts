@@ -28,6 +28,8 @@ export type Product = {
   loyalty_bonus_points?: number;
   // The instant the bonus ends (null = no end).
   loyalty_bonus_until?: string | null;
+  // Storage path of the photo (migration 053); null/missing = none. Not cost data.
+  photo_path?: string | null;
 };
 
 // code: the stable identity of a catalogue category (migration 035); null for
@@ -67,7 +69,7 @@ export type ProductInput = {
 export const PAGE_SIZE = 50;
 
 const LIST_COLUMNS =
-  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until";
+  "id, name, barcode, category_id, unit, selling_price_cents, stock_quantity, low_stock_threshold, is_low_stock, active, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until, photo_path";
 
 // The owner also reads the buying price and his cashier-discount choice.
 const OWNER_COLUMNS = `${LIST_COLUMNS}, current_cost_cents, discount_override`;

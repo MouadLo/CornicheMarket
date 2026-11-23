@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
+import { ProductPhotoSection } from "@/src/components/products/ProductPhotoSection";
 import { fetchCompetitorRows } from "@/src/lib/competitors/queries";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { errorKey } from "@/src/lib/errors/userMessage";
@@ -102,6 +103,9 @@ export default function EditProduct() {
         onDirtyChange={setDirty}
         categories={categories}
         initial={product}
+        header={
+          <ProductPhotoSection productId={product.id} initialPath={product.photo_path} canEdit />
+        }
         initialTile={tile}
         submitLabel={t("products.formSave")}
         onSubmit={async (input, change) => {

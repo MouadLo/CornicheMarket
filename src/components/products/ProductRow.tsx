@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { bonusIsActive } from "@/src/lib/loyalty/bonus";
 import { formatMAD, formatMargin, marginPercent } from "@/src/lib/money";
+import { ProductPhoto } from "@/src/components/products/ProductPhoto";
 import type { Product } from "@/src/lib/products/queries";
 import { unitLabel } from "@/src/lib/products/unitLabel";
 import { appDirection, isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
@@ -48,6 +49,7 @@ function ProductRowComponent({ product, showCost, onPress, highlighted }: Props)
       ]}
       onPress={onPress}
     >
+      <ProductPhoto path={product.photo_path} size={40} radius={8} />
       <View style={styles.main}>
         <Text style={[styles.name, { textAlign }]} numberOfLines={1}>
           {isolateBidi(product.name)}

@@ -17,7 +17,7 @@ const LEGACY_CACHE_KEY = "corniche.productCache.v1";
 const PAGE_SIZE = 200;
 // Never a cost column: this cache is read on cashier devices too.
 const CACHE_COLUMNS =
-  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until";
+  "id, barcode, name, selling_price_cents, unit, active, category_id, stock_quantity, low_stock_threshold, discountable, loyalty_excluded, loyalty_bonus_points, loyalty_bonus_until, photo_path";
 
 export type CachedProduct = {
   id: string;
@@ -37,6 +37,9 @@ export type CachedProduct = {
   loyalty_excluded?: boolean;
   loyalty_bonus_points?: number;
   loyalty_bonus_until?: string | null;
+  // Storage path of the product photo (migration 053; not cost data). Missing
+  // on older entries (no photo).
+  photo_path?: string | null;
 };
 
 type ProductCache = {

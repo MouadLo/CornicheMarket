@@ -194,6 +194,37 @@ describe("cache v2 (the Sell grid)", () => {
     expect(stored).toContain('"tabs"');
   });
 
+  it("carries each product's photo path, still with no cost column", async () => {
+    rows({
+      products_cashier_view: [
+        { ...SEED[0], photo_path: "p1/a.jpg" },
+        { ...SEED[1], photo_path: null },
+      ],
+      ...grid,
+    });
+    await refreshProductCache(false);
+    const stored = JSON.parse(mockStore.get("corniche.productCache.v2") ?? "{}");
+    expect(stored.products[0].photo_path).toBe("p1/a.jpg");
+    expect(stored.products[1].photo_path).toBeNull();
+    expect(JSON.stringify(stored)).not.toMatch(/cost/i);
+  });
+
+  it("asks for photo_path from both the owner's and the cashier's source", async () => {
+    const selected: string[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = (cols: string) => (selected.push(`${table}:${cols}`), b);
+      for (const m of ["eq", "order", "range"]) b[m] = () => b;
+      b.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
+      return b;
+    });
+    await refreshProductCache(true);
+    await refreshProductCache(false);
+    for (const source of ["products:", "products_cashier_view:"]) {
+      expect(selected.some((x) => x.startsWith(source) && x.includes("photo_path"))).toBe(true);
+    }
+  });
+
   it("an owner's refresh asks for the grid fields only, never a cost column", async () => {
     const selected: string[] = [];
     mockFrom.mockImplementation((table: string) => {

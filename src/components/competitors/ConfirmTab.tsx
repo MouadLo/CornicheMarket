@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { CardAction, CatalogCard } from "@/src/components/competitors/CatalogCard";
+import { CardAction, CatalogCard, UsePhoto } from "@/src/components/competitors/CatalogCard";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { BigButton } from "@/src/components/BigButton";
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -120,6 +120,9 @@ export function ConfirmTab({ onChanged }: { onChanged: () => void }) {
                 )
               }
             />
+          ) : null}
+          {row.image_url && row.candidate_product_id ? (
+            <UsePhoto imageUrl={row.image_url} productId={row.candidate_product_id} />
           ) : null}
           <CardAction
             label={t("competitors.confirmTab.notSame")}

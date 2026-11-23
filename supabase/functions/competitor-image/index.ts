@@ -1,6 +1,12 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { imageExtension, isAllowedImageType, parseHttpsUrl, isPrivateHost } from "../_shared/competitorParse.ts";
 import { corsHeaders, createPoliteFetcher } from "../_shared/politeFetch.ts";
+import {
+  decideStorable,
+  isUuid,
+  PRODUCT_PHOTO_BUCKET,
+  productPhotoPath,
+} from "../_shared/productPhoto.ts";
 
 // Owner only. Lets the owner download a competitor's product photo.
 // Competitor image hosts do not allow cross-origin downloads from a browser, so
@@ -10,6 +16,15 @@ import { corsHeaders, createPoliteFetcher } from "../_shared/politeFetch.ts";
 // honestly, redirects only stay on the same site, only image/* of a known type is
 // returned and at most 5 MB. Nothing is stored server-side.
 // Answer: { contentType, extension, base64 } (JSON, so every client decodes it the same way).
+//
+// Second mode, { url, saveToProductId }: the same fetch, then the photo (a JPEG,
+// PNG or WebP of at most 2 MB, stored as it is) is saved into the private
+// 'product-photos' bucket as <product_id>/<uuid>.<ext> and becomes the product's
+// photo through the owner's set_product_photo (so the database checks the path),
+// and the previous file is deleted. Answer: { status: "saved", path }. A photo
+// that cannot be stored as it is answers { status: "error", detail:
+// "photo_unsupported" | "photo_too_large" }; the app then downloads it (first
+// mode), resizes it on the device and uploads it itself.
 
 const response = (status: number, body: object) => Response.json(body, { status, headers: corsHeaders });
 
@@ -47,6 +62,8 @@ Deno.serve(async (req) => {
     return response(400, { error: "invalid_url" });
   }
   const target = parsed.toString();
+  const saveTo = body.saveToProductId;
+  if (saveTo !== undefined && !isUuid(saveTo)) return response(400, { error: "invalid_product" });
 
   // The URL must already be in our database, exactly as stored.
   const [item, point] = await Promise.all([
@@ -70,6 +87,35 @@ Deno.serve(async (req) => {
   if (res.tooLarge) return response(200, { status: "error", detail: "too_large" });
   const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   if (!isAllowedImageType(contentType)) return response(200, { status: "error", detail: "not_an_image" });
+
+  if (saveTo) {
+    const decision = decideStorable(contentType, res.bytes.length);
+    if (!decision.ok) {
+      return response(200, {
+        status: "error",
+        detail: decision.reason === "too_large" ? "photo_too_large" : "photo_unsupported",
+      });
+    }
+    const path = productPhotoPath(saveTo, crypto.randomUUID(), decision.extension);
+    const bucket = admin.storage.from(PRODUCT_PHOTO_BUCKET);
+    const uploaded = await bucket.upload(path, res.bytes, {
+      contentType: decision.contentType,
+      upsert: false,
+    });
+    if (uploaded.error) return response(200, { status: "error", detail: "photo_upload_failed" });
+    // The owner's own session sets it: the function checks the owner, the database
+    // checks the path and that the file exists.
+    const { data: oldPath, error: setError } = await caller.rpc("set_product_photo", {
+      p_product_id: saveTo,
+      p_path: path,
+    });
+    if (setError) {
+      await bucket.remove([path]);
+      return response(200, { status: "error", detail: "photo_set_failed" });
+    }
+    if (typeof oldPath === "string" && oldPath !== path) await bucket.remove([oldPath]);
+    return response(200, { status: "saved", path });
+  }
   return response(200, {
     status: "ok",
     contentType,

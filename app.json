@@ -44,8 +44,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Corniche Market to choose invoice photos.",
-          "cameraPermission": "Allow Corniche Market to photograph invoices.",
+          "photosPermission": "Allow Corniche Market to choose invoice and product photos.",
+          "cameraPermission": "Allow Corniche Market to photograph invoices and products.",
           "microphonePermission": false
         }
       ]

@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
-import { PhotoDownload } from "@/src/components/competitors/CatalogCard";
+import { PhotoDownload, UsePhoto } from "@/src/components/competitors/CatalogCard";
 import { Banner } from "@/src/components/ui/Banner";
 import { Field } from "@/src/components/ui/Field";
 import { InlineError } from "@/src/components/ui/InlineError";
@@ -99,7 +99,9 @@ export function CompetitorSection({
       ) : rows.length === 0 ? (
         <Text style={styles.hint}>{t("competitors.empty")}</Text>
       ) : (
-        rows.map((row) => <LinkCard key={row.link_id} row={row} onChanged={changed} />)
+        rows.map((row) => (
+          <LinkCard key={row.link_id} row={row} productId={productId} onChanged={changed} />
+        ))
       )}
       <AddLinkForm productId={productId} onAdded={changed} />
       <MarginOverride productId={productId} onSaved={onChanged} />
@@ -107,7 +109,15 @@ export function CompetitorSection({
   );
 }
 
-function LinkCard({ row, onChanged }: { row: OverviewRow; onChanged: () => Promise<void> }) {
+function LinkCard({
+  row,
+  productId,
+  onChanged,
+}: {
+  row: OverviewRow;
+  productId: string;
+  onChanged: () => Promise<void>;
+}) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -300,6 +310,7 @@ function LinkCard({ row, onChanged }: { row: OverviewRow; onChanged: () => Promi
         {row.image_url ? (
           <PhotoDownload imageUrl={row.image_url} name={row.title ?? row.product_name} />
         ) : null}
+        {row.image_url ? <UsePhoto imageUrl={row.image_url} productId={productId} /> : null}
         <LinkAction label={t("competitors.remove")} onPress={() => void remove()} danger />
       </View>
     </View>
