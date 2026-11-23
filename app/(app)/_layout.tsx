@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { AppShell } from "@/src/components/shell/AppShell";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { guardRedirect } from "@/src/lib/nav/sections";
+import { useNavOrigin } from "@/src/lib/nav/useNavOrigin";
 import { colors } from "@/src/theme/tokens";
 
 // Everything signed-in lives inside the POS shell (top bar, navigation,
@@ -12,6 +13,7 @@ import { colors } from "@/src/theme/tokens";
 export default function AppLayout() {
   const { profile, loading } = useAuth();
   const pathname = usePathname();
+  useNavOrigin();
 
   // The role is unknown until the profile arrives (e.g. right after a browser
   // reload): deciding then would treat the owner as a cashier and bounce them

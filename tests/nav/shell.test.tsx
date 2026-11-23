@@ -30,6 +30,7 @@ jest.mock("expo-router", () => {
   const React = require("react");
   return {
     usePathname: () => mockPathname,
+    useGlobalSearchParams: () => ({}),
     router: { navigate: (...a: unknown[]) => mockNavigate(...a) },
     Redirect: ({ href }: { href: string }) => React.createElement("Redirect", { href }),
     Slot: () => React.createElement("Slot"),

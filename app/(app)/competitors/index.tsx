@@ -1,5 +1,5 @@
-import { Redirect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -16,6 +16,9 @@ import { colors } from "@/src/theme/tokens";
 type Tab = "tracked" | "confirm" | "missing" | "sourcing" | "shops";
 const TABS: readonly Tab[] = ["tracked", "confirm", "missing", "sourcing", "shops"];
 
+const isTab = (value: unknown): value is Tab =>
+  typeof value === "string" && (TABS as readonly string[]).includes(value);
+
 // Owner only (a cashier is sent back to Vente). Concurrents: the tracked
 // products (phase 1), the proposed matches to confirm, the competitors' products
 // we do not have, what to source, and the shops we read.
@@ -23,22 +26,23 @@ export default function Competitors() {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const isOwner = profile?.role === "owner";
-  const [tab, setTab] = useState<Tab>("tracked");
   const [counts, setCounts] = useState<CatalogCounts | null>(null);
   // Remounts the list of the open tab after a change made in another one.
   const [version, setVersion] = useState(0);
 
-  // Another screen can send the owner back to a given tab, e.g. the new-product
-  // form after "Créer le produit" returns to À sourcer. `r` changes on every
-  // such return, so coming back twice to the same tab still reloads it.
+  // The open tab lives in the URL (`/competitors?tab=sourcing`), so it survives
+  // leaving the section and coming back (browser back, the header arrow of a
+  // screen opened from a tab) and a reload. An unknown value means the default.
+  // `r` changes on every return from "Créer le produit", so coming back twice
+  // to the same tab still reloads it.
   const params = useLocalSearchParams<{ tab?: string; r?: string }>();
+  const tab: Tab = isTab(params.tab) ? params.tab : "tracked";
+  const lastR = useRef(params.r);
   useEffect(() => {
-    const wanted = params.tab;
-    if (typeof wanted === "string" && (TABS as readonly string[]).includes(wanted)) {
-      setTab(wanted as Tab);
-      setVersion((v) => v + 1);
-    }
-  }, [params.tab, params.r]);
+    if (params.r === lastR.current) return;
+    lastR.current = params.r;
+    setVersion((v) => v + 1);
+  }, [params.r]);
 
   const refreshCounts = useCallback(() => {
     fetchCatalogCounts()
@@ -74,7 +78,7 @@ export default function Competitors() {
         ]}
         value={tab}
         onChange={(key) => {
-          setTab(key as Tab);
+          router.setParams({ tab: key });
           setVersion((v) => v + 1);
         }}
       />

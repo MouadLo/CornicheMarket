@@ -19,7 +19,10 @@ let mockFormProps: {
   onSubmit: (input: object, tile: null) => Promise<void>;
 };
 
+let mockStackIndex = 1;
 jest.mock("expo-router", () => ({
+  useNavigation: () => ({ getState: () => ({ index: mockStackIndex }) }),
+  usePathname: () => "/products/new",
   router: { back: () => mockBack(), navigate: jest.fn() },
   useLocalSearchParams: () => mockParams,
   Redirect: () => null,

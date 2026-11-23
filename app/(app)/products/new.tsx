@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ProductForm } from "@/src/components/products/ProductForm";
 import { ProductPhotoSection } from "@/src/components/products/ProductPhotoSection";
+import { useLeaveScreen } from "@/src/lib/nav/useLeaveScreen";
 import { useUnsavedGuard } from "@/src/lib/products/useUnsavedGuard";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmMatch } from "@/src/lib/competitors/shops";
@@ -26,6 +27,7 @@ import { DEFAULT_TILE_SETTINGS } from "@/src/lib/sellGrid/tileSettings";
 
 export default function NewProduct() {
   const { profile } = useAuth();
+  const leave = useLeaveScreen();
   // From "À sourcer" > "Créer le produit": the competitor item to link to the
   // product once it is saved, and its name to start from.
   const params = useLocalSearchParams<{ competitorItemId?: string; name?: string }>();
@@ -135,14 +137,16 @@ export default function NewProduct() {
             showToast({ text: t("products.photo.attachFailed"), tone: "info" });
           }
         }
-        router.back();
-        // Created from "À sourcer": go back to that tab, refreshed, rather than
-        // to the products list.
+        // Created from "À sourcer": back to that tab, refreshed. Otherwise back
+        // to where the owner came from (the products list, or another section
+        // such as Vente's empty-store prompt).
         if (competitorItemId) {
-          router.navigate({
+          leave({
             pathname: "/(app)/competitors",
             params: { tab: "sourcing", r: String(Date.now()) },
           });
+        } else {
+          leave();
         }
       }}
     />
