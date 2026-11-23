@@ -27,9 +27,11 @@ import Competitors from "../../app/(app)/competitors/index";
 
 let mockRole: "owner" | "cashier" = "owner";
 const mockPush = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock("expo-router", () => ({
   router: { push: (...a: unknown[]) => mockPush(...a) },
+  useLocalSearchParams: () => mockSearchParams,
   Redirect: ({ href }: { href: string }) => {
     const React = require("react");
     return React.createElement("Redirect", { href });
@@ -388,6 +390,13 @@ describe("À sourcer", () => {
     });
   beforeEach(() => jest.mocked(fetchCatalogPage).mockResolvedValue([wanted()]));
 
+  it("opens straight on À sourcer when sent back there (after Créer le produit)", async () => {
+    mockSearchParams = { tab: "sourcing", r: "1" };
+    await render();
+    expect(fetchCatalogPage).toHaveBeenCalledWith("wanted", expect.anything(), 0);
+    expect(texts()).toContain("Lorenz Crunchips Paprika");
+    mockSearchParams = {};
+  });
   it("loads the wanted items", async () => {
     await render();
     await openTab("sourcing");

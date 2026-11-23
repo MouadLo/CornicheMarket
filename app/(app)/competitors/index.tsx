@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -14,6 +14,7 @@ import { fetchCatalogCounts, type CatalogCounts } from "@/src/lib/competitors/sh
 import { colors } from "@/src/theme/tokens";
 
 type Tab = "tracked" | "confirm" | "missing" | "sourcing" | "shops";
+const TABS: readonly Tab[] = ["tracked", "confirm", "missing", "sourcing", "shops"];
 
 // Owner only (a cashier is sent back to Vente). Concurrents: the tracked
 // products (phase 1), the proposed matches to confirm, the competitors' products
@@ -26,6 +27,18 @@ export default function Competitors() {
   const [counts, setCounts] = useState<CatalogCounts | null>(null);
   // Remounts the list of the open tab after a change made in another one.
   const [version, setVersion] = useState(0);
+
+  // Another screen can send the owner back to a given tab, e.g. the new-product
+  // form after "Créer le produit" returns to À sourcer. `r` changes on every
+  // such return, so coming back twice to the same tab still reloads it.
+  const params = useLocalSearchParams<{ tab?: string; r?: string }>();
+  useEffect(() => {
+    const wanted = params.tab;
+    if (typeof wanted === "string" && (TABS as readonly string[]).includes(wanted)) {
+      setTab(wanted as Tab);
+      setVersion((v) => v + 1);
+    }
+  }, [params.tab, params.r]);
 
   const refreshCounts = useCallback(() => {
     fetchCatalogCounts()

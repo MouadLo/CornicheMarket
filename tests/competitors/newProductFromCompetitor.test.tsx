@@ -10,10 +10,11 @@ import NewProduct from "../../app/(app)/products/new";
 let mockParams: Record<string, string> = {};
 let mockRole = "owner";
 const mockBack = jest.fn();
+const mockNavigate = jest.fn();
 let mockFormProps: { initialName?: string; onSubmit: (input: object, tile: null) => Promise<void> };
 
 jest.mock("expo-router", () => ({
-  router: { back: () => mockBack() },
+  router: { back: () => mockBack(), navigate: (to: unknown) => mockNavigate(to) },
   useLocalSearchParams: () => mockParams,
   Redirect: ({ href }: { href: string }) => {
     const React = require("react");
@@ -70,6 +71,11 @@ it("starts from the competitor item's name and links the item once the product i
   expect(createProduct).toHaveBeenCalledTimes(1);
   expect(confirmMatch).toHaveBeenCalledWith("item-1", "new-product");
   expect(mockBack).toHaveBeenCalled();
+  // Back to the À sourcer tab, not the products list.
+  expect(mockNavigate).toHaveBeenCalledWith({
+    pathname: "/(app)/competitors",
+    params: { tab: "sourcing", r: expect.any(String) },
+  });
 });
 
 it("a failed link still keeps the product and says so", async () => {
@@ -83,6 +89,7 @@ it("a failed link still keeps the product and says so", async () => {
     expect.objectContaining({ text: "competitors.sourcingTab.linkFailed" })
   );
   expect(mockBack).toHaveBeenCalled();
+  expect(mockNavigate).toHaveBeenCalled();
 });
 
 it("without a competitor item nothing is linked", async () => {
@@ -92,6 +99,7 @@ it("without a competitor item nothing is linked", async () => {
     await mockFormProps.onSubmit({}, null);
   });
   expect(confirmMatch).not.toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
 });
 
 it("a cashier is sent back", async () => {

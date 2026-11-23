@@ -11,9 +11,11 @@ import CompetitorPrices from "../../app/(app)/competitors/index";
 
 let mockRole: "owner" | "cashier" = "owner";
 const mockPush = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock("expo-router", () => ({
   router: { push: (...a: unknown[]) => mockPush(...a) },
+  useLocalSearchParams: () => mockSearchParams,
   Redirect: ({ href }: { href: string }) => {
     const React = require("react");
     return React.createElement("Redirect", { href });
