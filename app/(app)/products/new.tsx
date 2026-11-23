@@ -74,6 +74,14 @@ export default function NewProduct() {
           }
         }
         router.back();
+        // Created from "À sourcer": go back to that tab, refreshed, rather than
+        // to the products list.
+        if (competitorItemId) {
+          router.navigate({
+            pathname: "/(app)/competitors",
+            params: { tab: "sourcing", r: String(Date.now()) },
+          });
+        }
       }}
     />
   );
