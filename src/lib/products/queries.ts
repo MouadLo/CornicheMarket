@@ -332,6 +332,8 @@ export type PriceChangeBatch = {
   percent: number;
   product_count: number;
   reverted_at: string | null;
+  // 'competitor' = prices applied from the Competitor prices page (migration 051).
+  source?: "percent" | "competitor";
 };
 
 // The latest bulk price changes, newest first (owner only: RLS returns nothing
@@ -339,7 +341,7 @@ export type PriceChangeBatch = {
 export async function fetchRecentPriceChanges(limit = 10): Promise<PriceChangeBatch[]> {
   const { data, error } = await supabase
     .from("price_change_batches")
-    .select("id, created_at, category_id, percent, product_count, reverted_at")
+    .select("id, created_at, category_id, percent, product_count, reverted_at, source")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);

@@ -65,6 +65,11 @@ jest.mock("../src/lib/sales/queries", () => ({
   fetchDiscountLimits: async () => ({ percent: 5, maxCents: 2000 }),
   updateDiscountLimits: jest.fn(),
 }));
+jest.mock("../src/lib/competitors/queries", () => ({
+  // Never settles: the section stays on "loading" and adds no field to these tests.
+  fetchStoreMinMargin: () => new Promise(() => {}),
+  updateStoreMinMargin: jest.fn(),
+}));
 jest.mock("../src/lib/auth/inviteCashier", () => ({
   inviteCashier: (...a: unknown[]) => mockInvite(...a),
 }));

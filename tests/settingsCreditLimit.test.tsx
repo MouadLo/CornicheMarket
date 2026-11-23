@@ -46,6 +46,11 @@ jest.mock("../src/lib/sales/queries", () => ({
   fetchStoreCreditLimit: () => mockFetchLimit(),
   updateStoreCreditLimit: (...a: unknown[]) => mockUpdateLimit(...a),
 }));
+jest.mock("../src/lib/competitors/queries", () => ({
+  // Never settles: the section stays on "loading" and adds no field to these tests.
+  fetchStoreMinMargin: () => new Promise(() => {}),
+  updateStoreMinMargin: jest.fn(),
+}));
 jest.mock("../src/lib/auth/inviteCashier", () => ({ inviteCashier: jest.fn() }));
 jest.mock("../src/lib/auth/staff", () => ({
   ...jest.requireActual("../src/lib/auth/staff"),
