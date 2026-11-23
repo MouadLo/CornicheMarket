@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { CompetitorSection } from "@/src/components/competitors/CompetitorSection";
 import { ProductForm } from "@/src/components/products/ProductForm";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { errorKey } from "@/src/lib/errors/userMessage";
@@ -79,6 +80,7 @@ export default function EditProduct() {
       categories={categories}
       initial={product}
       initialTile={tile}
+      footer={<CompetitorSection productId={product.id} />}
       submitLabel={t("products.formSave")}
       onSubmit={async (input, change) => {
         await updateProduct(product.id, input);

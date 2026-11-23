@@ -57,6 +57,7 @@ export function RecentPriceChangesPanel({ visible, categories, onClose, onUndone
   }, [visible, load]);
 
   const scopeLabel = (batch: PriceChangeBatch) => {
+    if (batch.source === "competitor") return t("products.priceChangeCompetitor");
     if (batch.category_id === null) return t("products.bulkAll");
     const category = categories.find((c) => c.id === batch.category_id);
     return category
@@ -102,10 +103,12 @@ export function RecentPriceChangesPanel({ visible, categories, onClose, onUndone
               </Text>
               <Text style={styles.scope}>{scopeLabel(batch)}</Text>
               <Text style={styles.detail}>
-                {t("products.priceChangeLine", {
-                  percent: isolateLtr(formatPercent(batch.percent)),
-                  count: batch.product_count,
-                })}
+                {batch.source === "competitor"
+                  ? t("products.priceChangeLineCompetitor", { count: batch.product_count })
+                  : t("products.priceChangeLine", {
+                      percent: isolateLtr(formatPercent(batch.percent)),
+                      count: batch.product_count,
+                    })}
               </Text>
               {batch.reverted_at ? (
                 <Text style={styles.tag}>{t("products.priceChangeReverted")}</Text>

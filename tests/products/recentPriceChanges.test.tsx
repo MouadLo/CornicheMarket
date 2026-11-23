@@ -124,3 +124,14 @@ it("says so when there is no change yet, and when the list cannot load", async (
   await render();
   expect(allTexts(tree.root)).toContain("products.priceChangesLoadError");
 });
+
+it("labels a batch applied from the competitor prices page, without a percent", async () => {
+  jest
+    .mocked(fetchRecentPriceChanges)
+    .mockResolvedValue([{ ...live, id: "b3", source: "competitor", percent: 0, product_count: 2 }]);
+  await render();
+  const shown = allTexts(tree.root).join("|");
+  expect(shown).toContain("products.priceChangeCompetitor");
+  expect(shown).toContain('products.priceChangeLineCompetitor{"count":2}');
+  expect(shown).not.toContain("products.priceChangeLine{");
+});

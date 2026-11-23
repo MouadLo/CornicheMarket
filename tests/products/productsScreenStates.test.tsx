@@ -117,6 +117,19 @@ it("a cashier is never offered the owner's action", async () => {
   expect(texts()).toContain("products.emptyHintCashier");
   expect(texts()).not.toContain("products.emptyAddFirst");
   expect(texts()).not.toContain("products.addNew");
+  expect(texts()).not.toContain("products.competitorPrices");
+});
+
+it("the owner reaches the competitor prices screen from the product tools", async () => {
+  mockFetchProducts.mockResolvedValue([]);
+  await render();
+  await act(async () => {
+    pressableByText(tree.root, "products.moreActions").props.onPress();
+  });
+  await act(async () => {
+    pressableByText(tree.root, "products.competitorPrices").props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith("/(app)/products/competitors");
 });
 
 describe("on a phone", () => {

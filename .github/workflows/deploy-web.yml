@@ -78,6 +78,11 @@ jobs:
       - name: Apply pending migrations
         run: supabase db push --linked --yes
 
+      # Every function in supabase/functions, bundled server-side (no Docker).
+      # Each function's verify_jwt setting comes from supabase/config.toml.
+      - name: Deploy edge functions to staging
+        run: supabase functions deploy --project-ref "$STAGING_REF" --use-api
+
   # ── 2. Build Expo web and deploy it to the staging Vercel project ────────
   deploy:
     name: Build web → corniche-staging

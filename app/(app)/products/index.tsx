@@ -418,6 +418,11 @@ export default function ProductsScreen() {
       onPress: () => setRecentOpen(true),
     },
     {
+      icon: "chart",
+      label: t("products.competitorPrices"),
+      onPress: () => router.push("/(app)/products/competitors"),
+    },
+    {
       icon: "clipboard",
       label: t("products.manageCategories"),
       onPress: () => router.push("/(app)/products/categories"),

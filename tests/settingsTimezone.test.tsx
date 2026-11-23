@@ -41,6 +41,11 @@ jest.mock("../src/lib/reports/queries", () => ({
   fetchStoreTimezone: () => mockFetchTz(),
   updateStoreTimezone: (...a: unknown[]) => mockUpdate(...(a as [])),
 }));
+jest.mock("../src/lib/competitors/queries", () => ({
+  // Never settles: the section stays on "loading" and adds no field to these tests.
+  fetchStoreMinMargin: () => new Promise(() => {}),
+  updateStoreMinMargin: jest.fn(),
+}));
 jest.mock("../src/lib/auth/inviteCashier", () => ({
   inviteCashier: (...a: unknown[]) => mockInvite(...a),
 }));

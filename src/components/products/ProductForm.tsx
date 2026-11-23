@@ -1,7 +1,7 @@
 import { Chip } from "@/src/components/ui/Chip";
 import { DateField } from "@/src/components/ui/DateField";
 import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -80,6 +80,8 @@ type Props = {
   // Tells the screen whether there are unsaved changes (it guards leaving).
   // Called with false just before onSubmit, since a saved screen navigates away.
   onDirtyChange?: (dirty: boolean) => void;
+  // Extra content after the Save button (the edit screen's owner-only sections).
+  footer?: ReactNode;
 };
 
 export function ProductForm({
@@ -89,6 +91,7 @@ export function ProductForm({
   onSubmit,
   initialTile,
   onDirtyChange,
+  footer,
 }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n?.language;
@@ -642,6 +645,8 @@ export function ProductForm({
         onPress={handleSubmit}
         disabled={submitting}
       />
+
+      {footer}
 
       <BarcodeScannerModal
         visible={scannerOpen}

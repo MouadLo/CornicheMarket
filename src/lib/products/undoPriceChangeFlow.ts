@@ -15,15 +15,17 @@ export function formatPercent(percent: number): string {
 // since. Resolves null when the owner said no or the undo failed (a toast says
 // why), so callers refresh their list only on a result.
 export async function undoPriceChangeWithConfirm(
-  batch: { id: string; percent: number; product_count: number },
+  batch: { id: string; percent: number; product_count: number; source?: "percent" | "competitor" },
   t: Translate
 ): Promise<UndoPriceChangeResult | null> {
   const ok = await confirmDestructive(
     t("products.priceUndoConfirmTitle"),
-    t("products.priceUndoConfirmMessage", {
-      count: batch.product_count,
-      percent: isolateLtr(formatPercent(batch.percent)),
-    }),
+    batch.source === "competitor"
+      ? t("products.priceUndoConfirmMessageCompetitor", { count: batch.product_count })
+      : t("products.priceUndoConfirmMessage", {
+          count: batch.product_count,
+          percent: isolateLtr(formatPercent(batch.percent)),
+        }),
     t("products.priceUndoConfirmLabel"),
     // Not "Annuler": in French that is also the word for undoing the change.
     t("products.priceUndoKeep")
