@@ -29,9 +29,30 @@ let mockRole: "owner" | "cashier" = "owner";
 const mockPush = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
+const mockSetParams = jest.fn();
+const mockParamListeners = new Set<() => void>();
+
 jest.mock("expo-router", () => ({
-  router: { push: (...a: unknown[]) => mockPush(...a) },
-  useLocalSearchParams: () => mockSearchParams,
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    // Like the real one: the URL params change and the screen re-renders.
+    setParams: (p: Record<string, string>) => {
+      mockSetParams(p);
+      mockSearchParams = { ...mockSearchParams, ...p };
+      mockParamListeners.forEach((l) => l());
+    },
+  },
+  useLocalSearchParams: () => {
+    const React = require("react");
+    const [, force] = React.useReducer((n: number) => n + 1, 0);
+    React.useEffect(() => {
+      mockParamListeners.add(force);
+      return () => {
+        mockParamListeners.delete(force);
+      };
+    }, []);
+    return mockSearchParams;
+  },
   Redirect: ({ href }: { href: string }) => {
     const React = require("react");
     return React.createElement("Redirect", { href });
@@ -166,6 +187,7 @@ const openTab = async (key: string) => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockRole = "owner";
+  mockSearchParams = {};
   jest.mocked(fetchCatalogCounts).mockResolvedValue({ proposed: 2, missing: 90, wanted: 1 });
   jest.mocked(fetchShops).mockResolvedValue([shop(), shop({ id: "sh2", name: "Other" })]);
   jest.mocked(fetchCatalogCategories).mockResolvedValue(["Chips", "Eau"]);
@@ -395,7 +417,33 @@ describe("À sourcer", () => {
     await render();
     expect(fetchCatalogPage).toHaveBeenCalledWith("wanted", expect.anything(), 0);
     expect(texts()).toContain("Lorenz Crunchips Paprika");
-    mockSearchParams = {};
+  });
+  it("pressing a tab puts it in the URL, and the URL decides the open tab", async () => {
+    await render();
+    await openTab("sourcing");
+    expect(mockSetParams).toHaveBeenCalledWith({ tab: "sourcing" });
+    expect(fetchCatalogPage).toHaveBeenCalledWith("wanted", expect.anything(), 0);
+  });
+  it("an unknown tab in the URL falls back to Suivis", async () => {
+    mockSearchParams = { tab: "nonsense" };
+    await render();
+    expect(fetchCatalogPage).not.toHaveBeenCalled();
+    expect(fetchShops).not.toHaveBeenCalled();
+  });
+  it("reloads the open list only when r changes", async () => {
+    mockSearchParams = { tab: "sourcing", r: "1" };
+    await render();
+    expect(fetchCatalogPage).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      mockSearchParams = { tab: "sourcing", r: "1" };
+      mockParamListeners.forEach((l) => l());
+    });
+    expect(fetchCatalogPage).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      mockSearchParams = { tab: "sourcing", r: "2" };
+      mockParamListeners.forEach((l) => l());
+    });
+    expect(fetchCatalogPage).toHaveBeenCalledTimes(2);
   });
   it("loads the wanted items", async () => {
     await render();

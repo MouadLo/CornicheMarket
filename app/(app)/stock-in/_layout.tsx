@@ -1,11 +1,12 @@
 import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { sectionStackOptions } from "@/src/components/nav/SectionBackButton";
 
 export default function StockInLayout() {
   const { t } = useTranslation();
 
   return (
-    <Stack>
+    <Stack screenOptions={sectionStackOptions}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="receive" options={{ title: t("stockIn.receiveTitle") }} />
       <Stack.Screen name="history" options={{ title: t("screenTitles.purchaseHistory") }} />

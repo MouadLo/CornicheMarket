@@ -5,6 +5,8 @@ import { confirmMatch } from "../../src/lib/competitors/shops";
 import { showToast } from "../../src/lib/dialog/store";
 import { createProduct } from "../../src/lib/products/queries";
 
+import { resetOrigin, trackLocation } from "../../src/lib/nav/origin";
+
 import NewProduct from "../../app/(app)/products/new";
 
 let mockParams: Record<string, string> = {};
@@ -13,7 +15,10 @@ const mockBack = jest.fn();
 const mockNavigate = jest.fn();
 let mockFormProps: { initialName?: string; onSubmit: (input: object, tile: null) => Promise<void> };
 
+let mockStackIndex = 1;
 jest.mock("expo-router", () => ({
+  useNavigation: () => ({ getState: () => ({ index: mockStackIndex }) }),
+  usePathname: () => "/products/new",
   router: { back: () => mockBack(), navigate: (to: unknown) => mockNavigate(to) },
   useLocalSearchParams: () => mockParams,
   Redirect: ({ href }: { href: string }) => {
@@ -55,6 +60,8 @@ const render = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
+  mockStackIndex = 1;
+  resetOrigin();
   mockRole = "owner";
   jest.mocked(createProduct).mockResolvedValue("new-product");
   jest.mocked(confirmMatch).mockResolvedValue("link");
@@ -106,4 +113,42 @@ it("a cashier is sent back", async () => {
   mockRole = "cashier";
   await render();
   expect(tree.root.findAllByType("Redirect" as never)[0].props.href).toBe("/(app)/products");
+});
+
+it("opened from another section (alone in its stack): Créer le produit goes straight to À sourcer", async () => {
+  mockStackIndex = 0;
+  mockParams = { competitorItemId: "item-1", name: "X" };
+  await render();
+  await act(async () => {
+    await mockFormProps.onSubmit({}, null);
+  });
+  expect(mockBack).not.toHaveBeenCalled();
+  expect(mockNavigate).toHaveBeenCalledWith({
+    pathname: "/(app)/competitors",
+    params: { tab: "sourcing", r: expect.any(String) },
+  });
+});
+
+it("opened from another section: Save returns to where the owner came from", async () => {
+  mockStackIndex = 0;
+  trackLocation("/sell");
+  trackLocation("/products/new");
+  await render();
+  await act(async () => {
+    await mockFormProps.onSubmit({}, null);
+  });
+  expect(mockBack).not.toHaveBeenCalled();
+  expect(mockNavigate).toHaveBeenCalledWith("/sell");
+});
+
+it("opened from the products list: Save is a plain back, whatever the origin", async () => {
+  trackLocation("/sell");
+  trackLocation("/products");
+  trackLocation("/products/new");
+  await render();
+  await act(async () => {
+    await mockFormProps.onSubmit({}, null);
+  });
+  expect(mockBack).toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
 });
