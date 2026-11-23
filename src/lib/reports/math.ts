@@ -160,3 +160,16 @@ export function summaryAfterReturns(input: {
     returnsCents: input.refundedCents,
   };
 }
+
+// Divers' share of the period's revenue, a whole percent (integer arithmetic on
+// centimes, rounded half up). null when the period has no revenue to compare to.
+// Never below 0; may exceed 100 only if the headline revenue is smaller than
+// Divers' (cannot happen when both come from the same period, but never crash).
+export function diversSharePercent(
+  diversRevenueCents: number,
+  totalRevenueCents: number
+): number | null {
+  if (!(totalRevenueCents > 0)) return null;
+  const divers = Math.max(0, Math.trunc(diversRevenueCents));
+  return Math.floor((divers * 100 * 2 + totalRevenueCents) / (totalRevenueCents * 2));
+}

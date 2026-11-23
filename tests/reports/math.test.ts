@@ -2,6 +2,7 @@ import {
   allocateSaleDiscount,
   averageBasketCents,
   compareByMetricThenName,
+  diversSharePercent,
   flooredInventoryValueCents,
   grossMarginPercent,
   inventoryPotentialProfitCents,
@@ -368,5 +369,23 @@ describe("item returns (migration 046)", () => {
     });
     expect(summary.revenueCents).toBe(0);
     expect(summary.marginPercent).toBeNull();
+  });
+});
+
+describe("diversSharePercent", () => {
+  it("is a whole percent of the period's revenue, rounded half up", () => {
+    expect(diversSharePercent(1200, 10000)).toBe(12);
+    expect(diversSharePercent(1250, 10000)).toBe(13); // 12.5 -> 13
+    expect(diversSharePercent(1249, 10000)).toBe(12);
+    expect(diversSharePercent(10000, 10000)).toBe(100);
+    expect(diversSharePercent(0, 10000)).toBe(0);
+  });
+  it("is null when there is no revenue to compare to", () => {
+    expect(diversSharePercent(500, 0)).toBeNull();
+    expect(diversSharePercent(0, 0)).toBeNull();
+    expect(diversSharePercent(500, -100)).toBeNull();
+  });
+  it("never goes below 0 (a period with only returns)", () => {
+    expect(diversSharePercent(-300, 10000)).toBe(0);
   });
 });

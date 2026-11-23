@@ -16,12 +16,13 @@ import { memberSalesShare, type LoyaltyReport } from "@/src/lib/loyalty/report";
 import { centsToDisplay, formatMAD, formatMargin } from "@/src/lib/money";
 import { exportTablesAsCsv, exportTablesAsPdf } from "@/src/lib/reports/export";
 import { buildReportTables } from "@/src/lib/reports/exportTables";
-import { compareByMetricThenName } from "@/src/lib/reports/math";
+import { compareByMetricThenName, diversSharePercent } from "@/src/lib/reports/math";
 import {
   fetchByCategory,
   fetchByHour,
   fetchDailyTrend,
   fetchDeadStock,
+  fetchDiversReport,
   fetchInventoryValue,
   fetchProductPerformance,
   fetchStoreTimezone,
@@ -29,6 +30,7 @@ import {
   type CategoryRow,
   type DailyPoint,
   type DeadStockRow,
+  type DiversReport,
   type HourRow,
   type InventoryValue,
   type ProductPerformance,
@@ -77,6 +79,8 @@ export default function ReportsScreen() {
   const [inventory, setInventory] = useState<InventoryValue | null>(null);
   // null = not read (or it failed): the card is left out, the rest still shows.
   const [loyalty, setLoyalty] = useState<LoyaltyReport | null>(null);
+  // null = not read (or it failed): the card is left out, the rest still shows.
+  const [divers, setDivers] = useState<DiversReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The owner-configured store time zone, fetched once and reused for
@@ -121,6 +125,7 @@ export default function ReportsScreen() {
         dead,
         inventoryValue,
         loyaltyReport,
+        diversReport,
       ] = await Promise.all([
         fetchSummary(todayRange.from, todayRange.to),
         fetchSummary(range.from, range.to),
@@ -134,6 +139,9 @@ export default function ReportsScreen() {
         Promise.resolve()
           .then(() => fetchLoyaltyReport(range.from, range.to))
           .catch(() => null),
+        Promise.resolve()
+          .then(() => fetchDiversReport(range.from, range.to))
+          .catch(() => null),
       ]);
 
       setToday(todaySummary);
@@ -145,6 +153,7 @@ export default function ReportsScreen() {
       setDeadStock(dead);
       setInventory(inventoryValue);
       setLoyalty(loyaltyReport);
+      setDivers(diversReport);
       setShowAllDeadStock(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("reports.loadError"));
@@ -334,6 +343,34 @@ export default function ReportsScreen() {
               />
             </View>
           </Section>
+
+          {divers && (divers.lineCount > 0 || divers.revenueCents !== 0) ? (
+            <Section title={t("reports.diversTitle")}>
+              <View style={styles.metricGrid}>
+                <Metric label={t("reports.diversLines")} value={String(divers.lineCount)} />
+                <Metric
+                  label={t("reports.diversRevenue")}
+                  value={formatMAD(divers.revenueCents)}
+                  large
+                />
+                <Metric
+                  label={t("reports.diversProfit")}
+                  value={formatMAD(divers.profitCents)}
+                  large
+                  accent
+                />
+              </View>
+              {(() => {
+                const share = diversSharePercent(divers.revenueCents, summary.revenue_cents);
+                return share === null ? null : (
+                  <Text style={styles.empty}>
+                    {t("reports.diversShare", { percent: isolateLtr(`${share} %`) })}
+                  </Text>
+                );
+              })()}
+              <Text style={styles.empty}>{t("reports.diversHint")}</Text>
+            </Section>
+          ) : null}
 
           {singleDay ? (
             <Section title={t("reports.byHour")}>

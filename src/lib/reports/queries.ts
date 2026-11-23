@@ -61,6 +61,42 @@ export type InventoryValue = {
   oversold_value_cents: number;
 };
 
+// Divers (the free-amount item) on its own: its cost is ESTIMATED from the
+// margin set in Settings, so it is kept out of the per-product rankings and
+// shown here instead (migration 050). Net of discounts and of returns.
+export type DiversReport = {
+  lineCount: number;
+  returnedCount: number;
+  revenueCents: number;
+  costCents: number;
+  profitCents: number;
+};
+
+const EMPTY_DIVERS: DiversReport = {
+  lineCount: 0,
+  returnedCount: 0,
+  revenueCents: 0,
+  costCents: 0,
+  profitCents: 0,
+};
+
+// bigint columns can arrive as strings: coerce, and treat anything unreadable as 0.
+function count(value: unknown): number {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function parseDiversReport(row: Record<string, unknown> | null | undefined): DiversReport {
+  if (!row) return EMPTY_DIVERS;
+  return {
+    lineCount: count(row.line_count),
+    returnedCount: count(row.returned_count),
+    revenueCents: count(row.revenue_cents),
+    costCents: count(row.cost_cents),
+    profitCents: count(row.profit_cents),
+  };
+}
+
 async function callReport<T>(fn: string, params: Record<string, unknown>): Promise<T[]> {
   const { data, error } = await supabase.rpc(fn, params);
   if (error) throw new Error(error.message);
@@ -152,4 +188,12 @@ export async function fetchInventoryValue(): Promise<InventoryValue> {
       oversold_value_cents: 0,
     }
   );
+}
+
+export async function fetchDiversReport(from: Date, to: Date): Promise<DiversReport> {
+  const rows = await callReport<Record<string, unknown>>("report_divers", {
+    p_from: from.toISOString(),
+    p_to: to.toISOString(),
+  });
+  return parseDiversReport(rows[0]);
 }

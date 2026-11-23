@@ -1150,6 +1150,13 @@ const fr = {
     metricAvgBasket: "Panier moyen",
     metricLosses: "Pertes (ajustements)",
     metricReturns: "Retours",
+    diversTitle: "Divers (estimé)",
+    diversLines: "Lignes Divers",
+    diversRevenue: "Chiffre d'affaires Divers",
+    diversProfit: "Bénéfice estimé",
+    diversShare: "{{percent}} du chiffre d'affaires",
+    diversHint:
+      "Le coût des ventes Divers est estimé avec la marge réglée dans Réglages ; il n'entre pas dans le classement des produits.",
     metricAtCost: "Au coût",
     metricAtSellingPrice: "Au prix de vente",
     metricPotentialProfit: "Bénéfice potentiel",

@@ -1136,6 +1136,13 @@ const en: Translations = {
     metricAvgBasket: "Average basket",
     metricLosses: "Losses written off",
     metricReturns: "Returns",
+    diversTitle: "Divers (estimated)",
+    diversLines: "Divers lines",
+    diversRevenue: "Divers revenue",
+    diversProfit: "Estimated profit",
+    diversShare: "{{percent}} of revenue",
+    diversHint:
+      "The cost of Divers sales is estimated from the margin set in Settings; Divers is left out of the product rankings.",
     metricAtCost: "At cost",
     metricAtSellingPrice: "At selling price",
     metricPotentialProfit: "Profit if all sold",
