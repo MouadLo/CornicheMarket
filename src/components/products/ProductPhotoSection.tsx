@@ -26,6 +26,11 @@ type Props = {
   canEdit: boolean;
   // New product: the picked photo (null again when removed).
   onPendingChange?: (photo: PreparedPhoto | null) => void;
+  // New product created from À sourcer: the competitor's photo, shown as a
+  // preview (from their own URL, nothing stored yet). It is copied into our
+  // storage when the product is saved, unless the owner removes or replaces it.
+  suggestedUrl?: string | null;
+  onSuggestedRemoved?: () => void;
   // Edit: the stored photo changed.
   onSaved?: (path: string | null) => void;
 };
@@ -38,13 +43,19 @@ export function ProductPhotoSection({
   canEdit,
   onPendingChange,
   onSaved,
+  suggestedUrl,
+  onSuggestedRemoved,
 }: Props) {
   const { t } = useTranslation();
   const [path, setPath] = useState<string | null>(initialPath ?? null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
-  const hasPhoto = !!preview || !!path;
+  // The competitor's photo stays on screen until the owner picks or removes one.
+  const [suggestedGone, setSuggestedGone] = useState(false);
+  const [suggestedFailed, setSuggestedFailed] = useState(false);
+  const suggested = suggestedUrl && !suggestedGone && !suggestedFailed ? suggestedUrl : null;
+  const hasPhoto = !!preview || !!path || !!suggested;
 
   const pick = async (source: "camera" | "library") => {
     if (inFlight.current) return;
@@ -65,6 +76,10 @@ export function ProductPhotoSection({
         showToast({ text: t("products.photo.saved"), tone: "success" });
       } else {
         setPreview(picked.previewUri);
+        if (suggested) {
+          setSuggestedGone(true);
+          onSuggestedRemoved?.();
+        }
         onPendingChange?.(picked.prepared);
       }
     } catch {
@@ -94,6 +109,10 @@ export function ProductPhotoSection({
       }
       setPath(null);
       setPreview(null);
+      if (suggested) {
+        setSuggestedGone(true);
+        onSuggestedRemoved?.();
+      }
       onPendingChange?.(null);
     } catch {
       showToast({ text: t("products.photo.error"), tone: "info" });
@@ -113,6 +132,18 @@ export function ProductPhotoSection({
           accessibilityLabel={t("products.photo.title")}
           testID="product-photo-preview"
         />
+      ) : suggested ? (
+        <>
+          <Image
+            source={{ uri: suggested }}
+            style={styles.big}
+            resizeMode="cover"
+            accessibilityLabel={t("products.photo.title")}
+            onError={() => setSuggestedFailed(true)}
+            testID="product-photo-suggested"
+          />
+          <Text style={styles.hint}>{t("products.photo.fromCompetitor")}</Text>
+        </>
       ) : (
         <ProductPhoto
           path={path}

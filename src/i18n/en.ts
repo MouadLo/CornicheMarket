@@ -512,6 +512,7 @@ const en: Translations = {
       removed: "Photo removed",
       error: "Could not save the photo. Try again.",
       cameraDenied: "Camera access is denied. Allow it in settings or choose an image.",
+      fromCompetitor: "Competitor's photo: it will be copied to your product when you save.",
       attachFailed:
         "Product created, but the photo could not be added. You can add it by editing the product.",
     },

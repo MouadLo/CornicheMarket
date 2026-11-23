@@ -49,12 +49,30 @@ export default function NewProduct() {
   const pendingPhoto = useRef<PreparedPhoto | null>(null);
   // The photo step runs once, even if saving is retried after a later failure.
   const photoDone = useRef(false);
+  // From À sourcer: the competitor's photo, shown in the form right away and
+  // copied into our storage on save. Null when the item has none, or once the
+  // owner removed it or picked their own.
+  const [suggestedUrl, setSuggestedUrl] = useState<string | null>(null);
+  const suggestedKept = useRef(true);
 
   useEffect(() => {
     fetchCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);
+
+  useEffect(() => {
+    if (!competitorItemId) return;
+    let live = true;
+    fetchCompetitorItemImageUrl(competitorItemId)
+      .then((url) => {
+        if (live) setSuggestedUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [competitorItemId]);
 
   if (profile && profile.role !== "owner") {
     return <Redirect href="/(app)/products" />;
@@ -71,6 +89,10 @@ export default function NewProduct() {
           canEdit
           onPendingChange={(photo) => {
             pendingPhoto.current = photo;
+          }}
+          suggestedUrl={suggestedUrl}
+          onSuggestedRemoved={() => {
+            suggestedKept.current = false;
           }}
         />
       }
@@ -101,8 +123,9 @@ export default function NewProduct() {
           try {
             if (pendingPhoto.current) {
               await uploadProductPhoto(productId, pendingPhoto.current);
-            } else if (competitorItemId) {
-              const imageUrl = await fetchCompetitorItemImageUrl(competitorItemId);
+            } else if (competitorItemId && suggestedKept.current) {
+              const imageUrl =
+                suggestedUrl ?? (await fetchCompetitorItemImageUrl(competitorItemId));
               if (imageUrl) {
                 const result = await copyCompetitorPhoto(imageUrl, productId);
                 if (result !== "saved") throw new Error(result);

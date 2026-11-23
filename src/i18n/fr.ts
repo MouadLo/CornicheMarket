@@ -518,6 +518,7 @@ const fr = {
       error: "Impossible d'enregistrer la photo. Réessayez.",
       cameraDenied:
         "L'accès à l'appareil photo est refusé. Autorisez-le dans les réglages ou choisissez une image.",
+      fromCompetitor: "Photo du concurrent : elle sera copiée dans votre fiche à l'enregistrement.",
       attachFailed:
         "Produit créé, mais la photo n'a pas pu être ajoutée. Vous pourrez l'ajouter en modifiant le produit.",
     },

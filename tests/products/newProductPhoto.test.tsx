@@ -138,3 +138,37 @@ it("without a competitor item and without a picked photo, no photo work happens"
   expect(uploadProductPhoto).not.toHaveBeenCalled();
   expect(copyCompetitorPhoto).not.toHaveBeenCalled();
 });
+
+it("from À sourcer, the competitor's photo is passed to the form as a preview", async () => {
+  mockParams = { competitorItemId: "item-1", name: "X" };
+  await render();
+  const section = mockFormProps.header as React.ReactElement<{ suggestedUrl: string | null }>;
+  expect(section.props.suggestedUrl).toBe("https://shop/a.jpg");
+});
+
+it("without a competitor item there is no preview and no lookup", async () => {
+  await render();
+  const section = mockFormProps.header as React.ReactElement<{ suggestedUrl: string | null }>;
+  expect(section.props.suggestedUrl).toBeNull();
+  expect(fetchCompetitorItemImageUrl).not.toHaveBeenCalled();
+});
+
+it("if the owner removed the competitor's photo in the form, it is not copied on save", async () => {
+  mockParams = { competitorItemId: "item-1", name: "X" };
+  await render();
+  const section = mockFormProps.header as React.ReactElement<{ onSuggestedRemoved: () => void }>;
+  act(() => section.props.onSuggestedRemoved());
+  await submit();
+  expect(copyCompetitorPhoto).not.toHaveBeenCalled();
+  expect(uploadProductPhoto).not.toHaveBeenCalled();
+  expect(mockBack).toHaveBeenCalled();
+});
+
+it("the previewed photo is the one copied on save (no second lookup)", async () => {
+  mockParams = { competitorItemId: "item-1", name: "X" };
+  await render();
+  expect(fetchCompetitorItemImageUrl).toHaveBeenCalledTimes(1);
+  await submit();
+  expect(fetchCompetitorItemImageUrl).toHaveBeenCalledTimes(1);
+  expect(copyCompetitorPhoto).toHaveBeenCalledWith("https://shop/a.jpg", "new-product");
+});
