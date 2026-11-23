@@ -1,63 +1,127 @@
-name: Deploy web
+name: Deploy to the test app (staging)
 
-# Only runs after the CI workflow passes on main — never deploys broken code.
+# After CI passes on main, the merged commit goes to the TEST app only:
+#   1. database migrations on the staging Supabase project,
+#   2. the Expo web build, pointed at that project, on the corniche-staging
+#      Vercel project (https://corniche-staging.vercel.app).
+# Production is never touched here: it is shipped by hand ("ship") from a
+# commit that was tested on staging. Both jobs refuse to run if they are
+# pointed at a production project.
 on:
   workflow_run:
     workflows: [CI]
     branches: [main]
     types: [completed]
+  # Re-deploy the current main to staging by hand (Actions -> Run workflow).
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# One staging deploy at a time; a newer merge waits for the running one.
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+env:
+  # Production identifiers, only used to refuse a misconfigured run.
+  PRODUCTION_SUPABASE_REF: oqbmmpvsiykburfseowv
+  PRODUCTION_VERCEL_PROJECT_ID: prj_rtjm46V1N9XMvTpL5QMMmCaB0Sg5
 
 jobs:
   # ── 1. Apply database migrations to the staging project ──────────────────
   migrate-staging:
     name: Staging DB migrations
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      STAGING_REF: ${{ vars.SUPABASE_STAGING_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # Check out the exact commit that passed CI, not just HEAD of main.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # The exact commit that passed CI (or main for a manual run).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
+
+      - name: Refuse anything but the staging project
+        run: |
+          if [ -z "$STAGING_REF" ] || [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_STAGING_PROJECT_REF (variable) or SUPABASE_ACCESS_TOKEN (secret) is missing in the staging environment."
+            exit 1
+          fi
+          if [ "$STAGING_REF" = "$PRODUCTION_SUPABASE_REF" ]; then
+            echo "::error::The staging project ref is the PRODUCTION project. Refusing to push migrations."
+            exit 1
+          fi
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
 
-      - name: Link staging project
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+      - name: Link the staging project
+        run: supabase link --project-ref "$STAGING_REF"
+
+      - name: Check the link really is staging
+        run: |
+          linked=$(cat supabase/.temp/project-ref)
+          if [ "$linked" != "$STAGING_REF" ] || [ "$linked" = "$PRODUCTION_SUPABASE_REF" ]; then
+            echo "::error::Linked to '$linked', expected the staging project. Refusing."
+            exit 1
+          fi
+
+      - name: Show pending migrations
+        run: supabase db push --linked --dry-run
 
       - name: Apply pending migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase db push --password "${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}"
+        run: supabase db push --linked --yes
 
-  # ── 2. Build Expo web and deploy to Vercel ───────────────────────────────
+  # ── 2. Build Expo web and deploy it to the staging Vercel project ────────
   deploy:
-    name: Build web → Vercel
+    name: Build web → corniche-staging
     needs: migrate-staging
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: staging
+    environment:
+      name: staging
+      url: https://corniche-staging.vercel.app
     env:
       CI: "1"
       EXPO_NO_DOTENV: "1"
-      # Use the staging Supabase project's URL and anon key so the web app
-      # talks to staging, not production.
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      # The staging project's public URL and publishable key (not secrets:
+      # they are in every page the site serves).
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      STAGING_REF: ${{ vars.SUPABASE_STAGING_PROJECT_REF }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
+
+      - name: Refuse anything but staging
+        run: |
+          for v in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!v}" ]; then echo "::error::$v is missing in the staging environment."; exit 1; fi
+          done
+          if [ "$VERCEL_PROJECT_ID" = "$PRODUCTION_VERCEL_PROJECT_ID" ]; then
+            echo "::error::VERCEL_PROJECT_ID is the PRODUCTION site. Refusing to deploy."
+            exit 1
+          fi
+          case "$EXPO_PUBLIC_SUPABASE_URL" in
+            *"$PRODUCTION_SUPABASE_REF"*)
+              echo "::error::EXPO_PUBLIC_SUPABASE_URL points at the PRODUCTION database. Refusing."
+              exit 1 ;;
+            *"$STAGING_REF"*) ;;
+            *)
+              echo "::error::EXPO_PUBLIC_SUPABASE_URL does not point at the staging project."
+              exit 1 ;;
+          esac
 
       - uses: actions/setup-node@v4
         with:
@@ -70,12 +134,45 @@ jobs:
       - name: Build Expo web
         run: npx expo export --platform web
 
-      # The vercel CLI reads VERCEL_ORG_ID and VERCEL_PROJECT_ID from the
-      # environment. --prod creates a production deployment (not a preview).
-      # --yes skips interactive prompts.
-      - name: Deploy to Vercel
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel dist --prod --yes --token="$VERCEL_TOKEN"
+      # Vercel never serves a folder named node_modules, and the fonts live in
+      # dist/assets/node_modules: rename it and rewrite the paths that point at it.
+      - name: Move bundled assets out of node_modules
+        run: |
+          if [ -d dist/assets/node_modules ]; then
+            mv dist/assets/node_modules dist/assets/vendor
+            grep -rl "assets/node_modules" dist | while read -r f; do
+              sed -i 's#assets/node_modules#assets/vendor#g' "$f"
+            done
+          fi
+          if grep -rq "assets/node_modules" dist; then
+            echo "::error::Some files still point at assets/node_modules."
+            exit 1
+          fi
+
+      - name: Check the build talks to staging only
+        run: |
+          grep -rq "$STAGING_REF" dist/_expo || { echo "::error::The build does not contain the staging project."; exit 1; }
+          if grep -rq "$PRODUCTION_SUPABASE_REF" dist; then
+            echo "::error::The build contains the PRODUCTION project. Refusing."
+            exit 1
+          fi
+
+      # The page-routing rules (every path serves index.html).
+      - name: Prepare the deploy folder
+        run: |
+          printf '{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }\n' > dist/vercel.json
+          printf '.env*\n.vercel\n' > dist/.vercelignore
+
+      # --prod makes it the live version of the corniche-staging project (its
+      # own address), never the production shop site, which is refused above.
+      - name: Deploy to corniche-staging
+        working-directory: dist
+        run: npx --yes vercel@66.6.0 deploy --prod --yes --token="$VERCEL_TOKEN"
+
+      - name: Check the test app answers
+        run: |
+          for p in / /sell /sell/print-station; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://corniche-staging.vercel.app$p")
+            echo "$p $code"
+            [ "$code" = "200" ] || exit 1
+          done
