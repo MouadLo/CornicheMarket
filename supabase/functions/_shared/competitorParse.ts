@@ -548,3 +548,288 @@ export function readingChanged(previous: StoredPoint | null, reading: Reading): 
     previous.in_stock !== reading.inStock
   );
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2: a whole WooCommerce shop (sync-competitor-shop)
+// ---------------------------------------------------------------------------
+
+export const STORE_API_PATH = "/wp-json/wc/store/v1/products";
+export const CATALOG_PER_PAGE = 100;
+// Safety net: 100 pages x 100 = 10 000 items; a bigger shop is read in part.
+export const CATALOG_MAX_PAGES = 100;
+// A new read of a shop may start once an hour, not more.
+export const SHOP_MIN_READ_GAP_MS = 60 * 60 * 1000;
+// A shop read completely less than 6 days ago is not due for the weekly job.
+export const SHOP_WEEKLY_GAP_MS = 6 * 24 * 60 * 60 * 1000;
+
+// The owner types "yournightshop.ma" or a full link: only the origin is kept.
+// https only; no IP address, no localhost, no credentials, no custom port.
+export function normalizeShopUrl(
+  raw: string
+): { ok: true; origin: string; host: string } | { ok: false; reason: "invalid_url" | "not_https" | "private_host" } {
+  const text = raw.trim();
+  if (!text) return { ok: false, reason: "invalid_url" };
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return { ok: false, reason: "invalid_url" };
+  }
+  if (url.protocol !== "https:") return { ok: false, reason: "not_https" };
+  if (url.username || url.password || url.port) return { ok: false, reason: "invalid_url" };
+  const host = url.hostname.toLowerCase();
+  if (!host.includes(".") || host.endsWith(".")) return { ok: false, reason: "private_host" };
+  if (isPrivateHost(host)) return { ok: false, reason: "private_host" };
+  return { ok: true, origin: `https://${host}`, host };
+}
+
+// Literal IPs (v4, v6), localhost and internal names: never fetched.
+export function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h.includes(":")) return true; // IPv6 literal
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return true; // IPv4 literal
+  if (/^\d+$/.test(h) || /^0x[0-9a-f]+$/i.test(h)) return true; // numeric forms of an IPv4
+  return (
+    h === "localhost" ||
+    h.endsWith(".localhost") ||
+    h.endsWith(".local") ||
+    h.endsWith(".internal") ||
+    h.endsWith(".lan") ||
+    h.endsWith(".home") ||
+    !h.includes(".")
+  );
+}
+
+export function catalogPageUrl(origin: string, page: number): string {
+  return `${origin}${STORE_API_PATH}?per_page=${CATALOG_PER_PAGE}&page=${page}&orderby=popularity&order=desc`;
+}
+
+// Position of an item in the shop's "most popular first" order.
+export function popularityRank(page: number, index: number): number {
+  return (page - 1) * CATALOG_PER_PAGE + index + 1;
+}
+
+// Our agent's group (or `*`) and the generic `*` group must both allow the path.
+// `other-bot` matches no named group, so it is judged by the `*` group alone.
+export function robotsAllowsCatalog(robotsTxt: string, path: string): boolean {
+  return robotsAllows(robotsTxt, path) && robotsAllows(robotsTxt, path, "other-bot");
+}
+
+export type CatalogItem = {
+  external_id: string;
+  name: string;
+  url: string;
+  price_cents: number | null;
+  regular_price_cents: number | null;
+  on_sale: boolean;
+  in_stock: boolean;
+  low_stock_remaining: number | null;
+  image_url: string | null;
+  categories: string[];
+  popularity_rank: number;
+};
+
+export type CatalogPage =
+  | { ok: true; items: CatalogItem[]; skipped: number }
+  | { ok: false; detail: "not_woocommerce" | "currency_not_mad" };
+
+const plainText = (value: unknown, max: number): string | null => {
+  if (typeof value !== "string") return null;
+  // Names can carry markup and doubly encoded entities (&amp;#8211;).
+  const once = decodeEntities(value);
+  const text = decodeEntities(once).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, max) : null;
+};
+
+// One page of /wp-json/wc/store/v1/products. Only facts are kept (no
+// description). Prices are integers in the currency's minor unit.
+export function parseCatalogPage(json: unknown, page: number): CatalogPage {
+  if (!Array.isArray(json)) return { ok: false, detail: "not_woocommerce" };
+  const items: CatalogItem[] = [];
+  let skipped = 0;
+  let sawNonMad = false;
+  let sawMad = false;
+  json.forEach((raw, index) => {
+    if (!raw || typeof raw !== "object") {
+      skipped++;
+      return;
+    }
+    const p = raw as Record<string, unknown>;
+    const id = typeof p.id === "number" || typeof p.id === "string" ? String(p.id) : "";
+    const name = plainText(p.name, 300);
+    const link = typeof p.permalink === "string" ? parseHttpsUrl(p.permalink) : null;
+    if (!id || !name || !link || link.toString().length > 2000) {
+      skipped++;
+      return;
+    }
+    const prices = (p.prices && typeof p.prices === "object" ? p.prices : {}) as Record<string, unknown>;
+    if (prices.currency_code !== undefined && !isMad(prices.currency_code)) {
+      sawNonMad = true;
+      skipped++;
+      return;
+    }
+    if (isMad(prices.currency_code)) sawMad = true;
+    const unit = prices.currency_minor_unit ?? 2;
+    const price = minorUnitsToCents(prices.price, unit);
+    let regular = minorUnitsToCents(prices.regular_price, unit);
+    if (regular === null) regular = price;
+    const sale = minorUnitsToCents(prices.sale_price, unit);
+    const onSale =
+      price !== null && regular !== null && price < regular && (sale !== null || p.on_sale === true);
+    const stock = p.low_stock_remaining;
+    const image = Array.isArray(p.images) && p.images.length > 0 ? cleanImage(p.images[0]) : null;
+    const categories: string[] = [];
+    if (Array.isArray(p.categories)) {
+      for (const c of p.categories) {
+        const label = plainText((c as { name?: unknown } | null)?.name, 80);
+        if (label && !categories.includes(label)) categories.push(label);
+        if (categories.length >= 10) break;
+      }
+    }
+    items.push({
+      external_id: id.slice(0, 100),
+      name,
+      url: link.toString(),
+      price_cents: price,
+      regular_price_cents: regular,
+      on_sale: onSale,
+      in_stock: p.is_in_stock !== false,
+      low_stock_remaining:
+        typeof stock === "number" && Number.isInteger(stock) && stock >= 0 ? stock : null,
+      image_url: image,
+      categories,
+      popularity_rank: popularityRank(page, index),
+    });
+  });
+  if (items.length === 0 && sawNonMad && !sawMad) return { ok: false, detail: "currency_not_mad" };
+  return { ok: true, items, skipped };
+}
+
+// X-WP-TotalPages / X-WP-Total, as the headers carry them.
+export function readTotals(headers: { get(name: string): string | null }): {
+  totalPages: number | null;
+  totalItems: number | null;
+} {
+  const num = (name: string) => {
+    const raw = headers.get(name);
+    return raw !== null && /^\d{1,7}$/.test(raw.trim()) ? Number(raw.trim()) : null;
+  };
+  return { totalPages: num("x-wp-totalpages"), totalItems: num("x-wp-total") };
+}
+
+// ---- reading in steps (resume across invocations) ----
+
+// After page `page` was stored: is the read finished, and which page is next?
+// The last page is known from X-WP-TotalPages; without it, a short or empty
+// page ends the read. CATALOG_MAX_PAGES bounds a shop that never ends.
+export function afterPage(input: {
+  page: number;
+  itemCount: number;
+  totalPages: number | null;
+}): { done: true } | { done: false; nextPage: number } {
+  const { page, itemCount, totalPages } = input;
+  if (itemCount === 0) return { done: true };
+  if (totalPages !== null ? page >= totalPages : itemCount < CATALOG_PER_PAGE) return { done: true };
+  if (page >= CATALOG_MAX_PAGES) return { done: true };
+  return { done: false, nextPage: page + 1 };
+}
+
+export type ShopReadState = {
+  status: string;
+  next_page: number | null;
+  last_sync_started_at: string | null;
+  last_sync_completed_at: string | null;
+};
+
+// The weekly job: a read in progress is continued; a refused shop is left alone
+// (only the owner's button retries it); otherwise a shop not read completely in
+// the last 6 days is due.
+export function shopIsDue(shop: ShopReadState, now: number): boolean {
+  if (shop.status === "refused") return false;
+  if (shop.next_page !== null) return true;
+  if (!shop.last_sync_completed_at) return true;
+  return now - Date.parse(shop.last_sync_completed_at) >= SHOP_WEEKLY_GAP_MS;
+}
+
+// The owner's "Lire maintenant": continuing a read is always allowed; a NEW read
+// at most once an hour (counted from when the last one began).
+export function ownerReadAllowed(
+  shop: ShopReadState,
+  now: number
+): { ok: true; resume: boolean } | { ok: false; retryAfterSeconds: number } {
+  if (shop.next_page !== null && shop.status !== "refused") return { ok: true, resume: true };
+  if (shop.last_sync_started_at) {
+    const wait = SHOP_MIN_READ_GAP_MS - (now - Date.parse(shop.last_sync_started_at));
+    // A refusal the owner retries on purpose is allowed after the hour too.
+    if (wait > 0) return { ok: false, retryAfterSeconds: Math.ceil(wait / 1000) };
+  }
+  return { ok: true, resume: false };
+}
+
+// What a Store API answer means. A JSON array is trusted as it is (a product
+// called "Access denied" must not look like a bot challenge); anything else is
+// checked for a refusal first. 401/403/429/451 and challenges are refusals and
+// are never retried or worked around; 404/410 or a non-JSON 200 means the shop
+// has no public Store API.
+export function classifyCatalogResponse(
+  status: number,
+  body: string
+):
+  | { kind: "ok"; json: unknown[] }
+  | { kind: "refused"; detail: string }
+  | { kind: "not_woocommerce" }
+  | { kind: "error"; detail: string } {
+  if (status >= 200 && status < 300) {
+    try {
+      const json = JSON.parse(body);
+      if (Array.isArray(json)) return { kind: "ok", json };
+    } catch {
+      // not JSON: fall through
+    }
+    return looksLikeBotChallenge(body)
+      ? { kind: "refused", detail: "bot_challenge" }
+      : { kind: "not_woocommerce" };
+  }
+  const verdict = classifyHttp(status, body);
+  if (verdict.kind === "refused") return verdict;
+  if (status === 404 || status === 410) return { kind: "not_woocommerce" };
+  return { kind: "error", detail: verdict.kind === "error" ? verdict.detail : `http_${status}` };
+}
+
+// ---------------------------------------------------------------------------
+// Competitor photos (competitor-image)
+// ---------------------------------------------------------------------------
+
+const IMAGE_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+// Only these raster types are returned (not SVG, which can carry scripts).
+export function isAllowedImageType(contentType: string): boolean {
+  return Object.prototype.hasOwnProperty.call(IMAGE_TYPES, contentType.toLowerCase());
+}
+
+export function imageExtension(contentType: string): string {
+  return IMAGE_TYPES[contentType.toLowerCase()] ?? "jpg";
+}
+
+// What a failed page does to the shop row. A refusal (robots, 401/403/429/451, a
+// bot challenge) ends the read: the shop is `refused`, nothing is kept to resume,
+// the weekly job skips it and only the owner's button tries again. Any other
+// failure keeps the page, so the next call continues there.
+export function shopStateAfterFailure(
+  kind: "refused" | "error" | "not_woocommerce" | "currency_not_mad",
+  detail: string,
+  page: number
+): { status: "refused" | "error"; status_detail: string; next_page: number | null } {
+  const detailText = (detail || kind).slice(0, 300);
+  return kind === "refused"
+    ? { status: "refused", status_detail: detailText, next_page: null }
+    : { status: "error", status_detail: detailText, next_page: page };
+}

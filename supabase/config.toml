@@ -393,3 +393,12 @@ verify_jwt = false
 # role checked in the function) or, for the daily job, the x-cron-secret header.
 [functions.check-competitor-prices]
 verify_jwt = false
+
+# sync-competitor-shop and competitor-image handle their own auth: the owner's
+# session token (owner role checked in the function) or, for the weekly job of
+# sync-competitor-shop, the x-cron-secret header.
+[functions.sync-competitor-shop]
+verify_jwt = false
+
+[functions.competitor-image]
+verify_jwt = false
