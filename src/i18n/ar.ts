@@ -1354,6 +1354,7 @@ const ar: Translations = {
       belowCost: "ثمنهم أقل من تكلفتك. تحدث مع المورد.",
       atFloor: "هو بالفعل أدنى ثمن يحافظ على هامشك الأدنى.",
       moneyTitle: "مال متروك · +{{gain}} / شهر",
+      moneyTitlePlain: "مال متروك",
       moneyEmpty: "لا يوجد منتج أرخص من المنافس يمكن رفع ثمنه.",
       moneyRow: "{{ours}} ← {{target}} ({{shop}} {{theirs}})",
       sold30d: "المبيعات في 30 يوما: {{qty}}",

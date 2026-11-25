@@ -175,6 +175,9 @@ it("shows an empty state in each section when there is nothing to do", async () 
   const shown = texts();
   expect(shown).toContain("competitors.opp.alertsEmpty");
   expect(shown).toContain("competitors.opp.moneyEmpty");
+  // No gain: a plain heading, not "+0.00 DH / month".
+  expect(shown).toContain("competitors.opp.moneyTitlePlain");
+  expect(shown).not.toContain("competitors.opp.moneyTitle{");
   expect(shown).toContain("competitors.opp.suggestEmpty");
 });
 
