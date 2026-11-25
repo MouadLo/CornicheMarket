@@ -39,12 +39,16 @@ begin
   perform pg_temp.expect('bucket limit', (select file_size_limit::text from storage.buckets where id = 'webstore-images'), '2097152');
   perform pg_temp.expect('bucket mime', (select allowed_mime_types::text from storage.buckets where id = 'webstore-images'),
     '{image/jpeg,image/png,image/webp}');
-  perform pg_temp.expect('three bucket policies', (select count(*)::text from pg_policies
+  perform pg_temp.expect('four bucket policies', (select count(*)::text from pg_policies
     where schemaname = 'storage' and tablename = 'objects' and policyname in (
-      'owner uploads webstore images', 'owner replaces webstore images', 'owner deletes webstore images')), '3');
-  perform pg_temp.expect('no anon or select policy on the bucket', (select count(*)::text from pg_policies
+      'owner reads webstore images', 'owner uploads webstore images',
+      'owner replaces webstore images', 'owner deletes webstore images')), '4');
+  perform pg_temp.expect('no anon policy on the bucket', (select count(*)::text from pg_policies
     where schemaname = 'storage' and tablename = 'objects' and policyname like '%webstore images%'
-      and (cmd = 'SELECT' or 'anon' = any (roles))), '0');
+      and 'anon' = any (roles)), '0');
+  perform pg_temp.expect('the only select policy is the owner one', (select string_agg(policyname, ',') from pg_policies
+    where schemaname = 'storage' and tablename = 'objects' and policyname like '%webstore images%'
+      and cmd = 'SELECT'), 'owner reads webstore images');
 
   ---------------------------------------------------------------- owner: columns and checks
   perform pg_temp.as_user(owner_id);
@@ -124,6 +128,7 @@ begin
   update public.web_products set image_source = 'url', image_path = null;
   get diagnostics v_n = row_count;
   perform pg_temp.expect('cashier update touches nothing', v_n::text, '0');
+  perform pg_temp.expect('cashier sees no objects', (select count(*)::text from storage.objects where bucket_id = 'webstore-images'), '0');
   perform pg_temp.expect('cashier cannot insert object',
     pg_temp.sqlstate_of($f$insert into storage.objects (bucket_id, name) values ('webstore-images', 'p001/1700000000004.jpg')$f$), '42501');
   delete from storage.objects where bucket_id = 'webstore-images';

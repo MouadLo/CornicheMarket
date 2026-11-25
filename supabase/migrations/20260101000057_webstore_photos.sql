@@ -5,8 +5,10 @@
 -- is never modified: using it for the site copies the file into this bucket.
 --
 -- The bucket is public on purpose: the site's visitors load the pictures without
--- signing in. Only the owner may write. Public buckets serve reads without a
--- select policy, so none is added (and nothing for anon).
+-- signing in: public buckets serve reads without any policy. Only the owner may
+-- write. The owner also needs a select policy: Storage looks an object up before it
+-- replaces, deletes or copies it (without it those calls fail with "not found").
+-- Nothing for anon.
 
 -------------------------------------------------------------------------------
 -- 1. Columns
@@ -27,6 +29,10 @@ values ('webstore-images', 'webstore-images', true, 2097152,
         array['image/jpeg', 'image/png', 'image/webp']);
 
 -- Object path convention: <web product id>/<timestamp>.jpg
+create policy "owner reads webstore images" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'webstore-images' and (select public.is_owner()));
+
 create policy "owner uploads webstore images" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'webstore-images' and (select public.is_owner()));
