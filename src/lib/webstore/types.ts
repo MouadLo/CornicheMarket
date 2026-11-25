@@ -11,7 +11,12 @@ export type LinkedAppProduct = {
   stock_quantity: number;
   active: boolean;
   kind: string;
+  // The app's own photo (private bucket). Never changed from the webstore.
+  photo_path?: string | null;
 };
+
+// Which picture the site shows: the image link, or the file uploaded for it.
+export type ImageSource = "url" | "file";
 
 export type WebProduct = {
   id: string;
@@ -24,6 +29,9 @@ export type WebProduct = {
   popular: boolean;
   keywords: string | null;
   image_url: string | null;
+  // The file uploaded for the site (bucket 'webstore-images', migration 057).
+  image_path: string | null;
+  image_source: ImageSource;
   // Typed price. Only used while the row is not linked.
   price_cents: number | null;
   stock_mode: StockMode;

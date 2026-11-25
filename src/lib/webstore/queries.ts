@@ -18,10 +18,10 @@ import type {
 
 const PAGE = 1000;
 
-const APP_COLUMNS = "id, name, selling_price_cents, stock_quantity, active, kind";
+const APP_COLUMNS = "id, name, selling_price_cents, stock_quantity, active, kind, photo_path";
 
 const WEB_COLUMNS =
-  "id, product_id, name, name_fr, size, category_id, sub_code, popular, keywords, image_url, price_cents, stock_mode, manual_in_stock, published, sort";
+  "id, product_id, name, name_fr, size, category_id, sub_code, popular, keywords, image_url, image_path, image_source, price_cents, stock_mode, manual_in_stock, published, sort";
 
 type WebRow = Omit<WebProduct, "app"> & {
   product: LinkedAppProduct | LinkedAppProduct[] | null;

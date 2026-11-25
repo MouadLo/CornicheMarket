@@ -1,6 +1,6 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
@@ -13,7 +13,7 @@ import { Segmented } from "@/src/components/ui/Segmented";
 import { ChoiceChips } from "@/src/components/webstore/ChoiceChips";
 import { LinkSection } from "@/src/components/webstore/LinkSection";
 import { SwitchRow } from "@/src/components/webstore/SwitchRow";
-import { WebImage } from "@/src/components/webstore/WebImage";
+import { WebPhotoSection } from "@/src/components/webstore/WebPhotoSection";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { showToast } from "@/src/lib/dialog/store";
@@ -96,7 +96,6 @@ export default function WebstoreProductEdit() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [imageFailed, setImageFailed] = useState(false);
 
   const product = useMemo(() => all?.find((p) => p.id === id) ?? null, [all, id]);
 
@@ -172,7 +171,6 @@ export default function WebstoreProductEdit() {
     setValues((v) => (v ? { ...v, [key]: value } : v));
     const field = FIELD_OF[key];
     if (field) setErrors((e) => ({ ...e, [field]: undefined }));
-    if (key === "imageUrl") setImageFailed(false);
   };
   const category = categories.find((c) => c.id === values.categoryId);
   const imageUrl = values.imageUrl.trim();
@@ -317,6 +315,14 @@ export default function WebstoreProductEdit() {
         {err("stock") ? <Text style={styles.error}>{err("stock")}</Text> : null}
       </Card>
 
+      <WebPhotoSection
+        product={product}
+        appPhotoPath={product.app?.photo_path ?? null}
+        onChange={(patch) =>
+          setAll((list) => list && list.map((p) => (p.id === product.id ? { ...p, ...patch } : p)))
+        }
+      />
+
       <Card title={t("webstore.sheetTitle")} style={styles.card}>
         <Field
           label={t("webstore.fName")}
@@ -381,12 +387,6 @@ export default function WebstoreProductEdit() {
             (imageUrl !== "" && !isValidImageUrl(imageUrl) ? t("webstore.errImageUrl") : undefined)
           }
         />
-        {imageUrl !== "" && isValidImageUrl(imageUrl) ? (
-          <View style={styles.preview}>
-            <WebImage uri={imageUrl} size={96} onFail={() => setImageFailed(true)} />
-            {imageFailed ? <Text style={styles.error}>{t("webstore.imageFail")}</Text> : null}
-          </View>
-        ) : null}
         <SwitchRow
           label={t("webstore.publishedLabel")}
           value={product.published}
@@ -420,5 +420,4 @@ const styles = StyleSheet.create({
   hint: { fontSize: 14, color: colors.ink600, lineHeight: 20 },
   muted: { fontSize: 13, color: colors.ink600 },
   error: { fontSize: 14, color: colors.danger700 },
-  preview: { gap: 6, alignItems: "flex-start" },
 });
