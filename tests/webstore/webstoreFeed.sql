@@ -150,6 +150,11 @@ begin
   ---------------------------------------------------------------- feed content
   v_feed := public.webstore_feed();
   perform pg_temp.expect('version in feed', v_feed ->> 'version', (select version::text from public.webstore_state));
+  -- Supabase's API refuses an UPDATE without WHERE (pg_safeupdate), which CI as postgres
+  -- does not enforce: pin it in the trigger's source so it cannot come back.
+  perform pg_temp.expect('version bump has a WHERE clause',
+    (pg_get_functiondef('public.webstore_bump_version()'::regprocedure)
+       ~* 'webstore_state set version = version \+ 1 where')::text, 'true');
   perform pg_temp.expect('generated_at format',
     (v_feed ->> 'generated_at' ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')::text, 'true');
   perform pg_temp.expect('category order and unused ones dropped',
