@@ -84,3 +84,20 @@ export type NewWebProduct = {
 
 // A candidate for linking: an app product the owner may link to.
 export type LinkCandidate = LinkedAppProduct;
+
+// A kit (web_kits) and its lines (web_kit_items). `web_product_id` has no
+// foreign key: it may name a product that no longer exists.
+export type WebKitItem = { web_product_id: string; qty: number; sort: number };
+
+export type WebKit = {
+  id: string;
+  name: string;
+  name_fr: string | null;
+  published: boolean;
+  sort: number;
+  items: WebKitItem[];
+};
+
+export type WebKitPatch = Partial<Pick<WebKit, "name" | "name_fr" | "published">>;
+
+export type NewWebKit = { id: string; name: string; name_fr: string | null; published: boolean };
