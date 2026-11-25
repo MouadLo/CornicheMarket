@@ -183,6 +183,29 @@ For a one-shop, one-phone deployment this is quick to verify by hand (check the 
 
 ---
 
+## Webstore import
+
+One-off (and re-runnable) copy of the owner's Google Sheet feed into the `web_*` tables. The scripts never connect to a database; you apply the SQL yourself.
+
+```bash
+# 1. Save the sheet's JSON feed to a file, then generate the SQL (validates first, refuses to write on errors)
+node scripts/webstore-import.ts sql --sheet feed.json --out import.sql
+
+# 2. Apply it from a worktree linked to the right project: staging first
+supabase db query --linked -f import.sql
+
+# 3. Optional: suggest which app product each web product is
+supabase db query --linked "select id, name, selling_price_cents, active, kind from products" > products.json
+node scripts/webstore-import.ts report --sheet feed.json --products products.json --out report.csv
+```
+
+- Imported products are all published, `manual` stock, `product_id` null, price from the sheet. Linking to app products is done later in the app. App prices are never changed.
+- Re-running is safe: sheet fields are refreshed, but `product_id`, `stock_mode` and `published` of an existing row are never overwritten, rows not in the sheet are left alone, and each imported kit gets its items replaced.
+- Run on production only when the owner says to ship. `report.csv` is UTF-8 with a BOM (opens in Excel and Numbers with accents).
+- The scripts run with plain Node (type stripping), hence the `.ts` extensions in the imports of `src/lib/webstore/` and `allowImportingTsExtensions` in `tsconfig.json`. Node prints a harmless "module type not specified" warning.
+
+---
+
 ## GitHub Secrets reference
 
 Set these in **GitHub → Settings → Secrets and variables → Actions**.
