@@ -122,9 +122,21 @@ describe("priceCheckAlerts", () => {
   it("sorts by gap percent of their price, biggest first", () => {
     const rows = [
       // 1.00 on 10.00 = 10 %
-      row({ product_id: "a", product_name: "A", link_id: "la", price_check: true, selling_price_cents: 1100 }),
+      row({
+        product_id: "a",
+        product_name: "A",
+        link_id: "la",
+        price_check: true,
+        selling_price_cents: 1100,
+      }),
       // 3.00 on 10.00 = 30 %
-      row({ product_id: "b", product_name: "B", link_id: "lb", price_check: true, selling_price_cents: 1300 }),
+      row({
+        product_id: "b",
+        product_name: "B",
+        link_id: "lb",
+        price_check: true,
+        selling_price_cents: 1300,
+      }),
       // 2.00 on 5.00 = 40 % although the gap in cents is smaller than the first two sum
       row({
         product_id: "c",
@@ -252,7 +264,13 @@ describe("moneyOnTheTable", () => {
       // 1.50 x 10 = 15.00
       cheap({ product_id: "a", product_name: "A", link_id: "la", sold_30d: 10 }),
       // 0.50 (ours 9.00) x 100 = 50.00
-      cheap({ product_id: "b", product_name: "B", link_id: "lb", selling_price_cents: 900, sold_30d: 100 }),
+      cheap({
+        product_id: "b",
+        product_name: "B",
+        link_id: "lb",
+        selling_price_cents: 900,
+        sold_30d: 100,
+      }),
       // 1.50 x 30 = 45.00
       cheap({ product_id: "c", product_name: "C", link_id: "lc", sold_30d: 30 }),
     ];
