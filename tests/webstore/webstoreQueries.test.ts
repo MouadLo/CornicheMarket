@@ -21,6 +21,8 @@ import {
 
 type Call = { table: string; op: string; payload?: unknown; filters: string[] };
 const mockCalls: Call[] = [];
+const mockRpcs: { fn: string; args: unknown }[] = [];
+let mockRpcError: { message: string } | null = null;
 let mockResult: (call: Call) => {
   data?: unknown;
   error?: unknown;
@@ -34,6 +36,10 @@ let mockResult: (call: Call) => {
 // and resolves (when awaited) to whatever mockResult says.
 jest.mock("../../src/lib/supabase/client", () => ({
   supabase: {
+    rpc: async (fn: string, args: unknown) => {
+      mockRpcs.push({ fn, args });
+      return { data: null, error: mockRpcError };
+    },
     from: (table: string) => {
       const call: Call = { table, op: "select", filters: [] };
       const builder: Record<string, unknown> = {};
@@ -71,6 +77,8 @@ jest.mock("../../src/lib/supabase/client", () => ({
 
 beforeEach(() => {
   mockCalls.length = 0;
+  mockRpcs.length = 0;
+  mockRpcError = null;
   mockResult = () => ({ data: [], error: null });
 });
 
@@ -80,9 +88,8 @@ describe("every UPDATE and DELETE has a filter", () => {
   it("kits", async () => {
     await updateKit("kit_a", { name: "x" });
     await setKitPublished("kit_a", false);
-    await saveKitItems("kit_a", [{ web_product_id: "p001", qty: 1 }]);
     await deleteKit("kit_a");
-    expect(writes().length).toBe(4);
+    expect(writes().length).toBe(3);
     for (const w of writes()) expect(w.filters.length).toBeGreaterThan(0);
   });
 
@@ -175,34 +182,29 @@ describe("kits", () => {
     });
   });
 
-  it("saveKitItems deletes the kit's lines, then inserts with sort = index * 10", async () => {
+  it("saveKitItems makes ONE call to save_web_kit_items with the lines in order", async () => {
     await saveKitItems("kit_a", [
       { web_product_id: "p3", qty: 2 },
       { web_product_id: "p1", qty: 5 },
     ]);
-    expect(mockCalls.map((c) => c.op)).toEqual(["delete", "insert"]);
-    expect(mockCalls[0].filters).toEqual(["kit_id=kit_a"]);
-    expect(mockCalls[1].payload).toEqual([
-      { kit_id: "kit_a", web_product_id: "p3", qty: 2, sort: 0 },
-      { kit_id: "kit_a", web_product_id: "p1", qty: 5, sort: 10 },
+    expect(mockCalls).toEqual([]);
+    expect(mockRpcs).toEqual([
+      {
+        fn: "save_web_kit_items",
+        args: {
+          p_kit_id: "kit_a",
+          p_items: [
+            { id: "p3", qty: 2 },
+            { id: "p1", qty: 5 },
+          ],
+        },
+      },
     ]);
   });
 
-  it("saveKitItems with no lines only deletes", async () => {
-    await saveKitItems("kit_a", []);
-    expect(mockCalls.map((c) => c.op)).toEqual(["delete"]);
-  });
-
-  it("puts the previous lines back when the insert fails, then throws", async () => {
-    mockResult = (c) =>
-      c.op === "insert" && mockCalls.length === 2 ? { error: { message: "boom" } } : {};
-    await expect(
-      saveKitItems("kit_a", [{ web_product_id: "p9", qty: 1 }], [{ web_product_id: "p1", qty: 3 }])
-    ).rejects.toThrow("boom");
-    expect(mockCalls.map((c) => c.op)).toEqual(["delete", "insert", "insert"]);
-    expect(mockCalls[2].payload).toEqual([
-      { kit_id: "kit_a", web_product_id: "p1", qty: 3, sort: 0 },
-    ]);
+  it("saveKitItems throws the database error", async () => {
+    mockRpcError = { message: "boom" };
+    await expect(saveKitItems("kit_a", [])).rejects.toThrow("boom");
   });
 });
 

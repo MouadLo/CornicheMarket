@@ -1,6 +1,7 @@
 // Data access for the owner's kits of the public webstore (tables web_kits and
 // web_kit_items, migration 054). Owner only: RLS refuses anyone else. Every
-// UPDATE and DELETE has a filter (the API refuses one without).
+// UPDATE and DELETE has a filter (the API refuses one without); the lines are
+// replaced by the save_web_kit_items function.
 import { supabase } from "@/src/lib/supabase/client";
 import { orderedItems, orderedKits } from "./kits";
 import type { NewWebKit, WebKit, WebKitItem, WebKitPatch } from "./types";
@@ -51,31 +52,18 @@ export async function deleteKit(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-const toRows = (kitId: string, items: readonly Pick<WebKitItem, "web_product_id" | "qty">[]) =>
-  items.map((item, index) => ({
-    kit_id: kitId,
-    web_product_id: item.web_product_id,
-    qty: item.qty,
-    sort: index * 10,
-  }));
-
-// Replaces the lines of one kit with `items`, in this order (sort = index * 10):
-// deletes the kit's lines, then inserts the new ones. Not atomic: when the
-// insert fails, the previous lines are put back (best effort) before the error
-// is thrown.
+// Replaces the lines of one kit with `items`, in this order, in ONE call: the
+// save_web_kit_items function (migration 059) deletes and inserts in a single
+// transaction, so a failure leaves the previous lines untouched. It sets
+// sort = position * 10 and refuses (22023) invalid quantities, more than 12
+// lines, duplicates and bad ids.
 export async function saveKitItems(
   kitId: string,
-  items: readonly Pick<WebKitItem, "web_product_id" | "qty">[],
-  previous: readonly Pick<WebKitItem, "web_product_id" | "qty">[] = []
+  items: readonly Pick<WebKitItem, "web_product_id" | "qty">[]
 ): Promise<void> {
-  const removed = await supabase.from("web_kit_items").delete().eq("kit_id", kitId);
-  if (removed.error) throw new Error(removed.error.message);
-  if (items.length === 0) return;
-  const inserted = await supabase.from("web_kit_items").insert(toRows(kitId, items));
-  if (inserted.error) {
-    if (previous.length > 0) {
-      await supabase.from("web_kit_items").insert(toRows(kitId, previous));
-    }
-    throw new Error(inserted.error.message);
-  }
+  const { error } = await supabase.rpc("save_web_kit_items", {
+    p_kit_id: kitId,
+    p_items: items.map((i) => ({ id: i.web_product_id, qty: i.qty })),
+  });
+  if (error) throw new Error(error.message);
 }

@@ -146,17 +146,10 @@ describe("order", () => {
     await render();
     await press('webstore.kits.moveDown{"name":"Coca"}');
     await press("webstore.kits.save");
-    expect(saveKitItems).toHaveBeenCalledWith(
-      "kit_a",
-      [
-        { web_product_id: "p002", qty: 2 },
-        { web_product_id: "p001", qty: 1 },
-      ],
-      [
-        { web_product_id: "p001", qty: 1 },
-        { web_product_id: "p002", qty: 2 },
-      ]
-    );
+    expect(saveKitItems).toHaveBeenCalledWith("kit_a", [
+      { web_product_id: "p002", qty: 2 },
+      { web_product_id: "p001", qty: 1 },
+    ]);
     expect(mockLeave).toHaveBeenCalled();
   });
 
@@ -176,26 +169,18 @@ describe("adding and removing", () => {
     expect(hasText(tree.root, "Red Bull")).toBe(true);
     await press('webstore.kits.pick{"name":"Red Bull"}');
     await press("webstore.kits.save");
-    expect(saveKitItems).toHaveBeenCalledWith(
-      "kit_a",
-      [
-        { web_product_id: "p001", qty: 1 },
-        { web_product_id: "p002", qty: 2 },
-        { web_product_id: "p003", qty: 1 },
-      ],
-      expect.any(Array)
-    );
+    expect(saveKitItems).toHaveBeenCalledWith("kit_a", [
+      { web_product_id: "p001", qty: 1 },
+      { web_product_id: "p002", qty: 2 },
+      { web_product_id: "p003", qty: 1 },
+    ]);
   });
 
   it("removes a line", async () => {
     await render();
     await press('webstore.kits.remove{"name":"Coca"}');
     await press("webstore.kits.save");
-    expect(saveKitItems).toHaveBeenCalledWith(
-      "kit_a",
-      [{ web_product_id: "p002", qty: 2 }],
-      expect.any(Array)
-    );
+    expect(saveKitItems).toHaveBeenCalledWith("kit_a", [{ web_product_id: "p002", qty: 2 }]);
   });
 
   it("does not touch the lines when only the name changed", async () => {

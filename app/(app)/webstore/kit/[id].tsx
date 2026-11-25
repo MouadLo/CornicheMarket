@@ -205,7 +205,7 @@ export default function WebstoreKitEdit() {
         }
       } else if (kit) {
         await updateKit(kit.id, { ...patch, published: values.published });
-        if (itemsChanged) await saveKitItems(kit.id, values.items, baseline?.items ?? []);
+        if (itemsChanged) await saveKitItems(kit.id, values.items);
       }
       setDirty(false);
       showToast({ text: t("webstore.kits.saved"), tone: "success" });
