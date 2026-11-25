@@ -9,7 +9,8 @@ export function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  options: { key: T; label: string }[];
+  // disabled: shown dimmed and ignored when pressed (e.g. a mode that needs a link).
+  options: { key: T; label: string; disabled?: boolean }[];
   value: T;
   onChange: (key: T) => void;
 }) {
@@ -20,10 +21,12 @@ export function Segmented<T extends string>({
         return (
           <Pressable
             key={o.key}
-            onPress={() => onChange(o.key)}
+            onPress={() => {
+              if (!o.disabled) onChange(o.key);
+            }}
             accessibilityRole="radio"
-            accessibilityState={{ selected: on }}
-            style={[styles.seg, on && styles.on]}
+            accessibilityState={{ selected: on, disabled: !!o.disabled }}
+            style={[styles.seg, on && styles.on, o.disabled && styles.off]}
           >
             <Text style={[styles.label, on && styles.labelOn]}>{o.label}</Text>
           </Pressable>
@@ -42,6 +45,7 @@ const styles = StyleSheet.create({
   },
   seg: { flex: 1, minHeight: touch.min, alignItems: "center", justifyContent: "center" },
   on: { backgroundColor: colors.brand700 },
+  off: { opacity: 0.45 },
   label: { fontSize: 16, fontWeight: "600", color: colors.ink700 },
   labelOn: { color: colors.white },
 });
