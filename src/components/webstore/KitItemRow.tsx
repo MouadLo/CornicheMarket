@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { IconButton } from "@/src/components/webstore/IconButton";
