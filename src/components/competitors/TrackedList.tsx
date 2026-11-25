@@ -17,7 +17,7 @@ import { errorKey } from "@/src/lib/errors/userMessage";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
 
-type Filter = "review" | "all" | "out";
+type Filter = "review" | "all" | "out" | "check";
 
 const openProduct = (id: string) => router.push(`/(app)/competitors/${id}`);
 
@@ -52,6 +52,7 @@ export function TrackedList() {
     if (!products) return [];
     if (filter === "review") return products.filter((p) => needsReview(p.decision));
     if (filter === "out") return products.filter((p) => p.anyOutOfStock);
+    if (filter === "check") return products.filter((p) => p.priceCheck);
     return products;
   }, [products, filter]);
 
@@ -128,6 +129,11 @@ export function TrackedList() {
           label={t("competitors.filterOut")}
           selected={filter === "out"}
           onPress={() => setFilter("out")}
+        />
+        <Chip
+          label={t("competitors.filterPriceCheck")}
+          selected={filter === "check"}
+          onPress={() => setFilter("check")}
         />
       </View>
       <ScrollView contentContainerStyle={styles.list}>

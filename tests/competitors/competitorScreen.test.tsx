@@ -75,6 +75,8 @@ const base: OverviewRow = {
   title: "Chips",
   image_url: null,
   observed_at: hoursAgo(1),
+  price_check: false,
+  sold_30d: 0,
 };
 const rows: OverviewRow[] = [
   // lower: competitor 10.00, cost 8.00 -> 20 % margin
@@ -256,4 +258,17 @@ it("Suivre un produit opens a picker, and picking a product opens its competitor
   const picker = tree.root.findByType("Picker" as never);
   await act(async () => picker.props.onPick({ id: "p9" }));
   expect(mockPush).toHaveBeenCalledWith("/(app)/competitors/p9");
+});
+
+it("tags price-check products with a badge, and the Repères filter lists only those", async () => {
+  jest
+    .mocked(fetchCompetitorRows)
+    .mockResolvedValue([{ ...rows[0], price_check: true }, { ...rows[4] }]);
+  await render();
+  await press("competitors.filterAll");
+  expect(texts()).toContain("competitors.priceCheckBadge");
+  expect(texts()).toContain("Pain");
+  await press("competitors.filterPriceCheck");
+  expect(texts()).toContain("Chips");
+  expect(texts()).not.toContain("Pain");
 });

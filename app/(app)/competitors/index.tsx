@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { ConfirmTab } from "@/src/components/competitors/ConfirmTab";
 import { MissingTab } from "@/src/components/competitors/MissingTab";
+import { OpportunitiesTab } from "@/src/components/competitors/OpportunitiesTab";
 import { ShopsTab } from "@/src/components/competitors/ShopsTab";
 import { SourcingTab } from "@/src/components/competitors/SourcingTab";
 import { TrackedList } from "@/src/components/competitors/TrackedList";
@@ -13,8 +14,15 @@ import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { fetchCatalogCounts, type CatalogCounts } from "@/src/lib/competitors/shops";
 import { colors } from "@/src/theme/tokens";
 
-type Tab = "tracked" | "confirm" | "missing" | "sourcing" | "shops";
-const TABS: readonly Tab[] = ["tracked", "confirm", "missing", "sourcing", "shops"];
+type Tab = "tracked" | "opportunities" | "confirm" | "missing" | "sourcing" | "shops";
+const TABS: readonly Tab[] = [
+  "tracked",
+  "opportunities",
+  "confirm",
+  "missing",
+  "sourcing",
+  "shops",
+];
 
 const isTab = (value: unknown): value is Tab =>
   typeof value === "string" && (TABS as readonly string[]).includes(value);
@@ -66,6 +74,7 @@ export default function Competitors() {
       <Tabs
         items={[
           { key: "tracked", label: t("competitors.tabs.tracked") },
+          { key: "opportunities", label: t("competitors.tabs.opportunities") },
           { key: "confirm", label: t("competitors.tabs.confirm"), badge: counts?.proposed },
           { key: "missing", label: t("competitors.tabs.missing") },
           {
@@ -84,6 +93,7 @@ export default function Competitors() {
       />
       <View style={styles.body} key={`${tab}-${version}`}>
         {tab === "tracked" ? <TrackedList /> : null}
+        {tab === "opportunities" ? <OpportunitiesTab /> : null}
         {tab === "confirm" ? <ConfirmTab onChanged={changed} /> : null}
         {tab === "missing" ? <MissingTab onChanged={changed} /> : null}
         {tab === "sourcing" ? <SourcingTab onChanged={changed} /> : null}

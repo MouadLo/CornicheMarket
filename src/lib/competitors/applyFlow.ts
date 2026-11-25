@@ -16,6 +16,15 @@ export async function applySuggestions(
   const prices = items
     .filter((p) => p.decision.suggestedCents !== null)
     .map((p) => ({ productId: p.productId, priceCents: p.decision.suggestedCents as number }));
+  await applyPrices(prices, t, reload);
+}
+
+// Same, for prices the caller worked out itself (the Opportunités tab).
+export async function applyPrices(
+  prices: { productId: string; priceCents: number }[],
+  t: Translate,
+  reload: () => Promise<void>
+): Promise<void> {
   if (prices.length === 0) return;
   try {
     const result = await applyCompetitorSuggestions(prices);

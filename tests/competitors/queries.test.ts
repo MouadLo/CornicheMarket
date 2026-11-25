@@ -3,6 +3,7 @@ import {
   checkCompetitorLink,
   fetchCompetitorRows,
   saveManualPrice,
+  setPriceCheck,
 } from "../../src/lib/competitors/queries";
 
 const mockRpc = jest.fn();
@@ -74,6 +75,11 @@ it("applyCompetitorSuggestions throws the server error", async () => {
   await expect(applyCompetitorSuggestions([{ productId: "p1", priceCents: 1 }])).rejects.toThrow(
     "only the owner"
   );
+});
+
+it("setPriceCheck updates only the price_check column of products", async () => {
+  await setPriceCheck("p1", true);
+  expect(mockUpdates).toEqual([{ table: "products", values: { price_check: true } }]);
 });
 
 describe("checkCompetitorLink", () => {
