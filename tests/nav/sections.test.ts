@@ -12,12 +12,13 @@ describe("sections by role", () => {
     expect(allowedSections("cashier").map((s) => s.id)).toEqual(["sell", "clients"]);
   });
 
-  it("the owner sees all seven, in this order", () => {
+  it("the owner sees all eight, in this order", () => {
     expect(allowedSections("owner").map((s) => s.id)).toEqual([
       "sell",
       "clients",
       "products",
       "competitors",
+      "webstore",
       "stock",
       "reports",
       "settings",
@@ -48,6 +49,9 @@ describe("sectionForPath", () => {
     ["/products/history/abc", "products"],
     ["/competitors", "competitors"],
     ["/competitors/abc-123", "competitors"],
+    ["/webstore", "webstore"],
+    ["/webstore/p001", "webstore"],
+    ["/(app)/webstore/new", "webstore"],
     ["/stock-in", "stock"],
     ["/stock-in/negative-stock", "stock"],
     ["/stock-in/delivery/42", "stock"],
@@ -78,6 +82,9 @@ describe("the route guard (not just hidden tabs)", () => {
     "/products/import",
     "/competitors",
     "/competitors/abc-123",
+    "/webstore",
+    "/webstore/p001",
+    "/webstore/new",
     "/stock-in",
     "/stock-in/history",
     "/stock-in/adjust",
@@ -116,10 +123,10 @@ describe("phone tabs", () => {
     expect(phoneTabs("cashier")).toEqual({ tabs: ["sell", "clients"], more: [] });
   });
 
-  it("owner: four tabs and a More holding Concurrents, Rapports and Réglages", () => {
+  it("owner: four tabs and a More holding Concurrents, Boutique en ligne, Rapports and Réglages", () => {
     expect(phoneTabs("owner")).toEqual({
       tabs: ["sell", "clients", "products", "stock"],
-      more: ["competitors", "reports", "settings"],
+      more: ["competitors", "webstore", "reports", "settings"],
     });
   });
 });

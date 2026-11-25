@@ -5,7 +5,7 @@ import type { IconName } from "@/src/components/ui/Icon";
 
 export type Role = "owner" | "cashier";
 export type SectionId =
-  "sell" | "clients" | "products" | "competitors" | "stock" | "reports" | "settings";
+  "sell" | "clients" | "products" | "competitors" | "webstore" | "stock" | "reports" | "settings";
 
 export type Section = {
   id: SectionId;
@@ -18,6 +18,7 @@ export type Section = {
     | "nav.clients"
     | "nav.products"
     | "nav.competitors"
+    | "nav.webstore"
     | "nav.stockIn"
     | "nav.reports"
     | "nav.settings";
@@ -56,6 +57,14 @@ export const SECTIONS: readonly Section[] = [
     segment: "competitors",
     labelKey: "nav.competitors",
     icon: "scale",
+    ownerOnly: true,
+  },
+  {
+    id: "webstore",
+    route: "/(app)/webstore",
+    segment: "webstore",
+    labelKey: "nav.webstore",
+    icon: "store",
     ownerOnly: true,
   },
   {
@@ -122,9 +131,9 @@ export function guardRedirect(role: Role | null, pathname: string): string | nul
 }
 
 // Sections that never take a bottom tab, so the daily ones (Stock) keep theirs.
-const MORE_ONLY: readonly SectionId[] = ["competitors"];
+const MORE_ONLY: readonly SectionId[] = ["competitors", "webstore"];
 
-// Phone: at most five tabs. The rest (Concurrents, Rapports, Réglages) live
+// Phone: at most five tabs. The rest (Concurrents, Boutique en ligne, Rapports, Réglages) live
 // behind "More".
 export function phoneTabs(role: Role | null): { tabs: SectionId[]; more: SectionId[] } {
   const ids = allowedSections(role).map((s) => s.id);
