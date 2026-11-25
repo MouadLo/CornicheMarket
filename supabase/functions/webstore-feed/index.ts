@@ -30,7 +30,16 @@ Deno.serve(async (req) => {
       headers: { ...baseHeaders, "Cache-Control": "no-store" },
     });
   }
-  return new Response(JSON.stringify(data), {
+  // An uploaded picture comes from the database as a path relative to the
+  // project (migration 057); the page needs the full address.
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  const feed = data as { products?: { image?: string | null }[] };
+  for (const product of feed.products ?? []) {
+    if (typeof product.image === "string" && product.image.startsWith("/storage/")) {
+      product.image = base + product.image;
+    }
+  }
+  return new Response(JSON.stringify(feed), {
     status: 200,
     headers: { ...baseHeaders, "Cache-Control": "public, max-age=60, s-maxage=60" },
   });
