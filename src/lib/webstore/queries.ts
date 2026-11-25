@@ -49,18 +49,6 @@ export async function fetchWebProducts(): Promise<WebProduct[]> {
   }
 }
 
-export async function fetchWebProduct(id: string): Promise<WebProduct | null> {
-  const { data, error } = await supabase
-    .from("web_products")
-    .select(`${WEB_COLUMNS}, product:products(${APP_COLUMNS})`)
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const { product, ...row } = data as unknown as WebRow;
-  return { ...row, app: toApp(product) };
-}
-
 export async function fetchWebCategories(): Promise<WebCategory[]> {
   const { data, error } = await supabase
     .from("web_categories")
