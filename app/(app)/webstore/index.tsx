@@ -10,7 +10,8 @@ import { EmptyState } from "@/src/components/ui/EmptyState";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { displayName, WebProductRow } from "@/src/components/webstore/WebProductRow";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
-import { confirm, showToast } from "@/src/lib/dialog/store";
+import { confirmDestructive } from "@/src/lib/confirmDestructive";
+import { showToast } from "@/src/lib/dialog/store";
 import { errorKey } from "@/src/lib/errors/userMessage";
 import { filterProducts, WEB_FILTERS, type WebFilter } from "@/src/lib/webstore/filter";
 import { fetchWebProducts, setPublished } from "@/src/lib/webstore/queries";
@@ -79,13 +80,12 @@ export default function WebstoreList() {
     // Hiding the product that would leave the site with fewer than the minimum
     // makes the site ignore the whole list: ask first.
     if (!published && dropsBelowMinimum(products, product.id, false)) {
-      const ok = await confirm({
-        tone: "danger",
-        title: t("webstore.hideTitle"),
-        message: t("webstore.hideMessage", { count: status.inFeed - 1, min: status.min }),
-        confirmLabel: t("webstore.hideConfirm"),
-        cancelLabel: t("common.cancel"),
-      });
+      const ok = await confirmDestructive(
+        t("webstore.hideTitle"),
+        t("webstore.hideMessage", { count: status.inFeed - 1, min: status.min }),
+        t("webstore.hideConfirm"),
+        t("common.cancel")
+      );
       if (!ok) return;
     }
     setBusy(product.id, true);

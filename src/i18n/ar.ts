@@ -1762,7 +1762,8 @@ const ar: Translations = {
     summary: "{{count}} منتج على الموقع · {{stock}} متوفر",
     warnBelow:
       "يتجاهل الموقع القائمة إذا كان فيها أقل من {{min}} منتجًا، وسيعرض القائمة القديمة. العدد الآن: {{count}}.",
-    excludedBanner: "منشورة لكنها غير ظاهرة على الموقع (منتج التطبيق معطَّل أو غير موجود): {{names}}",
+    excludedBanner:
+      "منشورة لكنها غير ظاهرة على الموقع (منتج التطبيق معطَّل أو غير موجود): {{names}}",
     search: "بحث (الاسم، المعرّف، الكلمات المفتاحية)",
     filterAll: "الكل",
     filterPublished: "المنشورة",
@@ -1798,7 +1799,6 @@ const ar: Translations = {
     newCategory: "فئة الموقع (إلزامية)",
     newPickedProduct: "المنتج المختار: {{name}}",
     newCreate: "إنشاء المنتج",
-    newCreateError: "تعذّر إنشاء المنتج. حاول مرة أخرى.",
     newNeedProduct: "اختر منتجًا من التطبيق.",
     newNeedName: "أدخل اسمًا.",
     newNeedCategory: "اختر فئة.",
@@ -1857,7 +1857,6 @@ const ar: Translations = {
     errAutoNeedsLink: "المخزون التلقائي يتطلب منتجًا مرتبطًا من التطبيق.",
     save: "حفظ",
     saved: "تم حفظ المنتج.",
-    saveError: "تعذّر الحفظ. حاول مرة أخرى.",
     notFound: "المنتج غير موجود.",
     deleteButton: "حذف من الموقع",
     deleteTitle: "حذف «{{name}}» من الموقع؟",

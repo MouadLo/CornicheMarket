@@ -6,7 +6,15 @@ import { colors, radius } from "@/src/theme/tokens";
 
 // A product photo from its address. No address, or an address that fails to
 // load: a plain icon, never a broken image.
-export function WebImage({ uri, size = 48 }: { uri: string | null; size?: number }) {
+export function WebImage({
+  uri,
+  size = 48,
+  onFail,
+}: {
+  uri: string | null;
+  size?: number;
+  onFail?: () => void;
+}) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [uri]);
   const box = { width: size, height: size };
@@ -22,7 +30,10 @@ export function WebImage({ uri, size = 48 }: { uri: string | null; size?: number
       source={{ uri }}
       style={[styles.box, box]}
       resizeMode="cover"
-      onError={() => setFailed(true)}
+      onError={() => {
+        setFailed(true);
+        onFail?.();
+      }}
       accessibilityIgnoresInvertColors
     />
   );
