@@ -205,12 +205,19 @@ export function WebPhotoSection({ product, appPhotoPath, onChange }: Props) {
         disabled={busy}
       />
       {appPhotoPath ? (
-        <BigButton
-          variant="secondary"
-          label={t("webstore.photoUseApp")}
-          onPress={() => void applyAppPhoto()}
-          disabled={busy}
-        />
+        <View style={styles.appCard} testID="web-app-photo-card">
+          <ProductPhoto path={appPhotoPath} size={SMALL} radius={radius.control} />
+          <View style={styles.appText}>
+            <Text style={styles.label}>{t("webstore.photoAppTitle")}</Text>
+            <Text style={styles.hint}>{t("webstore.photoAppHint")}</Text>
+            <BigButton
+              variant="secondary"
+              label={t("webstore.photoUseApp")}
+              onPress={() => void applyAppPhoto()}
+              disabled={busy}
+            />
+          </View>
+        </View>
       ) : null}
 
       {hasFile ? (
@@ -253,28 +260,8 @@ export function WebPhotoSection({ product, appPhotoPath, onChange }: Props) {
             <WebImage uri={file} size={SMALL} />
           </Thumb>
         ) : null}
-        {appPhotoPath ? (
-          <Thumb
-            label={t("webstore.photoThumbApp")}
-            active={false}
-            disabled={busy}
-            onPress={() => void applyAppPhoto()}
-            testID="web-thumb-app"
-          >
-            <ProductPhoto path={appPhotoPath} size={SMALL} radius={radius.control} />
-          </Thumb>
-        ) : null}
       </View>
 
-      {appPhotoPath ? (
-        <View style={styles.appCard} testID="web-app-photo-card">
-          <ProductPhoto path={appPhotoPath} size={SMALL} radius={radius.control} />
-          <View style={styles.appText}>
-            <Text style={styles.label}>{t("webstore.photoAppTitle")}</Text>
-            <Text style={styles.hint}>{t("webstore.photoAppHint")}</Text>
-          </View>
-        </View>
-      ) : null}
       {hasFile ? (
         <BigButton
           variant="danger"
