@@ -15,7 +15,8 @@ let mockRole: "owner" | "cashier" = "owner";
 jest.mock("expo-router", () => {
   const React = require("react");
   return {
-    router: { push: (...a: unknown[]) => mockPush(...a) },
+    router: { push: (...a: unknown[]) => mockPush(...a), setParams: jest.fn() },
+    useLocalSearchParams: () => ({}),
     Redirect: ({ href }: { href: string }) => React.createElement("Redirect", { href }),
     useFocusEffect: (effect: () => void) => React.useEffect(effect, [effect]),
   };

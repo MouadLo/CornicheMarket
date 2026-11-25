@@ -11,6 +11,8 @@ export default function WebstoreLayout() {
       <Stack.Screen name="index" options={{ title: t("nav.webstore") }} />
       <Stack.Screen name="new" options={{ title: t("screenTitles.webstoreNew") }} />
       <Stack.Screen name="[id]" options={{ title: t("screenTitles.webstoreProduct") }} />
+      <Stack.Screen name="kit/[id]" options={{ title: t("screenTitles.webstoreKit") }} />
+      <Stack.Screen name="category/[id]" options={{ title: t("screenTitles.webstoreCategory") }} />
     </Stack>
   );
 }
