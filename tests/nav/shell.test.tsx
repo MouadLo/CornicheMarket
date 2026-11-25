@@ -159,7 +159,7 @@ describe("navigation by role (laptop and tablet, >= 900 dp)", () => {
     expect(labelsOf(r)).toEqual(["nav.sell", "nav.clients"]);
   });
 
-  it("the owner's rail has all seven sections", async () => {
+  it("the owner's rail has all eight sections", async () => {
     mockProfile = owner;
     const r = await render(
       <AppShell>
@@ -171,6 +171,7 @@ describe("navigation by role (laptop and tablet, >= 900 dp)", () => {
       "nav.clients",
       "nav.products",
       "nav.competitors",
+      "nav.webstore",
       "nav.stockIn",
       "nav.reports",
       "nav.settings",
@@ -215,7 +216,7 @@ describe("navigation on a phone (< 900 dp)", () => {
     expect(labelsOf(r)).toEqual(["nav.sell", "nav.clients"]);
   });
 
-  it("the owner gets four tabs plus More, which holds Concurrents, Rapports and Réglages", async () => {
+  it("the owner gets four tabs plus More, which holds Concurrents, Boutique en ligne, Rapports and Réglages", async () => {
     mockProfile = owner;
     const r = await render(
       <AppShell>
@@ -231,7 +232,7 @@ describe("navigation on a phone (< 900 dp)", () => {
     ]);
     await act(async () => byLabel(r, "shell.more")[0].props.onPress());
     expect(texts(r.root)).toEqual(
-      expect.arrayContaining(["nav.competitors", "nav.reports", "nav.settings"])
+      expect.arrayContaining(["nav.competitors", "nav.webstore", "nav.reports", "nav.settings"])
     );
   });
 });
@@ -248,6 +249,8 @@ describe("the route guard in the layout", () => {
     "/products/new",
     "/competitors",
     "/competitors/p1",
+    "/webstore",
+    "/webstore/p001",
     "/stock-in/adjust",
     "/settings",
     "/dev-components",
