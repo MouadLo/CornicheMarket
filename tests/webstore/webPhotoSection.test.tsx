@@ -71,11 +71,14 @@ it("with no picture shows the placeholder and no destructive or app buttons", as
   expect(tree.root.findAllByProps({ testID: "web-app-photo-card" })).toHaveLength(0);
 });
 
-it("the uploaded-photo choice is disabled until a file exists", async () => {
+it("before any upload there is no source switch to confuse with an upload button: the upload buttons come first and a hint says how to add a photo", async () => {
   await render();
-  expect(radio("webstore.photoSourceFile").props.accessibilityState.disabled).toBe(true);
-  await act(async () => radio("webstore.photoSourceFile").props.onPress());
-  expect(setImageSource).not.toHaveBeenCalled();
+  expect(radio("webstore.photoSourceFile")).toBeUndefined();
+  expect(radio("webstore.photoSourceLink")).toBeUndefined();
+  expect(has("webstore.photoNoFileYet")).toBe(true);
+  expect(has("webstore.photoTake")).toBe(true);
+  expect(has("webstore.photoChoose")).toBe(true);
+  expect(has("webstore.photoShownTitle")).toBe(false);
 });
 
 describe("choosing the source", () => {

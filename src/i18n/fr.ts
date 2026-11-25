@@ -1901,6 +1901,9 @@ const fr = {
     photoSourceFile: "Photo importée",
     photoSourceHint:
       "Choisir une photo ne supprime pas les autres : le lien, la photo importée et la photo de l'app restent disponibles.",
+    photoAddTitle: "Ajouter une photo pour le site",
+    photoShownTitle: "Photo affichée sur le site",
+    photoNoFileYet: "Aucune photo importée pour l'instant. Utilisez un bouton ci-dessus pour en ajouter une.",
     photoTake: "Prendre une photo",
     photoChoose: "Choisir une image",
     photoAppTitle: "Photo de l'app",

@@ -191,15 +191,44 @@ export function WebPhotoSection({ product, appPhotoPath, onChange }: Props) {
         ) : null}
       </View>
 
-      <Segmented<ImageSource>
-        value={source}
-        onChange={choose}
-        options={[
-          { key: "url", label: t("webstore.photoSourceLink") },
-          { key: "file", label: t("webstore.photoSourceFile"), disabled: !hasFile },
-        ]}
+      <Text style={styles.label}>{t("webstore.photoAddTitle")}</Text>
+      <BigButton
+        variant="secondary"
+        label={t("webstore.photoTake")}
+        onPress={() => void pick("camera")}
+        disabled={busy}
       />
-      <Text style={styles.hint}>{t("webstore.photoSourceHint")}</Text>
+      <BigButton
+        variant="secondary"
+        label={t("webstore.photoChoose")}
+        onPress={() => void pick("library")}
+        disabled={busy}
+      />
+      {appPhotoPath ? (
+        <BigButton
+          variant="secondary"
+          label={t("webstore.photoUseApp")}
+          onPress={() => void applyAppPhoto()}
+          disabled={busy}
+        />
+      ) : null}
+
+      {hasFile ? (
+        <>
+          <Text style={styles.label}>{t("webstore.photoShownTitle")}</Text>
+          <Segmented<ImageSource>
+            value={source}
+            onChange={choose}
+            options={[
+              { key: "url", label: t("webstore.photoSourceLink") },
+              { key: "file", label: t("webstore.photoSourceFile") },
+            ]}
+          />
+          <Text style={styles.hint}>{t("webstore.photoSourceHint")}</Text>
+        </>
+      ) : (
+        <Text style={styles.hint}>{t("webstore.photoNoFileYet")}</Text>
+      )}
 
       <View style={styles.thumbs}>
         {link ? (
@@ -237,19 +266,6 @@ export function WebPhotoSection({ product, appPhotoPath, onChange }: Props) {
         ) : null}
       </View>
 
-      <BigButton
-        variant="secondary"
-        label={t("webstore.photoTake")}
-        onPress={() => void pick("camera")}
-        disabled={busy}
-      />
-      <BigButton
-        variant="secondary"
-        label={t("webstore.photoChoose")}
-        onPress={() => void pick("library")}
-        disabled={busy}
-      />
-
       {appPhotoPath ? (
         <View style={styles.appCard} testID="web-app-photo-card">
           <ProductPhoto path={appPhotoPath} size={SMALL} radius={radius.control} />
@@ -259,15 +275,6 @@ export function WebPhotoSection({ product, appPhotoPath, onChange }: Props) {
           </View>
         </View>
       ) : null}
-      {appPhotoPath ? (
-        <BigButton
-          variant="secondary"
-          label={t("webstore.photoUseApp")}
-          onPress={() => void applyAppPhoto()}
-          disabled={busy}
-        />
-      ) : null}
-
       {hasFile ? (
         <BigButton
           variant="danger"
