@@ -3,9 +3,9 @@
 -- current_cost_cents are populated through the normal trigger path
 -- (never written to directly).
 --
--- NOTE: insert an owner profile row yourself after creating your first
--- Supabase Auth user, e.g.:
---   update profiles set role = 'owner' where id = '<your-auth-user-uuid>';
+-- NOTE: only invited accounts get a profile automatically (migration 060).
+-- For your first owner, create the Auth user, then insert its profile yourself:
+--   insert into profiles (id, full_name, role) values ('<auth-user-uuid>', 'Owner', 'owner');
 
 insert into categories (id, name) values
   ('00000000-0000-0000-0000-000000000001', 'Boissons'),
@@ -38,10 +38,11 @@ insert into auth.users (
 )
   on conflict (id) do nothing;
 
--- The on_auth_user_created trigger already created a 'cashier' profile row;
--- promote it so seed purchases can be attributed to an owner.
-update profiles set role = 'owner', full_name = 'Seed System'
-where id = '00000000-0000-0000-0000-0000000000aa';
+-- Seeded accounts are not invited, so no profile is created automatically
+-- (migration 060): write the owner profile here.
+insert into profiles (id, full_name, role)
+values ('00000000-0000-0000-0000-0000000000aa', 'Seed System', 'owner')
+on conflict (id) do update set role = excluded.role, full_name = excluded.full_name;
 
 -- Products: (name, barcode, category, unit, selling_price_cents, low_stock_threshold)
 with product_rows (name, barcode, category_id, unit, selling_price_cents, low_stock_threshold, buy_qty, buy_cost_cents) as (
@@ -141,10 +142,10 @@ insert into auth.users (
 )
   on conflict (id) do nothing;
 
--- The on_auth_user_created trigger defaults new profiles to 'cashier',
--- which is exactly the role this account needs.
-update profiles set full_name = 'Amina Cashier'
-where id = '00000000-0000-0000-0000-0000000000bb';
+-- Not invited, so no automatic profile (migration 060): write it here.
+insert into profiles (id, full_name, role)
+values ('00000000-0000-0000-0000-0000000000bb', 'Amina Cashier', 'cashier')
+on conflict (id) do update set role = excluded.role, full_name = excluded.full_name;
 
 -- ============================================================
 -- ~150 additional generated products (on top of the 50 above), from the
