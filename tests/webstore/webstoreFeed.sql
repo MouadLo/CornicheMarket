@@ -162,8 +162,8 @@ begin
     '{"id": "phone", "icon": "bag", "name": "Phone", "name_fr": "Téléphone"}');
   perform pg_temp.expect('unpublished excluded', (pg_temp.feed_product(v_feed, 'p005') is null)::text, 'true');
   perform pg_temp.expect('inactive linked excluded', (pg_temp.feed_product(v_feed, 'p006') is null)::text, 'true');
-  perform pg_temp.expect('product order (category sort, sort, id)',
-    (select string_agg(e ->> 'id', ',') from jsonb_array_elements(v_feed -> 'products') e), 'p002,p003,p004,p001');
+  perform pg_temp.expect('product order (sort, id), across categories',
+    (select string_agg(e ->> 'id', ',') from jsonb_array_elements(v_feed -> 'products') e), 'p001,p002,p003,p004');
 
   -- linked: the app price wins over the typed 1 cent; 8500 -> 85 (a number, no .00)
   v_prod := pg_temp.feed_product(v_feed, 'p001');
