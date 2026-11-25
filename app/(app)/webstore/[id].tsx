@@ -134,8 +134,15 @@ export default function WebstoreProductEdit() {
     setAll(list);
     const found = list.find((p) => p.id === id);
     if (found) {
-      setValues((v) => (v ? { ...v, stockMode: found.stock_mode } : v));
-      setBaseline((b) => (b ? { ...b, stockMode: found.stock_mode } : b));
+      // While linked the typed price is not editable: do not let it count as a change.
+      const price = found.price_cents === null ? "" : centsToDisplay(found.price_cents);
+      const apply = (v: FormValues): FormValues => ({
+        ...v,
+        stockMode: found.stock_mode,
+        ...(found.product_id ? { priceText: price } : {}),
+      });
+      setValues((v) => (v ? apply(v) : v));
+      setBaseline((b) => (b ? apply(b) : b));
     }
   }, [id]);
 
@@ -369,7 +376,10 @@ export default function WebstoreProductEdit() {
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          error={err("image")}
+          error={
+            err("image") ??
+            (imageUrl !== "" && !isValidImageUrl(imageUrl) ? t("webstore.errImageUrl") : undefined)
+          }
         />
         {imageUrl !== "" && isValidImageUrl(imageUrl) ? (
           <View style={styles.preview}>
