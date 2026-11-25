@@ -7,7 +7,23 @@ export const CATEGORY_ID_MAX = 20;
 export const SUB_CODE_MAX = 40;
 
 // The icons the public page draws. Anything else it shows as "bag".
-export const CATEGORY_ICONS = ["drinks", "snacks", "phone", "home", "bag", "cup", "gift"] as const;
+export const CATEGORY_ICONS = [
+  "drinks",
+  "snacks",
+  "phone",
+  "home",
+  "bag",
+  "cup",
+  "gift",
+  "bread",
+  "fresh",
+  "dairy",
+  "frozen",
+  "clean",
+  "care",
+  "baby",
+  "pet",
+] as const;
 export type CategoryIcon = (typeof CATEGORY_ICONS)[number];
 
 export const isKnownIcon = (icon: string): icon is CategoryIcon =>

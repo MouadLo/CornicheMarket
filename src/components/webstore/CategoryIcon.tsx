@@ -10,6 +10,14 @@ const NAME: Record<Known, IconName> = {
   bag: "catBag",
   cup: "catCup",
   gift: "catGift",
+  bread: "catBread",
+  fresh: "catFresh",
+  dairy: "catDairy",
+  frozen: "catFrozen",
+  clean: "catClean",
+  care: "catCare",
+  baby: "catBaby",
+  pet: "catPet",
 };
 
 // What the page draws for a category's icon (an unknown one shows as a bag).
