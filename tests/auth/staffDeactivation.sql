@@ -154,7 +154,7 @@ begin
     raise exception 'a deactivated caller passed as postgres';
   exception when sqlstate 'PT403' then null;
   end;
-  -- Active staff, anon and a user without a profile still pass.
+  -- Active staff and anon still pass.
   perform pg_temp.as_user(cc);
   set local role authenticated;
   perform public.check_active_staff();
@@ -163,9 +163,14 @@ begin
   set local role authenticated;
   perform public.check_active_staff();
   reset role;
+  -- Since migration 060 a signed-in user without a profile is refused too.
   perform pg_temp.as_user(nobody);
   set local role authenticated;
-  perform public.check_active_staff();
+  begin
+    perform public.check_active_staff();
+    reset role; raise exception 'a user without a profile passed the pre-request check';
+  exception when sqlstate 'PT403' then null;
+  end;
   reset role;
   perform set_config('request.jwt.claims', '{}', true);
   set local role anon;
