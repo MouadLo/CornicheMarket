@@ -1872,6 +1872,9 @@ const ar: Translations = {
     photoSourceFile: "صورة مرفوعة",
     photoSourceHint:
       "اختيار صورة لا يحذف الأخرى: الرابط والصورة المرفوعة وصورة التطبيق تبقى كلها متاحة.",
+    photoAddTitle: "إضافة صورة للموقع",
+    photoShownTitle: "الصورة المعروضة على الموقع",
+    photoNoFileYet: "لا توجد صورة مرفوعة بعد. استخدم أحد الأزرار أعلاه لإضافة صورة.",
     photoTake: "التقاط صورة",
     photoChoose: "اختيار صورة",
     photoAppTitle: "صورة التطبيق",

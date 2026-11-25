@@ -1892,6 +1892,9 @@ const en: Translations = {
     photoSourceFile: "Uploaded photo",
     photoSourceHint:
       "Choosing a photo never deletes the others: the link, the uploaded photo and the app photo all stay available.",
+    photoAddTitle: "Add a photo for the site",
+    photoShownTitle: "Photo shown on the site",
+    photoNoFileYet: "No uploaded photo yet. Use a button above to add one.",
     photoTake: "Take a photo",
     photoChoose: "Choose an image",
     photoAppTitle: "App photo",
