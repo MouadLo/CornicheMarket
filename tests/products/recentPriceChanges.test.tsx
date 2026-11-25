@@ -135,3 +135,13 @@ it("labels a batch applied from the competitor prices page, without a percent", 
   expect(shown).toContain('products.priceChangeLineCompetitor{"count":2}');
   expect(shown).not.toContain("products.priceChangeLine{");
 });
+
+it("labels a batch made by linking a web product, without a percent", async () => {
+  jest
+    .mocked(fetchRecentPriceChanges)
+    .mockResolvedValue([{ ...live, id: "b4", source: "webstore", percent: 0, product_count: 1 }]);
+  await render();
+  const shown = allTexts(tree.root).join("|");
+  expect(shown).toContain("products.priceChangeWebstore");
+  expect(shown).not.toContain("products.priceChangeLine{");
+});

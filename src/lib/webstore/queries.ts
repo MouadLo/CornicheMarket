@@ -2,10 +2,12 @@
 // the web_* tables refuses anyone else. Reads the base `products` table (the
 // owner may see stock and prices), never the cashier view.
 //
-// Changing the app price of a linked product does NOT live here: the screen
-// calls updateSellingPrice() from src/lib/products/queries.ts, which the
-// selling_price_history trigger (migration 027) records.
+// Changing the app price of a linked product goes through applyWebPrice()
+// below: one undoable batch whose UPDATE the selling_price_history trigger
+// (migration 027) records.
+import { fetchProductMarginFloor } from "@/src/lib/competitors/queries";
 import { supabase } from "@/src/lib/supabase/client";
+import { minMarginBpFor } from "./priceMargin";
 import { nextWebId } from "./resolve";
 import type {
   LinkCandidate,
@@ -116,6 +118,45 @@ export async function linkWebProduct(id: string, productId: string | null): Prom
       : { product_id: productId };
   const { error } = await supabase.from("web_products").update(update).eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// Sets the app price of a linked product as ONE batch (source 'webstore'), so
+// undoPriceChange(batchId) puts the old price back. changed 0 (and no batch)
+// when the product already has this price.
+export async function applyWebPrice(
+  productId: string,
+  priceCents: number
+): Promise<{ batchId: string | null; changed: number }> {
+  const { data, error } = await supabase.rpc("apply_webstore_price", {
+    p_product_id: productId,
+    p_price_cents: priceCents,
+  });
+  if (error) throw new Error(error.message);
+  const result = (data ?? {}) as { batch_id?: unknown; changed?: unknown };
+  const changed = Number(result.changed);
+  return {
+    batchId: typeof result.batch_id === "string" ? result.batch_id : null,
+    changed: Number.isFinite(changed) ? changed : 0,
+  };
+}
+
+// What the margin check needs about an app product: its cost (null = none
+// recorded) and the minimum margin that applies, the same one the competitor
+// prices use (product override, else the store-wide setting).
+export async function fetchProductMarginInfo(
+  productId: string
+): Promise<{ costCents: number | null; minMarginBp: number }> {
+  const [cost, floor] = await Promise.all([
+    supabase.from("products").select("current_cost_cents").eq("id", productId).maybeSingle(),
+    fetchProductMarginFloor(productId),
+  ]);
+  if (cost.error) throw new Error(cost.error.message);
+  const raw = (cost.data as { current_cost_cents?: unknown } | null)?.current_cost_cents;
+  const value = raw === null || raw === undefined ? null : Number(raw);
+  return {
+    costCents: value !== null && Number.isFinite(value) && value > 0 ? value : null,
+    minMarginBp: minMarginBpFor(floor.override, floor.storePercent),
+  };
 }
 
 // Inserts at the end of the owner's order: the feed sorts by `sort`, and the

@@ -590,6 +590,7 @@ const fr = {
     priceChangeCategoryGone: "Catégorie supprimée",
     trackedAt: "Suivi chez {{count}} concurrent(s)",
     trackedSee: "Voir",
+    priceChangeWebstore: "Boutique en ligne",
     priceChangeCompetitor: "Alignement sur les concurrents",
     priceChangeLineCompetitor: "{{count}} produit(s)",
     priceUndoConfirmMessageCompetitor:
@@ -1870,6 +1871,23 @@ const fr = {
     priceChangeError: "Impossible de changer le prix dans l'app. Rien n'a été lié.",
     priceChangedLinkFailed:
       "Le prix de l'app a été changé, mais le lien a échoué. Réessayez de lier.",
+    marginChecking: "Calcul de la marge…",
+    marginOk: "Marge à {{price}} : {{margin}} %",
+    marginLow:
+      "Marge faible : {{margin}} % (minimum {{min}} %). Prix minimum conseillé : {{minPrice}}",
+    marginLoss: "Vous vendriez à perte (coût {{cost}})",
+    marginUnknown: "Coût inconnu : la marge ne peut pas être vérifiée.",
+    marginLowTitle: "Marge faible",
+    marginLossTitle: "Vente à perte",
+    marginConfirmLabel: "Changer quand même",
+    priceChangedToast:
+      "Prix de l'app changé : de {{old}} à {{new}}. « Annuler » remet seulement le prix, le produit reste lié.",
+    priceChangedLinkFailedUndo:
+      "Le prix de l'app a été changé, mais le lien a échoué. Réessayez de lier, ou annulez le prix.",
+    priceUndoLabel: "Annuler",
+    priceUndone: "Prix de l'app remis à {{price}}. Le produit reste lié.",
+    priceUndoSkipped: "Le prix a été modifié depuis : rien n'a été remis.",
+    priceUndoError: "Impossible d'annuler le changement de prix.",
     priceTitle: "Prix",
     priceFromApp: "Prix de l'app",
     priceFromAppHint:

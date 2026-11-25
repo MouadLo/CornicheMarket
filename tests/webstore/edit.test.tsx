@@ -4,11 +4,13 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import EditScreen from "../../app/(app)/webstore/[id]";
 import { confirm, showToast } from "../../src/lib/dialog/store";
 import { removeWebImageFile, setImageSource } from "../../src/lib/webstore/imageQueries";
-import { updateSellingPrice } from "../../src/lib/products/queries";
+import { undoPriceChange } from "../../src/lib/products/queries";
 import {
+  applyWebPrice,
   deleteWebProduct,
   fetchKitsUsing,
   fetchLinkCandidates,
+  fetchProductMarginInfo,
   fetchWebCategories,
   fetchWebProducts,
   linkWebProduct,
@@ -50,7 +52,7 @@ jest.mock("../../src/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("../../src/lib/dialog/store", () => ({ showToast: jest.fn(), confirm: jest.fn() }));
 jest.mock("../../src/lib/nav/useLeaveScreen", () => ({ useLeaveScreen: () => mockLeave }));
 jest.mock("../../src/lib/products/useUnsavedGuard", () => ({ useUnsavedGuard: () => jest.fn() }));
-jest.mock("../../src/lib/products/queries", () => ({ updateSellingPrice: jest.fn() }));
+jest.mock("../../src/lib/products/queries", () => ({ undoPriceChange: jest.fn() }));
 jest.mock("../../src/components/stock/ProductSearchPicker", () => {
   const React = require("react");
   return { ProductSearchPicker: (p: object) => React.createElement("Picker", p) };
@@ -68,6 +70,8 @@ jest.mock("../../src/lib/webstore/queries", () => ({
   fetchWebCategories: jest.fn(),
   fetchLinkCandidates: jest.fn(),
   fetchKitsUsing: jest.fn(),
+  applyWebPrice: jest.fn(),
+  fetchProductMarginInfo: jest.fn(),
   updateWebProduct: jest.fn(),
   setPublished: jest.fn(),
   linkWebProduct: jest.fn(),
@@ -96,7 +100,10 @@ beforeEach(() => {
   jest.mocked(confirm).mockResolvedValue(true);
   jest.mocked(updateWebProduct).mockResolvedValue();
   jest.mocked(linkWebProduct).mockResolvedValue();
-  jest.mocked(updateSellingPrice).mockResolvedValue();
+  jest.mocked(applyWebPrice).mockResolvedValue({ batchId: "b1", changed: 1 });
+  // Cost 3.00 on the site price 5.50: a 45 % margin, above the 15 % minimum.
+  jest.mocked(fetchProductMarginInfo).mockResolvedValue({ costCents: 300, minMarginBp: 1500 });
+  jest.mocked(undoPriceChange).mockResolvedValue({ restored: 1, skipped: 0 });
   jest.mocked(deleteWebProduct).mockResolvedValue();
   jest.mocked(setPublished).mockResolvedValue();
 });
@@ -123,7 +130,7 @@ describe("linking", () => {
     await render([unlinked()]);
     await press("webstore.linkAction");
     expect(linkWebProduct).toHaveBeenCalledWith("p001", "a1");
-    expect(updateSellingPrice).not.toHaveBeenCalled();
+    expect(applyWebPrice).not.toHaveBeenCalled();
     expect(tree.root.findAllByProps({ testID: "webstore-conflict" })).toHaveLength(0);
   });
 
@@ -151,23 +158,122 @@ describe("linking", () => {
       await press("webstore.linkAction");
       await press("webstore.keepAppPrice");
       expect(linkWebProduct).toHaveBeenCalledWith("p001", "a1");
-      expect(updateSellingPrice).not.toHaveBeenCalled();
+      expect(applyWebPrice).not.toHaveBeenCalled();
     });
 
-    it("'the site price is right' changes the app price through the product price path, then links", async () => {
+    const toastWith = (text: string) =>
+      jest
+        .mocked(showToast)
+        .mock.calls.map((c) => c[0])
+        .find((t) => t.text.startsWith(text));
+
+    it("'the site price is right' applies the price as a batch, then links, with an undo toast", async () => {
       const order: string[] = [];
-      jest.mocked(updateSellingPrice).mockImplementation(async () => void order.push("price"));
+      jest.mocked(applyWebPrice).mockImplementation(async () => {
+        order.push("price");
+        return { batchId: "b1", changed: 1 };
+      });
       jest.mocked(linkWebProduct).mockImplementation(async () => void order.push("link"));
       await render([conflicting()]);
       await press("webstore.linkAction");
+      expect(hasText(tree.root, "webstore.marginOk")).toBe(true);
       await press("webstore.siteIsRight");
-      expect(updateSellingPrice).toHaveBeenCalledWith("a1", 550);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(applyWebPrice).toHaveBeenCalledWith("a1", 550);
       expect(linkWebProduct).toHaveBeenCalledWith("p001", "a1");
       expect(order).toEqual(["price", "link"]);
+      const toast = toastWith("webstore.priceChangedToast");
+      expect(toast).toMatchObject({ tone: "success", duration: 10000 });
+      expect(toast?.text).toContain("6.00");
+      expect(toast?.action?.label).toBe("webstore.priceUndoLabel");
+    });
+
+    it("the undo action calls undoPriceChange(batchId) and reloads", async () => {
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      await press("webstore.siteIsRight");
+      jest.mocked(fetchWebProducts).mockClear();
+      const toast = toastWith("webstore.priceChangedToast");
+      await act(async () => {
+        toast?.action?.onPress();
+      });
+      expect(undoPriceChange).toHaveBeenCalledWith("b1");
+      expect(fetchWebProducts).toHaveBeenCalledTimes(1);
+      expect(toastWith("webstore.priceUndone")?.text).toContain("6.00");
+    });
+
+    it("a price edited since is not put back and the toast says so", async () => {
+      jest.mocked(undoPriceChange).mockResolvedValue({ restored: 0, skipped: 1 });
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      await press("webstore.siteIsRight");
+      await act(async () => {
+        toastWith("webstore.priceChangedToast")?.action?.onPress();
+      });
+      expect(toastWith("webstore.priceUndoSkipped")).toBeDefined();
+    });
+
+    it("a low margin asks first; cancelling applies and links nothing", async () => {
+      jest.mocked(fetchProductMarginInfo).mockResolvedValue({ costCents: 500, minMarginBp: 1500 });
+      jest.mocked(confirm).mockResolvedValue(false);
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      expect(hasText(tree.root, "webstore.marginLow")).toBe(true);
+      await press("webstore.siteIsRight");
+      expect(confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "webstore.marginLowTitle" })
+      );
+      expect(applyWebPrice).not.toHaveBeenCalled();
+      expect(linkWebProduct).not.toHaveBeenCalled();
+    });
+
+    it("a low margin can still be confirmed", async () => {
+      jest.mocked(fetchProductMarginInfo).mockResolvedValue({ costCents: 500, minMarginBp: 1500 });
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      await press("webstore.siteIsRight");
+      expect(applyWebPrice).toHaveBeenCalledWith("a1", 550);
+      expect(linkWebProduct).toHaveBeenCalledWith("p001", "a1");
+    });
+
+    it("a sale below cost asks with the loss text (cost 7.20)", async () => {
+      jest.mocked(fetchProductMarginInfo).mockResolvedValue({ costCents: 720, minMarginBp: 1500 });
+      jest.mocked(confirm).mockResolvedValue(false);
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      expect(hasText(tree.root, "webstore.marginLoss")).toBe(true);
+      await press("webstore.siteIsRight");
+      expect(confirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "webstore.marginLossTitle",
+          message: expect.stringContaining("7.20"),
+        })
+      );
+      expect(applyWebPrice).not.toHaveBeenCalled();
+      expect(linkWebProduct).not.toHaveBeenCalled();
+    });
+
+    it("an unknown cost shows a neutral note and does not block", async () => {
+      jest.mocked(fetchProductMarginInfo).mockResolvedValue({ costCents: null, minMarginBp: 1500 });
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      expect(hasText(tree.root, "webstore.marginUnknown")).toBe(true);
+      await press("webstore.siteIsRight");
+      expect(confirm).not.toHaveBeenCalled();
+      expect(applyWebPrice).toHaveBeenCalledWith("a1", 550);
+    });
+
+    it("if the margin cannot be read it is treated as unknown, not blocked", async () => {
+      jest.mocked(fetchProductMarginInfo).mockRejectedValue(new Error("boom"));
+      await render([conflicting()]);
+      await press("webstore.linkAction");
+      expect(hasText(tree.root, "webstore.marginUnknown")).toBe(true);
+      await press("webstore.siteIsRight");
+      expect(applyWebPrice).toHaveBeenCalled();
     });
 
     it("if the price change fails nothing is linked", async () => {
-      jest.mocked(updateSellingPrice).mockRejectedValue(new Error("boom"));
+      jest.mocked(applyWebPrice).mockRejectedValue(new Error("boom"));
       await render([conflicting()]);
       await press("webstore.linkAction");
       await press("webstore.siteIsRight");
@@ -175,15 +281,17 @@ describe("linking", () => {
       expect(showToast).toHaveBeenCalledWith({ text: "webstore.priceChangeError", tone: "info" });
     });
 
-    it("if the link fails after the price changed, the owner is told", async () => {
+    it("if the link fails after the price changed, the owner is told and can still undo", async () => {
       jest.mocked(linkWebProduct).mockRejectedValue(new Error("boom"));
       await render([conflicting()]);
       await press("webstore.linkAction");
       await press("webstore.siteIsRight");
-      expect(showToast).toHaveBeenCalledWith({
-        text: "webstore.priceChangedLinkFailed",
-        tone: "info",
+      const toast = toastWith("webstore.priceChangedLinkFailedUndo");
+      expect(toast?.action?.label).toBe("webstore.priceUndoLabel");
+      await act(async () => {
+        toast?.action?.onPress();
       });
+      expect(undoPriceChange).toHaveBeenCalledWith("b1");
     });
 
     it("cancel closes the choice and changes nothing", async () => {
@@ -192,7 +300,7 @@ describe("linking", () => {
       await press("common.cancel");
       expect(tree.root.findAllByProps({ testID: "webstore-conflict" })).toHaveLength(0);
       expect(linkWebProduct).not.toHaveBeenCalled();
-      expect(updateSellingPrice).not.toHaveBeenCalled();
+      expect(applyWebPrice).not.toHaveBeenCalled();
     });
   });
 

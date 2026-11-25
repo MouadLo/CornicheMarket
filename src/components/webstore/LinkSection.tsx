@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -6,11 +6,15 @@ import { BigButton } from "@/src/components/BigButton";
 import { ProductSearchPicker } from "@/src/components/stock/ProductSearchPicker";
 import { Banner } from "@/src/components/ui/Banner";
 import { Card } from "@/src/components/ui/Card";
+import { bpToPercentText } from "@/src/lib/competitors/pricing";
+import { confirmDestructive } from "@/src/lib/confirmDestructive";
 import { showToast } from "@/src/lib/dialog/store";
+import { errorKeyOr } from "@/src/lib/errors/userMessage";
 import { formatMAD } from "@/src/lib/money";
-import { updateSellingPrice, type Product } from "@/src/lib/products/queries";
+import { undoPriceChange, type Product } from "@/src/lib/products/queries";
 import { isolateBidi, keepNumberLtr } from "@/src/lib/text/bidi";
-import { linkWebProduct } from "@/src/lib/webstore/queries";
+import { checkSitePriceMargin, type PriceMarginCheck } from "@/src/lib/webstore/priceMargin";
+import { applyWebPrice, fetchProductMarginInfo, linkWebProduct } from "@/src/lib/webstore/queries";
 import { excludedReason, linkSuggestions, priceConflict } from "@/src/lib/webstore/resolve";
 import type { LinkCandidate, WebProduct } from "@/src/lib/webstore/types";
 import { Text } from "@/src/theme/Text";
@@ -61,6 +65,33 @@ export function LinkSection({ product, all, candidates, onChanged }: Props) {
   );
   const conflict = pending ? priceConflict(product, pending) : null;
 
+  // The margin the site price would leave, checked while the owner chooses.
+  // null = still loading; a failed read is "unknown" (it never blocks).
+  const [margin, setMargin] = useState<{ check: PriceMarginCheck; minMarginBp: number } | null>(
+    null
+  );
+  const [costCents, setCostCents] = useState<number | null>(null);
+  const pendingId = pending?.id ?? null;
+  const siteCents = conflict?.siteCents ?? null;
+  useEffect(() => {
+    setMargin(null);
+    if (pendingId === null || siteCents === null) return;
+    let cancelled = false;
+    fetchProductMarginInfo(pendingId)
+      .catch(() => ({ costCents: null, minMarginBp: 0 }))
+      .then((info) => {
+        if (cancelled) return;
+        setCostCents(info.costCents);
+        setMargin({
+          check: checkSitePriceMargin({ newPriceCents: siteCents, ...info }),
+          minMarginBp: info.minMarginBp,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingId, siteCents]);
+
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -70,32 +101,98 @@ export function LinkSection({ product, all, candidates, onChanged }: Props) {
     }
   };
 
+  // "Undo" only puts the app price back: the product stays linked (the owner
+  // can unlink). The toasts say so.
+  const undoAction = (batchId: string, oldCents: number) => ({
+    label: t("webstore.priceUndoLabel"),
+    onPress: () => {
+      undoPriceChange(batchId)
+        .then((result) => {
+          showToast({
+            text:
+              result.restored > 0
+                ? t("webstore.priceUndone", { price: price(oldCents) })
+                : t("webstore.priceUndoSkipped"),
+            tone: result.restored > 0 ? "success" : "info",
+          });
+          return onChanged();
+        })
+        .catch((failure) =>
+          showToast({ text: t(errorKeyOr(failure, "webstore.priceUndoError")), tone: "info" })
+        );
+    },
+  });
+
   const doLink = (candidate: LinkCandidate, changeAppPrice: boolean) =>
     run(async () => {
       setNotice(null);
+      let batchId: string | null = null;
       if (changeAppPrice && product.price_cents !== null) {
         try {
-          // The app's own price path: recorded in the selling price history.
-          await updateSellingPrice(candidate.id, product.price_cents);
+          // One undoable batch, recorded in the selling price history.
+          batchId = (await applyWebPrice(candidate.id, product.price_cents)).batchId;
         } catch {
           showToast({ text: t("webstore.priceChangeError"), tone: "info" });
           return;
         }
       }
+      const oldCents = candidate.selling_price_cents;
       try {
         await linkWebProduct(product.id, candidate.id);
       } catch {
         showToast({
-          text: t(changeAppPrice ? "webstore.priceChangedLinkFailed" : "webstore.linkError"),
+          text: t(changeAppPrice ? "webstore.priceChangedLinkFailedUndo" : "webstore.linkError"),
           tone: "info",
+          ...(batchId ? { duration: 10000, action: undoAction(batchId, oldCents) } : {}),
         });
         if (changeAppPrice) await onChanged().catch(() => undefined);
         return;
+      }
+      if (batchId && product.price_cents !== null) {
+        showToast({
+          text: t("webstore.priceChangedToast", {
+            old: price(oldCents),
+            new: price(product.price_cents),
+          }),
+          tone: "success",
+          duration: 10000,
+          action: undoAction(batchId, oldCents),
+        });
       }
       setPending(null);
       setChanging(false);
       await onChanged().catch(() => undefined);
     });
+
+  // A price that leaves a low margin or a loss asks first; the owner may go on.
+  const confirmSitePrice = async (candidate: LinkCandidate) => {
+    const level = margin?.check.level;
+    if (level === "low" || level === "loss") {
+      const ok = await confirmDestructive(
+        t(level === "loss" ? "webstore.marginLossTitle" : "webstore.marginLowTitle"),
+        marginLine(margin as NonNullable<typeof margin>, level),
+        t("webstore.marginConfirmLabel"),
+        t("common.cancel")
+      );
+      if (!ok) return;
+    }
+    await doLink(candidate, true);
+  };
+
+  const marginLine = (m: NonNullable<typeof margin>, level: "low" | "loss" | "ok") => {
+    if (level === "loss") return t("webstore.marginLoss", { cost: price(costCents ?? 0) });
+    if (level === "low") {
+      return t("webstore.marginLow", {
+        margin: bpToPercentText(Math.max(0, m.check.marginBp ?? 0)),
+        min: bpToPercentText(m.minMarginBp),
+        minPrice: price(m.check.minPriceCents ?? 0),
+      });
+    }
+    return t("webstore.marginOk", {
+      price: price(siteCents ?? 0),
+      margin: bpToPercentText(m.check.marginBp ?? 0),
+    });
+  };
 
   const requestLink = (candidate: LinkCandidate) => {
     if (candidate.kind === "misc" || !candidate.active) {
@@ -225,9 +322,23 @@ export function LinkSection({ product, all, candidates, onChanged }: Props) {
           <BigButton
             label={t("webstore.siteIsRight", { price: price(conflict.siteCents) })}
             variant="secondary"
-            disabled={busy}
-            onPress={() => void doLink(pending, true)}
+            disabled={busy || margin === null}
+            onPress={() => void confirmSitePrice(pending)}
           />
+          {margin === null ? (
+            <Text style={styles.meta}>{t("webstore.marginChecking")}</Text>
+          ) : margin.check.level === "unknown" ? (
+            <Text style={styles.meta} testID="webstore-margin">
+              {t("webstore.marginUnknown")}
+            </Text>
+          ) : (
+            <Banner
+              tone={
+                margin.check.level === "loss" ? "bad" : margin.check.level === "low" ? "warn" : "ok"
+              }
+              text={marginLine(margin, margin.check.level)}
+            />
+          )}
           <BigButton
             label={t("common.cancel")}
             variant="secondary"

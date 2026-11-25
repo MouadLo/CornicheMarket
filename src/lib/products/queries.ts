@@ -334,8 +334,9 @@ export type PriceChangeBatch = {
   percent: number;
   product_count: number;
   reverted_at: string | null;
-  // 'competitor' = prices applied from the Competitor prices page (migration 051).
-  source?: "percent" | "competitor";
+  // 'competitor' = prices applied from the Competitor prices page (migration 051);
+  // 'webstore' = the app price taken from the site price when linking (migration 058).
+  source?: "percent" | "competitor" | "webstore";
 };
 
 // The latest bulk price changes, newest first (owner only: RLS returns nothing
