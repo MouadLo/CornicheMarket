@@ -110,6 +110,9 @@ export function ComparisonCard({
         ) : (
           <Text style={[styles.name, styles.flex]}>{product.name}</Text>
         )}
+        {product.priceCheck ? (
+          <StatusPill label={t("competitors.priceCheckBadge")} tone="info" icon="tag" />
+        ) : null}
         <Text style={styles.hint}>{t("competitors.links", { count: product.offers.length })}</Text>
       </View>
 

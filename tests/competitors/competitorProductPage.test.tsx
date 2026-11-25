@@ -2,7 +2,11 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import type { OverviewRow } from "../../src/lib/competitors/overview";
-import { applyCompetitorSuggestions, fetchCompetitorRows } from "../../src/lib/competitors/queries";
+import {
+  applyCompetitorSuggestions,
+  fetchCompetitorRows,
+  setPriceCheck,
+} from "../../src/lib/competitors/queries";
 import { fetchProduct } from "../../src/lib/products/queries";
 import { allTexts, pressableByText } from "../sales/sellTestUtils";
 
@@ -39,6 +43,7 @@ jest.mock("../../src/lib/dialog/store", () => ({ confirm: jest.fn(), showToast: 
 jest.mock("../../src/lib/competitors/queries", () => ({
   fetchCompetitorRows: jest.fn(),
   applyCompetitorSuggestions: jest.fn(),
+  setPriceCheck: jest.fn(),
   fetchProductMarginFloor: jest.fn().mockResolvedValue({ override: null, storePercent: 15 }),
 }));
 jest.mock("../../src/lib/products/queries", () => ({
@@ -140,4 +145,27 @@ it("the product sheet link opens the edit screen", async () => {
   await render();
   await act(async () => pressableByText(tree.root, "competitors.viewProduct").props.onPress());
   expect(mockPush).toHaveBeenCalledWith("/(app)/products/p1");
+});
+
+it("the Produit repère switch shows the hint and saves the new value, then reloads", async () => {
+  jest.mocked(setPriceCheck).mockResolvedValue();
+  await render();
+  expect(texts()).toContain("competitors.priceCheckLabel");
+  expect(texts()).toContain("competitors.priceCheckHint");
+  const toggle = tree.root.findAll(
+    (n) =>
+      n.props.accessibilityLabel === "competitors.priceCheckLabel" &&
+      typeof n.props.onValueChange === "function"
+  )[0];
+  expect(toggle.props.value).toBe(false);
+  const before = jest.mocked(fetchCompetitorRows).mock.calls.length;
+  await act(async () => toggle.props.onValueChange(true));
+  expect(setPriceCheck).toHaveBeenCalledWith("p1", true);
+  expect(jest.mocked(fetchCompetitorRows).mock.calls.length).toBe(before + 1);
+});
+
+it("no switch before the product has a link", async () => {
+  jest.mocked(fetchCompetitorRows).mockResolvedValue([]);
+  await render();
+  expect(texts()).not.toContain("competitors.priceCheckLabel");
 });

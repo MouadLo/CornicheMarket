@@ -9,10 +9,12 @@ import { Icon } from "@/src/components/ui/Icon";
 import { LoadError } from "@/src/components/ui/LoadError";
 import { Money } from "@/src/components/ui/Money";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
+import { SwitchRow } from "@/src/components/webstore/SwitchRow";
 import { applySuggestions } from "@/src/lib/competitors/applyFlow";
 import { compareProducts, type ProductComparison } from "@/src/lib/competitors/overview";
-import { fetchCompetitorRows } from "@/src/lib/competitors/queries";
-import { errorKey } from "@/src/lib/errors/userMessage";
+import { fetchCompetitorRows, setPriceCheck } from "@/src/lib/competitors/queries";
+import { errorKey, errorKeyOr } from "@/src/lib/errors/userMessage";
+import { showToast } from "@/src/lib/dialog/store";
 import { fetchProduct, type Product } from "@/src/lib/products/queries";
 import { Text } from "@/src/theme/Text";
 import { colors } from "@/src/theme/tokens";
@@ -72,6 +74,18 @@ export default function CompetitorProduct() {
     }
   };
 
+  const togglePriceCheck = async (value: boolean) => {
+    setBusy(true);
+    try {
+      await setPriceCheck(product.id, value);
+      await load();
+    } catch (failure) {
+      showToast({ text: t(errorKeyOr(failure, "competitors.priceCheckError")), tone: "info" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       {comparison ? (
@@ -100,6 +114,18 @@ export default function CompetitorProduct() {
           </View>
         </View>
       )}
+
+      {comparison ? (
+        <View style={styles.card}>
+          <SwitchRow
+            label={t("competitors.priceCheckLabel")}
+            value={comparison.priceCheck}
+            disabled={busy}
+            onValueChange={(value) => void togglePriceCheck(value)}
+          />
+          <Text style={styles.label}>{t("competitors.priceCheckHint")}</Text>
+        </View>
+      ) : null}
 
       <CompetitorSection productId={product.id} onChanged={load} />
 

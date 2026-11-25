@@ -259,3 +259,16 @@ it("Suivre un produit opens a picker, and picking a product opens its competitor
   await act(async () => picker.props.onPick({ id: "p9" }));
   expect(mockPush).toHaveBeenCalledWith("/(app)/competitors/p9");
 });
+
+it("tags price-check products with a badge, and the Repères filter lists only those", async () => {
+  jest
+    .mocked(fetchCompetitorRows)
+    .mockResolvedValue([{ ...rows[0], price_check: true }, { ...rows[4] }]);
+  await render();
+  await press("competitors.filterAll");
+  expect(texts()).toContain("competitors.priceCheckBadge");
+  expect(texts()).toContain("Pain");
+  await press("competitors.filterPriceCheck");
+  expect(texts()).toContain("Chips");
+  expect(texts()).not.toContain("Pain");
+});
