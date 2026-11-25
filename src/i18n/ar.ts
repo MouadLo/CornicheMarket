@@ -1835,11 +1835,11 @@ const ar: Translations = {
     marginLossTitle: "البيع بخسارة",
     marginConfirmLabel: "تغيير رغم ذلك",
     priceChangedToast:
-      "تم تغيير سعر التطبيق: من {{old}} إلى {{new}}. «تراجع» يعيد السعر فقط، ويبقى المنتج مربوطًا.",
+      "تم تغيير سعر التطبيق من {{old}} إلى {{new}}، ويعرض الموقع أيضًا {{new}}. «تراجع» يعيد {{old}} في التطبيق وعلى الموقع، ويبقى المنتج مربوطًا.",
     priceChangedLinkFailedUndo:
       "تم تغيير سعر التطبيق لكن الربط فشل. حاول الربط مرة أخرى، أو تراجع عن السعر.",
     priceUndoLabel: "تراجع",
-    priceUndone: "أُعيد سعر التطبيق إلى {{price}}. يبقى المنتج مربوطًا.",
+    priceUndone: "أُعيد السعر إلى {{price}} في التطبيق وعلى الموقع. يبقى المنتج مربوطًا.",
     priceUndoSkipped: "تم تغيير السعر بعد ذلك: لم يُعد أي شيء.",
     priceUndoError: "تعذّر التراجع عن تغيير السعر.",
     priceTitle: "السعر",
@@ -1882,7 +1882,6 @@ const ar: Translations = {
     photoAppHint: "تُنسخ صورة التطبيق للموقع ولا يتم تعديلها.",
     photoThumbLink: "الرابط",
     photoThumbFile: "مرفوعة",
-    photoThumbApp: "التطبيق",
     photoActive: "معروضة",
     photoRemove: "حذف الصورة المرفوعة",
     photoRemoveTitle: "حذف الصورة المرفوعة؟",

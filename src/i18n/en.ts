@@ -1855,11 +1855,11 @@ const en: Translations = {
     marginLossTitle: "Selling at a loss",
     marginConfirmLabel: "Change anyway",
     priceChangedToast:
-      "App price changed: from {{old}} to {{new}}. Undo only puts the price back; the product stays linked.",
+      "App price changed from {{old}} to {{new}}; the site shows {{new}} too. Undo puts {{old}} back in the app and on the site; the product stays linked.",
     priceChangedLinkFailedUndo:
       "The app price was changed, but linking failed. Try linking again, or undo the price.",
     priceUndoLabel: "Undo",
-    priceUndone: "App price put back to {{price}}. The product stays linked.",
+    priceUndone: "Price put back to {{price}} in the app and on the site. The product stays linked.",
     priceUndoSkipped: "The price was changed since: nothing was put back.",
     priceUndoError: "Could not undo the price change.",
     priceTitle: "Price",
@@ -1902,7 +1902,6 @@ const en: Translations = {
     photoAppHint: "The app photo is copied for the site. It is not changed.",
     photoThumbLink: "Link",
     photoThumbFile: "Uploaded",
-    photoThumbApp: "App",
     photoActive: "Shown",
     photoRemove: "Delete the uploaded photo",
     photoRemoveTitle: "Delete the uploaded photo?",

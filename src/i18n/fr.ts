@@ -1881,11 +1881,11 @@ const fr = {
     marginLossTitle: "Vente à perte",
     marginConfirmLabel: "Changer quand même",
     priceChangedToast:
-      "Prix de l'app changé : de {{old}} à {{new}}. « Annuler » remet seulement le prix, le produit reste lié.",
+      "Prix de l'app changé : de {{old}} à {{new}} ; le site affiche aussi {{new}}. « Annuler » remet {{old}} dans l'app et sur le site ; le produit reste lié.",
     priceChangedLinkFailedUndo:
       "Le prix de l'app a été changé, mais le lien a échoué. Réessayez de lier, ou annulez le prix.",
     priceUndoLabel: "Annuler",
-    priceUndone: "Prix de l'app remis à {{price}}. Le produit reste lié.",
+    priceUndone: "Prix remis à {{price}} dans l'app et sur le site. Le produit reste lié.",
     priceUndoSkipped: "Le prix a été modifié depuis : rien n'a été remis.",
     priceUndoError: "Impossible d'annuler le changement de prix.",
     priceTitle: "Prix",
@@ -1929,7 +1929,6 @@ const fr = {
     photoAppHint: "La photo de l'app est copiée pour le site. Elle n'est pas modifiée.",
     photoThumbLink: "Lien",
     photoThumbFile: "Importée",
-    photoThumbApp: "App",
     photoActive: "Affichée",
     photoRemove: "Supprimer la photo importée",
     photoRemoveTitle: "Supprimer la photo importée ?",
