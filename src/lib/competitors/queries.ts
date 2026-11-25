@@ -195,3 +195,13 @@ export async function fetchProductMarginFloor(
   const raw = (floor.data as { min_margin_percent?: unknown } | null)?.min_margin_percent;
   return { override: raw === undefined || raw === null ? null : Number(raw), storePercent };
 }
+
+// Tags (or untags) a "produit repère": a product customers know the price of.
+// Owner only: the column grant and the products policy refuse anyone else.
+export async function setPriceCheck(productId: string, priceCheck: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("products")
+    .update({ price_check: priceCheck })
+    .eq("id", productId);
+  if (error) throw new Error(error.message);
+}

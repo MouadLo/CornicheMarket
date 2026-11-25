@@ -30,6 +30,9 @@ export type OverviewRow = {
   title: string | null;
   image_url: string | null;
   observed_at: string | null;
+  price_check: boolean;
+  // Units sold in the last 30 days (numeric: decimal for kg products).
+  sold_30d: number | string;
 };
 
 export type ProductComparison = {
@@ -43,6 +46,10 @@ export type ProductComparison = {
   decision: Decision;
   // True when a link is out of stock (for the "Concurrent en rupture" filter).
   anyOutOfStock: boolean;
+  // "Produit repère": customers know this price, so we stay level with the competitor.
+  priceCheck: boolean;
+  // Units sold in the last 30 days (can be decimal for a product sold by weight).
+  sold30d: number;
 };
 
 export function offerFromRow(row: OverviewRow): CompetitorOffer {
@@ -75,6 +82,8 @@ export function compareProducts(rows: OverviewRow[], now: number): ProductCompar
         offers: [],
         decision: null as unknown as Decision,
         anyOutOfStock: false,
+        priceCheck: row.price_check === true,
+        sold30d: Number(row.sold_30d ?? 0) || 0,
       };
       byProduct.set(row.product_id, entry);
     }

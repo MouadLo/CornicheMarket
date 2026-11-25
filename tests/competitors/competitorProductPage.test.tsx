@@ -71,6 +71,8 @@ const row: OverviewRow = {
   title: "Chips",
   image_url: null,
   observed_at: hoursAgo(1),
+  price_check: false,
+  sold_30d: 0,
 };
 
 let tree: ReactTestRenderer;

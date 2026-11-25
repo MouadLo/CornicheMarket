@@ -73,6 +73,8 @@ const row = (over: Partial<OverviewRow> = {}): OverviewRow => ({
   title: "Lorenz Crunchips Paprika",
   image_url: "https://yournightshop.ma/img.jpg",
   observed_at: hoursAgo(2),
+  price_check: false,
+  sold_30d: 0,
   ...over,
 });
 

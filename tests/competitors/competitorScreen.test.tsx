@@ -75,6 +75,8 @@ const base: OverviewRow = {
   title: "Chips",
   image_url: null,
   observed_at: hoursAgo(1),
+  price_check: false,
+  sold_30d: 0,
 };
 const rows: OverviewRow[] = [
   // lower: competitor 10.00, cost 8.00 -> 20 % margin

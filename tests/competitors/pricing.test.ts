@@ -282,6 +282,8 @@ describe("compareProducts", () => {
     title: "Chips",
     image_url: null,
     observed_at: hoursAgo(1),
+    price_check: false,
+    sold_30d: 0,
     ...over,
   });
   it("groups links by product and decides per product with the effective floor", () => {
