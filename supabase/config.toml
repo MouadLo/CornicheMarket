@@ -402,3 +402,8 @@ verify_jwt = false
 
 [functions.competitor-image]
 verify_jwt = false
+
+# webstore-feed is public on purpose: the owner's webstore page reads it without a
+# login. It only returns the published catalogue built by webstore_feed().
+[functions.webstore-feed]
+verify_jwt = false
