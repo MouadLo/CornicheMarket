@@ -134,7 +134,7 @@ export default function WebstoreCategoryEdit() {
 
   const set = <K extends keyof Values>(key: K, value: Values[K]) => {
     setValues((v) => (v ? { ...v, [key]: value } : v));
-    setErrors((e) => ({ ...e, [key === "nameFr" ? "nameFr" : key]: undefined }));
+    setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
   const inUseText = (key: "category" | "sub", count: number) =>
