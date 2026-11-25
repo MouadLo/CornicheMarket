@@ -78,8 +78,24 @@ describe("validateNames / icon", () => {
     });
   });
 
-  it("knows the seven icons; an unknown stored icon shows as bag", () => {
-    for (const i of ["drinks", "snacks", "phone", "home", "bag", "cup", "gift"]) {
+  it("knows the fifteen icons; an unknown stored icon shows as bag", () => {
+    for (const i of [
+      "drinks",
+      "snacks",
+      "phone",
+      "home",
+      "bag",
+      "cup",
+      "gift",
+      "bread",
+      "fresh",
+      "dairy",
+      "frozen",
+      "clean",
+      "care",
+      "baby",
+      "pet",
+    ]) {
       expect(validateIconChoice(i)).toBeNull();
     }
     expect(validateIconChoice("rocket")).not.toBeNull();
