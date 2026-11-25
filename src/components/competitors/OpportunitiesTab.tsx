@@ -149,7 +149,13 @@ export function OpportunitiesTab() {
         )}
       </Section>
 
-      <Section title={t("competitors.opp.moneyTitle", { gain: dh(money.totalMonthlyGainCents) })}>
+      <Section
+        title={
+          money.totalMonthlyGainCents > 0
+            ? t("competitors.opp.moneyTitle", { gain: dh(money.totalMonthlyGainCents) })
+            : t("competitors.opp.moneyTitlePlain")
+        }
+      >
         {money.items.length === 0 ? (
           <Text style={styles.hint}>{t("competitors.opp.moneyEmpty")}</Text>
         ) : (

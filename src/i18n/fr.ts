@@ -1382,6 +1382,7 @@ const fr = {
       belowCost: "Leur prix est sous votre coût. Parlez-en à votre fournisseur.",
       atFloor: "Déjà au prix le plus bas qui garde votre marge minimale.",
       moneyTitle: "Argent sur la table · +{{gain}} / mois",
+      moneyTitlePlain: "Argent sur la table",
       moneyEmpty: "Aucun produit moins cher que le concurrent à relever.",
       moneyRow: "{{ours}} → {{target}} ({{shop}} {{theirs}})",
       sold30d: "Vendus en 30 jours : {{qty}}",
