@@ -226,3 +226,21 @@ it("a load error shows the retry screen, not an empty list", async () => {
   });
   expect(hasText(tree.root, "webstore.loadError")).toBe(true);
 });
+
+describe("row photo", () => {
+  const imageUri = () => [
+    ...new Set(
+      tree.root.findAll((n) => n.props.source?.uri).map((n) => n.props.source.uri as string)
+    ),
+  ];
+
+  it("shows the link image, or the uploaded file when that is the chosen source", async () => {
+    await render([webProduct({ image_url: "https://i/a.jpg", image_path: "p001/1.jpg" })]);
+    expect(imageUri()).toEqual(["https://i/a.jpg"]);
+    act(() => tree.unmount());
+    await render([
+      webProduct({ image_url: "https://i/a.jpg", image_path: "p001/1.jpg", image_source: "file" }),
+    ]);
+    expect(imageUri()[0]).toMatch(/\/storage\/v1\/object\/public\/webstore-images\/p001\/1\.jpg$/);
+  });
+});

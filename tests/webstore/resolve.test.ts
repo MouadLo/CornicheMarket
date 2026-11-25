@@ -32,6 +32,8 @@ const web = (over: Partial<WebProduct> = {}): WebProduct => ({
   popular: false,
   keywords: null,
   image_url: null,
+  image_path: null,
+  image_source: "url",
   price_cents: 550,
   stock_mode: "manual",
   manual_in_stock: true,

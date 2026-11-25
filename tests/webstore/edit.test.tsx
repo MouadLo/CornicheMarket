@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 import EditScreen from "../../app/(app)/webstore/[id]";
 import { confirm, showToast } from "../../src/lib/dialog/store";
+import { removeWebImageFile, setImageSource } from "../../src/lib/webstore/imageQueries";
 import { updateSellingPrice } from "../../src/lib/products/queries";
 import {
   deleteWebProduct,
@@ -54,6 +55,14 @@ jest.mock("../../src/components/stock/ProductSearchPicker", () => {
   const React = require("react");
   return { ProductSearchPicker: (p: object) => React.createElement("Picker", p) };
 });
+jest.mock("../../src/lib/products/photoPicker", () => ({ pickProductPhoto: jest.fn() }));
+jest.mock("../../src/lib/products/photoUrls", () => ({ usePhotoUrl: () => null }));
+jest.mock("../../src/lib/webstore/imageQueries", () => ({
+  uploadWebImage: jest.fn(),
+  copyAppPhotoToWeb: jest.fn(),
+  setImageSource: jest.fn(),
+  removeWebImageFile: jest.fn(),
+}));
 jest.mock("../../src/lib/webstore/queries", () => ({
   fetchWebProducts: jest.fn(),
   fetchWebCategories: jest.fn(),
@@ -365,4 +374,47 @@ describe("deleting", () => {
 it("an unknown id shows not found", async () => {
   await render([webProduct({ id: "p777" })]);
   expect(hasText(tree.root, "webstore.notFound")).toBe(true);
+});
+
+describe("photo", () => {
+  it("shows the photo block with the app photo of a linked product", async () => {
+    await render([linkedProduct({}, { photo_path: "a1/x.jpg" })]);
+    expect(hasText(tree.root, "webstore.photoTitle")).toBe(true);
+    expect(tree.root.findAllByProps({ testID: "web-app-photo-card" }).length).toBeGreaterThan(0);
+  });
+
+  it("offers no app photo to an unlinked product", async () => {
+    await render([webProduct()]);
+    expect(tree.root.findAllByProps({ testID: "web-app-photo-card" })).toHaveLength(0);
+  });
+
+  it("choosing the uploaded photo saves at once, without the form's Save and without deleting", async () => {
+    jest.mocked(setImageSource).mockResolvedValue();
+    await render([webProduct({ image_url: "https://i/a.jpg", image_path: "p001/1.jpg" })]);
+    const file = tree.root.findAll(
+      (n) => n.props.accessibilityRole === "radio" && hasText(n, "webstore.photoSourceFile")
+    )[0];
+    await act(async () => file.props.onPress());
+    expect(setImageSource).toHaveBeenCalledWith("p001", "file");
+    expect(updateWebProduct).not.toHaveBeenCalled();
+    expect(removeWebImageFile).not.toHaveBeenCalled();
+    expect(
+      tree.root.findAll(
+        (n) =>
+          n.props.accessibilityRole === "radio" &&
+          n.props.accessibilityState?.selected &&
+          hasText(n, "webstore.photoSourceFile")
+      ).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("saving the form leaves the chosen source alone (the patch has no photo fields)", async () => {
+    await render([
+      webProduct({ image_url: "https://i/a.jpg", image_path: "p001/1.jpg", image_source: "file" }),
+    ]);
+    await press("webstore.save");
+    const patch = jest.mocked(updateWebProduct).mock.calls[0][1];
+    expect(patch).not.toHaveProperty("image_source");
+    expect(patch).not.toHaveProperty("image_path");
+  });
 });

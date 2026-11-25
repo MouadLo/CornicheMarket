@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { WebImage } from "@/src/components/webstore/WebImage";
 import { StatusPill } from "@/src/components/ui/StatusPill";
 import { formatMAD } from "@/src/lib/money";
+import { effectiveImage, webImageBase } from "@/src/lib/webstore/images";
 import { isExcluded, resolvedInStock, resolvedPriceCents } from "@/src/lib/webstore/resolve";
 import type { WebProduct } from "@/src/lib/webstore/types";
 import { isolateBidi, keepNumberLtr } from "@/src/lib/text/bidi";
@@ -36,7 +37,7 @@ export function WebProductRow({ product, onOpen, onTogglePublished, busy }: Prop
         onPress={onOpen}
         style={({ pressed }) => [styles.main, pressed && styles.pressed]}
       >
-        <WebImage uri={product.image_url} />
+        <WebImage uri={effectiveImage(product, webImageBase())} />
         <View style={styles.text}>
           <Text style={styles.title} numberOfLines={1}>
             {isolateBidi(name)}
