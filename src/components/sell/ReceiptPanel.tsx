@@ -20,6 +20,7 @@ import {
   discountSplit,
   formatReceiptQuantity,
   loyaltyFooterLines,
+  RECEIPT_SHOP_TAGLINE,
   receiptDateText,
   receiptToHtml,
   receiptToText,
@@ -185,6 +186,7 @@ export function ReceiptPanel({
         <Text style={styles.title}>{t("receipt.title")}</Text>
         <ScrollView style={styles.paperScroll} contentContainerStyle={styles.paper}>
           <Text style={styles.shop}>{receipt.shopName}</Text>
+          <Text style={styles.tagline}>{RECEIPT_SHOP_TAGLINE}</Text>
           <Text style={styles.meta}>{receiptDateText(receipt, options)}</Text>
           <Text style={styles.meta}>{`${labels.number} ${receipt.receiptNumber}`}</Text>
           {receipt.afterReturns ? (
@@ -333,6 +335,7 @@ const styles = StyleSheet.create({
   paperScroll: { flexShrink: 1, backgroundColor: colors.sunken, borderRadius: radius.control },
   paper: { padding: spacing.s4, gap: spacing.s2 },
   shop: { fontSize: 18, fontWeight: "700", color: colors.ink900, textAlign: "center" },
+  tagline: { fontSize: 14, color: colors.ink700, textAlign: "center" },
   meta: { fontSize: 15, color: colors.ink700, textAlign: "center" },
   rule: { height: 1, backgroundColor: colors.border, marginVertical: spacing.s1 },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.s3 },

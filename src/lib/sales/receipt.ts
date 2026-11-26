@@ -12,7 +12,9 @@ import { formatLocaleDateTime } from "@/src/lib/text/dates";
 // one so a cost carried by a cart line can never travel into the receipt.
 // Every amount is integer centimes.
 
-export const RECEIPT_SHOP_NAME = "Corniche Market";
+export const RECEIPT_SHOP_NAME = "MOONSTOP";
+// Printed under the name on every receipt.
+export const RECEIPT_SHOP_TAGLINE = "la boutique Corniche Market";
 
 export type ReceiptLine = {
   name: string;
@@ -403,7 +405,8 @@ export function receiptToHtml(
   .receipt { width: 72mm; max-width: 100%; margin: 0 auto; }${
     roll ? "\n  .receipt { width: 70mm; padding: 2mm 0 0; }" : ""
   }
-  h1 { font-size: 22px; line-height: 1.2; text-align: center; margin: 0 0 6px; }
+  h1 { font-size: 22px; line-height: 1.2; text-align: center; margin: 0 0 2px; }
+  .tagline { text-align: center; font-size: 12px; margin: 0 0 6px; }
   .meta { text-align: center; margin-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; }
   td { padding: 3px 0; vertical-align: top; text-align: ${start}; }
@@ -423,6 +426,7 @@ export function receiptToHtml(
 <body>
 <div class="receipt">
 <h1>${escapeHtml(model.shopName)}</h1>
+<div class="tagline">${escapeHtml(RECEIPT_SHOP_TAGLINE)}</div>
 ${tag}
 <div class="meta">${meta.join("")}</div>
 <table class="items"><tbody>${lineRows}</tbody></table>${allReturned ? `<div class="meta">${escapeHtml(labels.allReturned)}</div>` : ""}
@@ -441,6 +445,7 @@ export function receiptToText(
 ): string {
   const out: string[] = [
     model.shopName,
+    RECEIPT_SHOP_TAGLINE,
     receiptDateText(model, options),
     `${labels.number} ${model.receiptNumber}`,
   ];
