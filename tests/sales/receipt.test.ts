@@ -236,7 +236,8 @@ describe("receipt html", () => {
 
   it("shows the date without seconds, the lines, the totals and the thank-you", () => {
     const html = receiptToHtml(receiptFromPendingSale(pending()), labels, opts);
-    expect(html).toContain("Corniche Market");
+    expect(html).toContain("<h1>MOONSTOP</h1>");
+    expect(html).toContain('<div class="tagline">la boutique Corniche Market</div>');
     expect(html).toContain("17/11/2026, 10:00");
     expect(html).toContain("ABCDEF12");
     expect(html).toContain("3 pieces");
@@ -339,7 +340,7 @@ describe("receipt text and quantities", () => {
 
   it("produces a plain-text version with the same amounts", () => {
     const text = receiptToText(receiptFromPendingSale(pending()), labels, opts);
-    expect(text).toContain("Corniche Market");
+    expect(text.split("\n").slice(0, 2)).toEqual(["MOONSTOP", "la boutique Corniche Market"]);
     expect(text).toContain("Total: 21.50 DH");
     expect(text).toContain("Subtotal: 22.50 DH");
     expect(text).toContain("Thank you!");
