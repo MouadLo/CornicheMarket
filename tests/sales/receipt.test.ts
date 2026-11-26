@@ -10,8 +10,11 @@ import {
   receiptNumberOf,
   receiptToHtml,
   receiptToText,
+  RECEIPT_STORE_URL,
+  storeQrSvg,
   type ReceiptLabels,
 } from "../../src/lib/sales/receipt";
+import { qrMatrix, qrPath } from "../../src/lib/qr";
 
 const labels: ReceiptLabels = {
   receipt: "Receipt",
@@ -26,6 +29,7 @@ const labels: ReceiptLabels = {
   cashReceived: "Cash received",
   change: "Change",
   thanks: "Thank you!",
+  storeQr: "Order online",
   updatedAfterReturn: "Updated after return",
   returnedOn: (date) => `Returned on ${date}`,
   originalTotal: "Original total",
@@ -344,6 +348,31 @@ describe("receipt text and quantities", () => {
     expect(text).toContain("Total: 21.50 DH");
     expect(text).toContain("Subtotal: 22.50 DH");
     expect(text).toContain("Thank you!");
+    expect(text.trimEnd().split("\n").pop()).toBe(`Order online: ${RECEIPT_STORE_URL}`);
+  });
+});
+
+describe("web store QR on the receipt", () => {
+  it("points at the web store", () => {
+    expect(RECEIPT_STORE_URL).toBe("https://moonstop-storefront.vercel.app");
+  });
+
+  it("the SVG draws the store URL's QR modules, black on white", () => {
+    const svg = storeQrSvg();
+    expect(svg).toContain(`d="${qrPath(qrMatrix(RECEIPT_STORE_URL), 4)}"`);
+    const n = qrMatrix(RECEIPT_STORE_URL).length + 8;
+    expect(svg).toContain(`viewBox="0 0 ${n} ${n}"`);
+    expect(svg).toContain('fill="#fff"');
+    expect(svg).toContain('fill="#000"');
+  });
+
+  it("every printed receipt ends with the label, the code and the short address", () => {
+    const html = receiptToHtml(receiptFromPendingSale(pending()), labels, opts);
+    const store = html.slice(html.indexOf('<div class="store">'));
+    expect(store).toContain("Order online");
+    expect(store).toContain(storeQrSvg());
+    expect(store).toContain('<div class="url" dir="ltr">moonstop-storefront.vercel.app</div>');
+    expect(html.indexOf("Thank you!")).toBeLessThan(html.indexOf('<div class="store">'));
   });
 });
 

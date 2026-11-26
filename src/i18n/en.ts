@@ -2193,6 +2193,7 @@ const en: Translations = {
     refundCredit: "deducted from credit",
     allReturned: "All items were returned",
     thanks: "Thank you for your visit!",
+    storeQr: "Order online",
     unknownProduct: "Unknown product",
     print: "Print",
     share: "Share",

@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { BigButton } from "@/src/components/BigButton";
+import { CardQr } from "@/src/components/loyalty/CardQr";
 import { Banner } from "@/src/components/ui/Banner";
 import { useAuth } from "@/src/lib/auth/AuthProvider";
 import { cashierLabelFor, normalizeLanguage } from "@/src/lib/print/jobs";
@@ -21,6 +22,8 @@ import {
   formatReceiptQuantity,
   loyaltyFooterLines,
   RECEIPT_SHOP_TAGLINE,
+  RECEIPT_STORE_URL,
+  RECEIPT_STORE_URL_SHORT,
   receiptDateText,
   receiptToHtml,
   receiptToText,
@@ -61,6 +64,7 @@ export function receiptLabels(t: Translate, model: ReceiptModel): ReceiptLabels 
     cashReceived: t("receipt.cashReceived"),
     change: t("receipt.change"),
     thanks: t("receipt.thanks"),
+    storeQr: t("receipt.storeQr"),
     updatedAfterReturn: t("receipt.updatedAfterReturn"),
     returnedOn: (date) => t("receipt.returnedOn", { date }),
     originalTotal: t("receipt.originalTotal"),
@@ -267,6 +271,11 @@ export function ReceiptPanel({
             </Text>
           ))}
           <Text style={styles.thanks}>{labels.thanks}</Text>
+          <View style={styles.store}>
+            <Text style={styles.meta}>{labels.storeQr}</Text>
+            <CardQr value={RECEIPT_STORE_URL} size={120} label={labels.storeQr} />
+            <Text style={styles.storeUrl}>{isolateLtr(RECEIPT_STORE_URL_SHORT)}</Text>
+          </View>
         </ScrollView>
         {error ? <Banner tone="bad" text={error} /> : null}
         <View style={styles.stationLine}>
@@ -345,6 +354,8 @@ const styles = StyleSheet.create({
   lineMain: { flex: 1, gap: 2 },
   lineName: { fontSize: 15, fontWeight: "600", color: colors.ink900 },
   sub: { fontSize: 15, color: colors.ink600 },
+  store: { alignItems: "center", gap: spacing.s1, marginTop: spacing.s2 },
+  storeUrl: { fontSize: 13, color: colors.ink700, textAlign: "center" },
   thanks: { fontSize: 15, color: colors.ink700, textAlign: "center", marginTop: spacing.s2 },
   actions: { gap: spacing.s2 },
   stationLine: { flexDirection: "row", alignItems: "center", gap: spacing.s2 },

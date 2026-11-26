@@ -2223,6 +2223,7 @@ const fr = {
     refundCredit: "déduit du crédit",
     allReturned: "Tous les articles ont été retournés",
     thanks: "Merci de votre visite !",
+    storeQr: "Commandez en ligne",
     unknownProduct: "Produit inconnu",
     print: "Imprimer",
     share: "Partager",
