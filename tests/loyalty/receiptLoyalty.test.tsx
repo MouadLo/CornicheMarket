@@ -52,6 +52,7 @@ const labels: ReceiptLabels = {
   cashReceived: "Cash received",
   change: "Change",
   thanks: "Thank you!",
+  storeQr: "Order online",
   updatedAfterReturn: "Updated after return",
   returnedOn: (date) => `Returned on ${date}`,
   originalTotal: "Original total",

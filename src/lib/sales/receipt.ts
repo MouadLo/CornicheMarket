@@ -6,6 +6,7 @@ import type { RefundMethod, SaleReturnRecord } from "@/src/lib/sales/returns";
 import { lineTotal } from "@/src/lib/sales/totals";
 import { isolateBidi, isolateLtr } from "@/src/lib/text/bidi";
 import { formatLocaleDateTime } from "@/src/lib/text/dates";
+import { qrMatrix, qrPath } from "@/src/lib/qr";
 
 // A customer receipt. Built only from what the customer may see: there is no
 // cost, margin or profit field here, and the builders below copy fields one by
@@ -15,6 +16,18 @@ import { formatLocaleDateTime } from "@/src/lib/text/dates";
 export const RECEIPT_SHOP_NAME = "MOONSTOP";
 // Printed under the name on every receipt.
 export const RECEIPT_SHOP_TAGLINE = "la boutique Corniche Market";
+// The web store. Every receipt carries a QR code to it.
+export const RECEIPT_STORE_URL = "https://moonstop-storefront.vercel.app";
+// The same address without "https://", printed under the code.
+export const RECEIPT_STORE_URL_SHORT = RECEIPT_STORE_URL.replace(/^https?:\/\//, "");
+
+// The store QR as an inline SVG (black on white, 4-module quiet zone).
+export function storeQrSvg(url: string = RECEIPT_STORE_URL): string {
+  const quiet = 4;
+  const matrix = qrMatrix(url);
+  const n = matrix.length + quiet * 2;
+  return `<svg class="qr" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><rect width="${n}" height="${n}" fill="#fff"/><path d="${qrPath(matrix, quiet)}" fill="#000"/></svg>`;
+}
 
 export type ReceiptLine = {
   name: string;
@@ -185,6 +198,7 @@ export type ReceiptLabels = {
   cashReceived: string;
   change: string;
   thanks: string;
+  storeQr: string; // "Order online", above the web store QR
   updatedAfterReturn: string;
   returnedOn: (date: string) => string;
   originalTotal: string;
@@ -416,7 +430,10 @@ export function receiptToHtml(
   .sub { font-size: 11px; }
   tr.total td { font-size: 15px; font-weight: 700; border-top: 1px solid #000; padding-top: 5px; }
   .loyalty { margin-top: 4px; }
-  .thanks { text-align: center; margin-top: 10px; }${
+  .thanks { text-align: center; margin-top: 10px; }
+  .store { text-align: center; margin-top: 8px; }
+  .store .qr { display: block; width: 30mm; height: 30mm; margin: 2px auto; }
+  .store .url { font-size: 11px; }${
     tag
       ? "\n  h1 { font-size: 24px; border: 3px solid #000; padding: 6px 4px; margin: 0 0 6px; overflow-wrap: anywhere; }\n  .cashier-tag { font-size: 16px; font-weight: 700; text-align: center; margin: 0 0 6px; overflow-wrap: anywhere; }"
       : ""
@@ -432,6 +449,7 @@ ${tag}
 <table class="items"><tbody>${lineRows}</tbody></table>${allReturned ? `<div class="meta">${escapeHtml(labels.allReturned)}</div>` : ""}
 <table><tbody>${totals.join("")}</tbody></table>${loyaltyNotes}
 <div class="thanks">${escapeHtml(labels.thanks)}</div>
+<div class="store"><div>${escapeHtml(labels.storeQr)}</div>${storeQrSvg()}<div class="url" dir="ltr">${escapeHtml(RECEIPT_STORE_URL_SHORT)}</div></div>
 </div>
 </body>
 </html>`;
@@ -486,6 +504,6 @@ export function receiptToText(
     out.push(`${labels.change}: ${formatMAD(model.changeCents)}`);
   }
   out.push(...loyaltyFooterLines(model, labels));
-  out.push("", labels.thanks);
+  out.push("", labels.thanks, `${labels.storeQr}: ${RECEIPT_STORE_URL}`);
   return out.join("\n");
 }

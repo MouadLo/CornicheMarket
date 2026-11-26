@@ -2172,6 +2172,7 @@ const ar: Translations = {
     refundCredit: "خُصم من الدين",
     allReturned: "تم إرجاع جميع المواد",
     thanks: "شكراً لزيارتكم!",
+    storeQr: "اطلب عبر الإنترنت",
     unknownProduct: "منتج غير معروف",
     print: "طباعة",
     share: "مشاركة",
